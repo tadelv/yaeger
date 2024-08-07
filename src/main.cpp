@@ -16,6 +16,9 @@ const char *host = "esp32 Roaster";
 AsyncWebSocket ws("/ws");
 AsyncWebServer server(80);
 
+float BeanTemp = 22.2;
+float exhaustTemp = 22.2;
+
 void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                AwsEventType type, void *arg, uint8_t *data, size_t len) {
 
@@ -63,8 +66,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     // Get BurnerVal from Artisan over Websocket
     if (!doc["BurnerVal"].isNull()) {
       Serial.print("BurnerVal: ");
-      Serial.println(doc["BurnerVal"].as<long>());
+      long val = doc["BurnerVal"].as<long>();
+				Serial.println(val);
       // DimmerVal = doc["BurnerVal"].as<long>();
+			BeanTemp += 0.5 * val;
+			exhaustTemp += 0.8 * val;
     }
 
     // Send Values to Artisan over Websocket
@@ -78,8 +84,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       data["DimmerVal"] = 0.2f; // float(DimmerVal);
     } else if (command == "getData") {
       root["id"] = ln_id;
-      data["BT"] = 22.2; // Med_BeanTemp.getMedian();
-      data["ET"] = 22.2;
+      data["BT"] = BeanTemp; // Med_BeanTemp.getMedian();
+      data["ET"] = exhaustTemp;
       data["DimmerVal"] = 0.2; // float(DimmerVal);
     }
 
