@@ -4,10 +4,14 @@
 #include <WiFi.h>
 
 // lib for Over the Air (ota) programming
+#include <Adafruit_NeoPixel.h>
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA
 
-#include <MainLoop.h>
+#include "CommandLoop.h"
+#include "sensors.h"
+#define PIN 48
+Adafruit_NeoPixel pixels(1, PIN);
 // for ota
 const char *host = "esp32 Roaster";
 // Create AsyncWebServer object on port 80
@@ -48,12 +52,18 @@ void setup(void) {
   WiFi.begin(ssid, password);
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
   Serial.println("");
+	startSensors();
+  pixels.begin();
+  pixels.clear();
+  pixels.setPixelColor(0, pixels.Color(5, 0, 0));
+  pixels.show();
 
   // Wait for connection
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
+
   Serial.println("");
   Serial.print("Connected to ");
   Serial.println(ssid);
@@ -71,14 +81,19 @@ void setup(void) {
   ElegantOTA.onEnd(onOTAEnd);
 
   // WebSocket handler
-	setupMainLoop(&ws);
+  setupMainLoop(&ws);
   server.addHandler(&ws);
 
   server.begin();
   Serial.println("HTTP server started");
+  pixels.clear();
+  pixels.setPixelColor(0, pixels.Color(0, 5, 0));
+  pixels.show();
 }
 
 void loop(void) {
   ElegantOTA.loop();
   ws.cleanupClients();
+	delay(1000);
+	takeReadings();
 }

@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
+#include "sensors.h"
 
 float BeanTemp = 22.2;
 float exhaustTemp = 22.2;
@@ -59,21 +60,23 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       exhaustTemp += 0.8 * val;
     }
 
+		float *etbt = getETBTReadings();
     // Send Values to Artisan over Websocket
     JsonObject root = doc.to<JsonObject>();
     JsonObject data = root.createNestedObject("data");
     if (command == "getBT") {
       root["id"] = ln_id;
-      data["BT"] = 22.2f; // Med_BeanTemp.getMedian();
+      data["BT"] = etbt[1]; // Med_BeanTemp.getMedian();
     } else if (command == "getDimmerVal") {
       root["id"] = ln_id;
       data["DimmerVal"] = 0.2f; // float(DimmerVal);
     } else if (command == "getData") {
       root["id"] = ln_id;
-      data["BT"] = BeanTemp; // Med_BeanTemp.getMedian();
-      data["ET"] = exhaustTemp;
+      data["BT"] = etbt[1]; // Med_BeanTemp.getMedian();
+      data["ET"] = etbt[0]; // Med_ExhaustTemp.getMedian()
       data["DimmerVal"] = 0.2; // float(DimmerVal);
     }
+			free(etbt);
 
     //====================================
     // DEBUG
