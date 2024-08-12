@@ -10,6 +10,9 @@
 
 #include "CommandLoop.h"
 #include "sensors.h"
+#include "fan.h"
+#include "heater.h"
+
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
 // for ota
@@ -89,11 +92,15 @@ void setup(void) {
   pixels.clear();
   pixels.setPixelColor(0, pixels.Color(0, 5, 0));
   pixels.show();
+
+	initFan();
+	initHeater();
 }
 
 void loop(void) {
   ElegantOTA.loop();
   ws.cleanupClients();
-	delay(1000);
+	delay(50);
 	takeReadings();
+	updateHeater();
 }

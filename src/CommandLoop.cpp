@@ -1,7 +1,9 @@
+#include "fan.h"
+#include "heater.h"
+#include "sensors.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
-#include "sensors.h"
 
 float BeanTemp = 22.2;
 float exhaustTemp = 22.2;
@@ -56,11 +58,16 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       long val = doc["BurnerVal"].as<long>();
       Serial.println(val);
       // DimmerVal = doc["BurnerVal"].as<long>();
-      BeanTemp += 0.5 * val;
-      exhaustTemp += 0.8 * val;
+      setHeaterPower(val);
+    }
+    if (!doc["FanVal"].isNull()) {
+      Serial.print("FanVal: ");
+      long val = doc["FanVal"].as<long>();
+      Serial.println(val);
+      setFanSpeed(val);
     }
 
-		float *etbt = getETBTReadings();
+    float *etbt = getETBTReadings();
     // Send Values to Artisan over Websocket
     JsonObject root = doc.to<JsonObject>();
     JsonObject data = root.createNestedObject("data");
@@ -72,11 +79,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       data["DimmerVal"] = 0.2f; // float(DimmerVal);
     } else if (command == "getData") {
       root["id"] = ln_id;
-      data["BT"] = etbt[1]; // Med_BeanTemp.getMedian();
-      data["ET"] = etbt[0]; // Med_ExhaustTemp.getMedian()
+      data["BT"] = etbt[1];    // Med_BeanTemp.getMedian();
+      data["ET"] = etbt[0];    // Med_ExhaustTemp.getMedian()
       data["DimmerVal"] = 0.2; // float(DimmerVal);
     }
-			free(etbt);
+    free(etbt);
 
     //====================================
     // DEBUG
