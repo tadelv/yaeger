@@ -20,6 +20,6 @@ void setFanSpeed(int speed) {
 		speed = 100;
 	}
 	/*analogWrite(FAN_PIN, speed * 255 / 100);*/
-	digitalWrite(FAN_PIN, speed > 0 ? HIGH : LOW);
+	digitalWrite(FAN_PIN, speed * 255 / 100);
 	Serial.printf("Fan speed set to %d%%\n", speed);
 }
