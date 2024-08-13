@@ -58,3 +58,7 @@ unsigned long currentMillis = millis();
     isSSROn = false; // Ensure it's off if past onTime
   }
 }
+
+int getHeaterPower() {
+	return heaterPower;
+}

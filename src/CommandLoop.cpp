@@ -19,6 +19,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     break;
   case WS_EVT_DISCONNECT: {
     Serial.printf("[%u] Disconnected!\n", client->id());
+    // turn off heater and set fan to 100%
+    setHeaterPower(0);
+    setFanSpeed(100);
   } break;
   case WS_EVT_DATA: {
 
@@ -79,9 +82,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       data["DimmerVal"] = 0.2f; // float(DimmerVal);
     } else if (command == "getData") {
       root["id"] = ln_id;
-      data["BT"] = etbt[1];    // Med_BeanTemp.getMedian();
-      data["ET"] = etbt[0];    // Med_ExhaustTemp.getMedian()
-      data["DimmerVal"] = 0.2; // float(DimmerVal);
+      data["BT"] = etbt[1];                 // Med_BeanTemp.getMedian();
+      data["ET"] = etbt[0];                 // Med_ExhaustTemp.getMedian()
+      data["BurnerVal"] = getHeaterPower(); // float(DimmerVal);
+      data["FanVal"] = getFanSpeed();
     }
     free(etbt);
 

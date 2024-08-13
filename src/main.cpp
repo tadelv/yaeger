@@ -100,7 +100,7 @@ void setup(void) {
 void loop(void) {
   ElegantOTA.loop();
   ws.cleanupClients();
-	delay(50);
+	delay(10);
 	takeReadings();
 	updateHeater();
 }
