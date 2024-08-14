@@ -9,9 +9,9 @@
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA
 
 #include "CommandLoop.h"
-#include "sensors.h"
 #include "fan.h"
 #include "heater.h"
+#include "sensors.h"
 
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
@@ -51,27 +51,31 @@ void onOTAEnd(bool success) {
 
 void setup(void) {
   Serial.begin(115200);
-  WiFi.mode(WIFI_STA);
-  WiFi.begin(ssid, password);
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   Serial.println("");
-	startSensors();
+  startSensors();
   pixels.begin();
   pixels.clear();
   pixels.setPixelColor(0, pixels.Color(5, 0, 0));
   pixels.show();
 
   // Wait for connection
+#ifdef EASY_AP
+  WiFi.softAP("Yaeger");
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
+#else
+  WiFi.mode(WIFI_STA);
+  WiFi.begin(ssid, password);
+  WiFi.setTxPower(WIFI_POWER_8_5dBm);
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
-
   Serial.println("");
   Serial.print("Connected to ");
   Serial.println(ssid);
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+#endif
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
     request->send(200, "text/plain", "Hi! This is ElegantOTA AsyncDemo.");
@@ -93,14 +97,14 @@ void setup(void) {
   pixels.setPixelColor(0, pixels.Color(0, 5, 0));
   pixels.show();
 
-	initFan();
-	initHeater();
+  initFan();
+  initHeater();
 }
 
 void loop(void) {
   ElegantOTA.loop();
   ws.cleanupClients();
-	delay(10);
-	takeReadings();
-	updateHeater();
+  delay(10);
+  takeReadings();
+  updateHeater();
 }

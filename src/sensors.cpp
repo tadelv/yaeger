@@ -1,3 +1,4 @@
+#include "config.h"
 #include <Adafruit_MAX31855.h>
 #include <Arduino.h>
 #include <SPI.h>
@@ -10,14 +11,6 @@ void getChipTemp() {
   Serial.printf("Temperature: %.2f\n", temp);
 }
 
-#define MAX1DO 5
-#define MAX1CS 6
-#define MAX1CLK 7
-
-#define MAX2DO 9
-#define MAX2CS 10
-#define MAX2CLK 11
-
 Adafruit_MAX31855 tcExhaust(MAX1CLK, MAX1CS, MAX1DO);
 Adafruit_MAX31855 tcBeans(MAX2CLK, MAX2CS, MAX2DO);
 
@@ -25,9 +18,12 @@ KalmanFilter exhaustFilter;
 KalmanFilter beansFilter;
 unsigned long lastReadTime = 0;
 
+void takeETReadings(float dt);
+void takeBTReadings(float dt);
+
 void startSensors() {
-	exhaustFilter.init();
-	beansFilter.init();
+  exhaustFilter.init();
+  beansFilter.init();
   exhaustFilter.set(22.f);
   beansFilter.set(22.f);
 
@@ -40,19 +36,51 @@ void startSensors() {
 }
 
 void takeReadings() {
-  Serial.println("Taking readings");
-  float exhaustTemp = tcExhaust.readCelsius();
-  float beanTemp = tcBeans.readCelsius();
-  Serial.printf("Exhaust Temp: %.2f\n", exhaustTemp);
-  Serial.printf("Bean Temp: %.2f\n", beanTemp);
   float dt = (millis() - lastReadTime) / 1000.0;
+  if (dt < 1) {
+    return;
+  }
+  takeETReadings(dt);
+  takeBTReadings(dt);
   lastReadTime = millis();
-  exhaustFilter.predict(dt);
-  beansFilter.predict(dt);
-  exhaustFilter.correct(exhaustTemp);
-  beansFilter.correct(beanTemp);
+#ifdef DEBUG
   Serial.printf("Filtered Exhaust Temp: %.2f\n", exhaustFilter.get());
   Serial.printf("Filtered Bean Temp: %.2f\n", beansFilter.get());
+#endif
+}
+
+void takeETReadings(float dt) {
+  float exhaustTemp = tcExhaust.readCelsius();
+  if (isnan(exhaustTemp)) {
+    Serial.println("Thermocouple fault(s) detected!");
+    uint8_t e = tcExhaust.readError();
+    if (e & MAX31855_FAULT_OPEN)
+      Serial.println("FAULT: Thermocouple is open - no connections.");
+    if (e & MAX31855_FAULT_SHORT_GND)
+      Serial.println("FAULT: Thermocouple is short-circuited to GND.");
+    if (e & MAX31855_FAULT_SHORT_VCC)
+      Serial.println("FAULT: Thermocouple is short-circuited to VCC.");
+		return;
+	}
+	exhaustFilter.predict(dt);
+  exhaustFilter.correct(exhaustTemp);
+}
+
+void takeBTReadings(float dt) {
+  float beanTemp = tcBeans.readCelsius();
+  if (isnan(beanTemp)) {
+    Serial.println("Thermocouple fault(s) detected!");
+    uint8_t e = tcBeans.readError();
+    if (e & MAX31855_FAULT_OPEN)
+      Serial.println("FAULT: Thermocouple is open - no connections.");
+    if (e & MAX31855_FAULT_SHORT_GND)
+      Serial.println("FAULT: Thermocouple is short-circuited to GND.");
+    if (e & MAX31855_FAULT_SHORT_VCC)
+      Serial.println("FAULT: Thermocouple is short-circuited to VCC.");
+		return;
+	}
+  beansFilter.predict(dt);
+  beansFilter.correct(beanTemp);
 }
 
 float *getETBTReadings() {

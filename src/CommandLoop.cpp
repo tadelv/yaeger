@@ -26,9 +26,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
   case WS_EVT_DATA: {
 
     AwsFrameInfo *info = (AwsFrameInfo *)arg;
+#ifdef DEBUG
     Serial.printf("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(),
                   (info->opcode == WS_TEXT) ? "text" : "binary", info->len);
     Serial.printf("final: %d\n", info->final);
+#endif
     String msg = "";
     /*if (info->opcode != WS_TEXT || !info->final) {*/
     /*  break;*/
@@ -37,7 +39,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     for (size_t i = 0; i < info->len; i++) {
       msg += (char)data[i];
     }
+#ifdef DEBUG
     Serial.printf("msg: %s\n", msg.c_str());
+#endif
+
     const size_t capacity = JSON_OBJECT_SIZE(3) + 60; // Memory pool
     DynamicJsonDocument doc(capacity);
 
@@ -70,24 +75,21 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       setFanSpeed(val);
     }
 
-    float *etbt = getETBTReadings();
     // Send Values to Artisan over Websocket
     JsonObject root = doc.to<JsonObject>();
     JsonObject data = root.createNestedObject("data");
     if (command == "getBT") {
       root["id"] = ln_id;
       data["BT"] = etbt[1]; // Med_BeanTemp.getMedian();
-    } else if (command == "getDimmerVal") {
-      root["id"] = ln_id;
-      data["DimmerVal"] = 0.2f; // float(DimmerVal);
     } else if (command == "getData") {
+      float *etbt = getETBTReadings();
       root["id"] = ln_id;
       data["BT"] = etbt[1];                 // Med_BeanTemp.getMedian();
       data["ET"] = etbt[0];                 // Med_ExhaustTemp.getMedian()
       data["BurnerVal"] = getHeaterPower(); // float(DimmerVal);
       data["FanVal"] = getFanSpeed();
+      free(etbt);
     }
-    free(etbt);
 
     //====================================
     // DEBUG

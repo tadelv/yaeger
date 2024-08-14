@@ -1,8 +1,7 @@
 
 #include <Arduino.h>
 #include "heater.h"
-
-#define HEATER_PIN 3
+#include "config.h"
 
 void initHeater() {
 	pinMode(HEATER_PIN, OUTPUT);
