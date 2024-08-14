@@ -31,3 +31,10 @@ Load the config in Artisan-Scope, change the server ip to match yours and click 
 
 #### Using Yaeger on the go
 If you're out and about, without access to a Wifi, Yaeger can create its own access point. Add a define `#define EASY_AP` in the `config.h` file and you will be able to join the Yaeger wifi network. The ip of Yaeger is in this case `192.168.4.1`. 
+
+
+# Disclaimer
+Be careful when messing about with electronics and high voltage. I can not and will not take any responsibility for any
+sort of damage or injury caused by Yaeger, either directly or indirectly.
+**You do this at your own risk**
+### You have been warned!
