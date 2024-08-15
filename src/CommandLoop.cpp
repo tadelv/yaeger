@@ -78,10 +78,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     // Send Values to Artisan over Websocket
     JsonObject root = doc.to<JsonObject>();
     JsonObject data = root.createNestedObject("data");
-    if (command == "getBT") {
-      root["id"] = ln_id;
-      data["BT"] = etbt[1]; // Med_BeanTemp.getMedian();
-    } else if (command == "getData") {
+    if (command == "getData") {
       float *etbt = getETBTReadings();
       root["id"] = ln_id;
       data["BT"] = etbt[1];                 // Med_BeanTemp.getMedian();
