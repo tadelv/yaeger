@@ -17,6 +17,7 @@ void setupLogging(AsyncWebServer *server) {
 }
 
 void log(const char *message) {
+	Serial.println(message);
 	WebSerial.println(message);
 }
 
@@ -27,4 +28,5 @@ void logf(const char *format, ...) {
 	vsnprintf(buf, sizeof(buf), format, args);
 	va_end(args);
 	WebSerial.println(buf);
+	Serial.println(buf);
 }

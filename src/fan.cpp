@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include "fan.h"
 #include "config.h"
+#include "logging.h"
 
 // Initialize the fan
 // This function should be called in the setup function
@@ -22,7 +23,7 @@ void setFanSpeed(int speed) {
 	currentFanSpeed = speed;
 	/*analogWrite(FAN_PIN, speed * 255 / 100);*/
 	analogWrite(FAN_PIN, currentFanSpeed * 255 / 100);
-	Serial.printf("Fan speed set to %d%%\n", speed);
+	logf("Fan speed set to %d%%\n", speed);
 }
 
 int getFanSpeed() {

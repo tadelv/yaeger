@@ -1,6 +1,7 @@
 #include "fan.h"
 #include "heater.h"
 #include "sensors.h"
+#include "logging.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
@@ -13,12 +14,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
   switch (type) {
   case WS_EVT_CONNECT:
-    Serial.printf("[%u] Connected!\n", client->id());
+    logf("[%u] Connected!\n", client->id());
     // client->text("Connected");
 
     break;
   case WS_EVT_DISCONNECT: {
-    Serial.printf("[%u] Disconnected!\n", client->id());
+    logf("[%u] Disconnected!\n", client->id());
     // turn off heater and set fan to 100%
     setHeaterPower(0);
     setFanSpeed(100);
@@ -27,9 +28,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
     AwsFrameInfo *info = (AwsFrameInfo *)arg;
 #ifdef DEBUG
-    Serial.printf("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(),
+    logf("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(),
                   (info->opcode == WS_TEXT) ? "text" : "binary", info->len);
-    Serial.printf("final: %d\n", info->final);
+    logf("final: %d\n", info->final);
 #endif
     String msg = "";
     /*if (info->opcode != WS_TEXT || !info->final) {*/
@@ -40,14 +41,14 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       msg += (char)data[i];
     }
 #ifdef DEBUG
-    Serial.printf("msg: %s\n", msg.c_str());
+    logf("msg: %s\n", msg.c_str());
 #endif
 
     const size_t capacity = JSON_OBJECT_SIZE(3) + 60; // Memory pool
     DynamicJsonDocument doc(capacity);
 
     // DEBUG WEBSOCKET
-    // Serial.printf("[%u] get Text: %s\n", num, payload);
+    // logf("[%u] get Text: %s\n", num, payload);
 
     // Extract Values lt. https://arduinojson.org/v6/example/http-client/
     // Artisan Anleitung: https://artisan-scope.org/devices/websockets/
@@ -62,16 +63,14 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     long ln_id = doc["id"].as<long>();
     // Get BurnerVal from Artisan over Websocket
     if (!doc["BurnerVal"].isNull()) {
-      Serial.print("BurnerVal: ");
       long val = doc["BurnerVal"].as<long>();
-      Serial.println(val);
+      logf("BurnerVal: %d\n", val);
       // DimmerVal = doc["BurnerVal"].as<long>();
       setHeaterPower(val);
     }
     if (!doc["FanVal"].isNull()) {
-      Serial.print("FanVal: ");
       long val = doc["FanVal"].as<long>();
-      Serial.println(val);
+      logf("FanVal: %d\n", val);
       setFanSpeed(val);
     }
 
@@ -93,20 +92,20 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     /*
     if(!doc["command"].isNull())
     {
-      Serial.print("Command: ");
-      Serial.println(doc["command"].as<char*>());
+      logf("Command: ");
+      log(doc["command"].as<char*>());
     }
     if(!doc["BurnerVal"].isNull())
     {
-      Serial.print("BurnerVal: ");
-      Serial.println(doc["BurnerVal"].as<long>());
+      logf("BurnerVal: ");
+      log(doc["BurnerVal"].as<long>());
       DimmerVal = doc["BurnerVal"].as<long>();
     }
 
-    Serial.print("ID: ");
-    Serial.println(doc["id"].as<long>());
-    Serial.print("RoasterID: ");
-    Serial.println(doc["roasterID"].as<long>());
+    logf("ID: ");
+    log(doc["id"].as<long>());
+    logf("RoasterID: ");
+    log(doc["roasterID"].as<long>());
 
     //==========================
     //JETZT JSON-Payload generieren und senden!!!
@@ -127,7 +126,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     size_t len = serializeJson(doc, buffer); // serialize to buffer
 
     // DEBUG WEBSOCKET
-    Serial.println(buffer);
+    log(buffer);
 
     client->text(buffer);
     // send message to client
@@ -137,7 +136,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     // webSocket.broadcastTXT("message here");
   } break;
   default: // send message to client
-    Serial.printf("msg: tp: %d, data: %s\n", type, data);
+    logf("msg: tp: %d, data: %s\n", type, data);
     // webSocket.sendBIN(num, payload, length);
     break;
   }

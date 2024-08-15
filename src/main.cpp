@@ -12,6 +12,7 @@
 #include "fan.h"
 #include "heater.h"
 #include "sensors.h"
+#include "logging.h"
 
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
@@ -26,7 +27,7 @@ AsyncWebServer server(80);
 unsigned long ota_progress_millis = 0;
 void onOTAStart() {
   // Log when OTA has started
-  Serial.println("OTA update started!");
+  log("OTA update started!");
   // <Add your own code here>
 }
 
@@ -42,9 +43,9 @@ void onOTAProgress(size_t current, size_t final) {
 void onOTAEnd(bool success) {
   // Log when OTA has finished
   if (success) {
-    Serial.println("OTA update finished successfully!");
+    log("OTA update finished successfully!");
   } else {
-    Serial.println("There was an error during OTA update!");
+    log("There was an error during OTA update!");
   }
   // <Add your own code here>
 }
@@ -87,12 +88,14 @@ void setup(void) {
   ElegantOTA.onProgress(onOTAProgress);
   ElegantOTA.onEnd(onOTAEnd);
 
+	setupLogging(&server);
+
   // WebSocket handler
   setupMainLoop(&ws);
   server.addHandler(&ws);
 
   server.begin();
-  Serial.println("HTTP server started");
+  log("HTTP server started");
   pixels.clear();
   pixels.setPixelColor(0, pixels.Color(0, 5, 0));
   pixels.show();

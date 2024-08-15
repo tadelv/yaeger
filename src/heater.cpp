@@ -2,6 +2,7 @@
 #include <Arduino.h>
 #include "heater.h"
 #include "config.h"
+#include "logging.h"
 
 void initHeater() {
 	pinMode(HEATER_PIN, OUTPUT);
@@ -24,7 +25,7 @@ void setHeaterPower(int power) {
 		power = 100;
 	}
 	heaterPower = power;
-	Serial.printf("Heater power set to %d%%\n", power);
+	logf("Heater power set to %d%%\n", power);
 	onTime = (refreshPeriod * heaterPower) / 100;
 }
 
