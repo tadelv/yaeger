@@ -52,6 +52,7 @@ void onOTAEnd(bool success) {
 
 void setup(void) {
   Serial.begin(115200);
+	delay(1000); // Take some time to open up the Serial Monitor
   Serial.println("");
   startSensors();
   pixels.begin();

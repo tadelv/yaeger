@@ -27,6 +27,6 @@ void logf(const char *format, ...) {
 	va_start(args, format);
 	vsnprintf(buf, sizeof(buf), format, args);
 	va_end(args);
-	WebSerial.println(buf);
-	Serial.println(buf);
+	WebSerial.print(buf);
+	Serial.print(buf);
 }

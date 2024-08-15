@@ -31,8 +31,8 @@ void startSensors() {
   log("Initializing sensors");
   delay(500); // Give the sensors time to settle
   bool allGood = true;
-  allGood |= tcExhaust.begin();
-  allGood |= tcBeans.begin();
+  allGood &= tcExhaust.begin();
+  allGood &= tcBeans.begin();
   logf("Sensors %s\n", allGood ? "initialized" : "failed to init");
 }
 
