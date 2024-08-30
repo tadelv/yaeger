@@ -3,7 +3,8 @@
 #include <Adafruit_MAX31855.h>
 #include <Arduino.h>
 #include <SPI.h>
-#include <kalman.h>
+#include <SimpleKalmanFilter.h>
+#include <mutex>
 
 void getChipTemp() {
   // Get Ambient Temp from DS18B20
@@ -15,19 +16,18 @@ void getChipTemp() {
 Adafruit_MAX31855 tcExhaust(MAX1CLK, MAX1CS, MAX1DO);
 Adafruit_MAX31855 tcBeans(MAX2CLK, MAX2CS, MAX2DO);
 
-KalmanFilter exhaustFilter;
-KalmanFilter beansFilter;
+SimpleKalmanFilter exhaustFilter(80, 80, 3);
+SimpleKalmanFilter beansFilter(80, 80, 3);
 unsigned long lastReadTime = 0;
+
+std::mutex mtx;
+
+float readings[2] = {0, 0};
 
 void takeETReadings(float dt);
 void takeBTReadings(float dt);
 
 void startSensors() {
-  exhaustFilter.init();
-  beansFilter.init();
-  exhaustFilter.set(22.f);
-  beansFilter.set(22.f);
-
   log("Initializing sensors");
   delay(500); // Give the sensors time to settle
   bool allGood = true;
@@ -37,56 +37,55 @@ void startSensors() {
 }
 
 void takeReadings() {
-  float dt = (millis() - lastReadTime) / 1000.0;
-  if (dt < 1) {
+  std::lock_guard<std::mutex> lock(mtx);
+  float dt = (millis() - lastReadTime);
+  if (dt < 500) {
     return;
   }
   takeETReadings(dt);
   takeBTReadings(dt);
   lastReadTime = millis();
-#ifdef DEBUG
-  logf("Filtered Exhaust Temp: %.2f\n", exhaustFilter.get());
-  logf("Filtered Bean Temp: %.2f\n", beansFilter.get());
-#endif
+  float internal = tcExhaust.readInternal();
+  logf("internal: %.2f\n", internal);
 }
 
 void takeETReadings(float dt) {
   float exhaustTemp = tcExhaust.readCelsius();
   if (isnan(exhaustTemp)) {
-    log("Thermocouple fault(s) detected!");
     uint8_t e = tcExhaust.readError();
+    logf("Thermocouple fault(s) detected! %d", e);
     if (e & MAX31855_FAULT_OPEN)
       log("FAULT: Thermocouple is open - no connections.");
     if (e & MAX31855_FAULT_SHORT_GND)
       log("FAULT: Thermocouple is short-circuited to GND.");
     if (e & MAX31855_FAULT_SHORT_VCC)
       log("FAULT: Thermocouple is short-circuited to VCC.");
-		return;
-	}
-	exhaustFilter.predict(dt);
-  exhaustFilter.correct(exhaustTemp);
+    return;
+  }
+  logf("Exhaust Temp: %.2f\n", exhaustTemp);
+  readings[0] = exhaustFilter.updateEstimate(exhaustTemp);
 }
 
 void takeBTReadings(float dt) {
   float beanTemp = tcBeans.readCelsius();
   if (isnan(beanTemp)) {
-    log("Thermocouple fault(s) detected!");
     uint8_t e = tcBeans.readError();
+    logf("Thermocouple fault(s) detected! %d", e);
     if (e & MAX31855_FAULT_OPEN)
       log("FAULT: Thermocouple is open - no connections.");
     if (e & MAX31855_FAULT_SHORT_GND)
       log("FAULT: Thermocouple is short-circuited to GND.");
     if (e & MAX31855_FAULT_SHORT_VCC)
       log("FAULT: Thermocouple is short-circuited to VCC.");
-		return;
-	}
-  beansFilter.predict(dt);
-  beansFilter.correct(beanTemp);
+    return;
+  }
+  logf("Bean Temp: %.2f\n", beanTemp);
+  readings[1] = beansFilter.updateEstimate(beanTemp);
 }
 
 float *getETBTReadings() {
-  float *readings = (float *)malloc(2 * sizeof(float));
-  readings[0] = exhaustFilter.get();
-  readings[1] = beansFilter.get();
-  return readings;
+  std::lock_guard<std::mutex> lock(mtx);
+  float *newReadings = (float *)malloc(2 * sizeof(float));
+  memcpy(newReadings, readings, 2 * sizeof(float));
+  return newReadings;
 }
