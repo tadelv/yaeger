@@ -3,7 +3,7 @@
 #include <Adafruit_MAX31855.h>
 #include <Arduino.h>
 #include <SPI.h>
-#include <SimpleKalmanFilter.h>
+#include <NexgenFilter.h>
 #include <mutex>
 
 void getChipTemp() {
@@ -22,7 +22,7 @@ unsigned long lastReadTime = 0;
 
 std::mutex mtx;
 
-float readings[2] = {0, 0};
+float readings[3] = {0, 0, 0};
 
 void takeETReadings(float dt);
 void takeBTReadings(float dt);

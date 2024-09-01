@@ -21,8 +21,8 @@ bool isSSROn = false;
 void setHeaterPower(int power) {
 	if (power < 0) {
 		power = 0;
-	} else if (power > 100) {
-		power = 100;
+	} else if (power > 80) {
+		power = 80; // don't go over 80% for safety
 	}
 	heaterPower = power;
 	logf("Heater power set to %d%%\n", power);
