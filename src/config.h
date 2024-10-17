@@ -11,3 +11,5 @@
 #define MAX2DO 9
 #define MAX2CS 10
 #define MAX2CLK 11
+
+#define DEBUG

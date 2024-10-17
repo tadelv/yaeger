@@ -9,10 +9,12 @@
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA
 
 #include "CommandLoop.h"
+#include "IPAddress.h"
+#include "WiFiType.h"
 #include "fan.h"
 #include "heater.h"
-#include "sensors.h"
 #include "logging.h"
+#include "sensors.h"
 
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
@@ -29,6 +31,8 @@ void onOTAStart() {
   // Log when OTA has started
   log("OTA update started!");
   // <Add your own code here>
+	pixels.setPixelColor(0, pixels.Color(5,5,0));
+	pixels.show();
 }
 
 void onOTAProgress(size_t current, size_t final) {
@@ -48,11 +52,13 @@ void onOTAEnd(bool success) {
     log("There was an error during OTA update!");
   }
   // <Add your own code here>
+	pixels.setPixelColor(0, pixels.Color(0,0,0));
+	pixels.show();
 }
 
 void setup(void) {
   Serial.begin(115200);
-	delay(1000); // Take some time to open up the Serial Monitor
+  delay(1000); // Take some time to open up the Serial Monitor
   Serial.println("");
   startSensors();
   pixels.begin();
@@ -65,16 +71,25 @@ void setup(void) {
   WiFi.softAP("Yaeger");
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
 #else
-  WiFi.mode(WIFI_STA);
+  const char *hostname = "yaeger.local";
+  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
+  WiFi.setHostname(hostname);
+  WiFi.mode(WIFI_AP_STA);
+  WiFi.softAP("YAEGER");
   WiFi.begin(ssid, password);
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  int wifiCounter = 0;
   while (WiFi.status() != WL_CONNECTED) {
+    wifiCounter++;
     delay(500);
     Serial.print(".");
+    if (wifiCounter > 15) {
+      break;
+    }
   }
   Serial.println("");
   Serial.print("Connected to ");
-  Serial.println(ssid);
+  Serial.println(WiFi.SSID());
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
 #endif
@@ -89,7 +104,7 @@ void setup(void) {
   ElegantOTA.onProgress(onOTAProgress);
   ElegantOTA.onEnd(onOTAEnd);
 
-	setupLogging(&server);
+  setupLogging(&server);
 
   // WebSocket handler
   setupMainLoop(&ws);

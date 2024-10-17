@@ -6,8 +6,7 @@
 // Initialize the fan
 // This function should be called in the setup function
 void initFan() {
-	pinMode(FAN_PIN, OUTPUT);
-	digitalWrite(FAN_PIN, LOW);
+	analogWrite(FAN_PIN, 0);
 }
 
 int currentFanSpeed = 0;
