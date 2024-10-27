@@ -15,6 +15,7 @@
 #include "heater.h"
 #include "logging.h"
 #include "sensors.h"
+#include "config.h"
 
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
@@ -31,8 +32,8 @@ void onOTAStart() {
   // Log when OTA has started
   log("OTA update started!");
   // <Add your own code here>
-	pixels.setPixelColor(0, pixels.Color(5,5,0));
-	pixels.show();
+	/*pixels.setPixelColor(0, pixels.Color(5,5,0));*/
+	/*pixels.show();*/
 }
 
 void onOTAProgress(size_t current, size_t final) {
@@ -52,8 +53,8 @@ void onOTAEnd(bool success) {
     log("There was an error during OTA update!");
   }
   // <Add your own code here>
-	pixels.setPixelColor(0, pixels.Color(0,0,0));
-	pixels.show();
+	/*pixels.setPixelColor(0, pixels.Color(0,0,0));*/
+	/*pixels.show();*/
 }
 
 void setup(void) {
@@ -74,8 +75,8 @@ void setup(void) {
   const char *hostname = "yaeger.local";
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
   WiFi.setHostname(hostname);
-  WiFi.mode(WIFI_AP_STA);
-  WiFi.softAP("YAEGER");
+  WiFi.mode(WIFI_STA);
+  /*WiFi.softAP("YAEGER");*/
   WiFi.begin(ssid, password);
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
   int wifiCounter = 0;
