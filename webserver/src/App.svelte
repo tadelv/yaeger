@@ -1,30 +1,51 @@
 <script>
-	export let name;
+  import FanSlider from './components/FanSlider.svelte';
+  import HeaterSlider from './components/HeaterSlider.svelte';
+  import TemperatureReadout from './components/TemperatureReadout.svelte';
+  import RoastGraph from './components/RoastGraph.svelte';
+  import EventButtons from './components/EventButtons.svelte';
+  import SettingsDialog from './components/SettingsDialog.svelte';
+  import RoastSettingsDialog from './components/RoastSettingsDialog.svelte';
+  import { startRoast, stopRoast, resetRoast } from './store.js';
+  import { readings } from './store.js';
+
+  let showStart = true;
+  let showStop = false;
+  let showReset = false;
+  
+  function startRoast1() {
+    startRoast();
+    showStart = false;
+    showStop = true;
+  }
+
+  function stopRoast1() {
+    stopRoast();
+    showStop = false;
+    showReset = true;
+  }
+
+  function reset() {
+    resetRoast();
+    showReset = false;
+    showStart = true;
+  }
 </script>
 
-<main>
-	<h1>Hello {name}!</h1>
-	<p>Visit the <a href="https://svelte.dev/tutorial">Svelte tutorial</a> to learn how to build Svelte apps.</p>
-</main>
+<div>
+  {#if showStart}
+    <button on:click={startRoast1}>Start</button>
+  {:else if showStop}
+    <button on:click={stopRoast1}>Stop</button>
+  {:else if showReset}
+    <button on:click={reset}>Reset</button>
+  {/if}
 
-<style>
-	main {
-		text-align: center;
-		padding: 1em;
-		max-width: 240px;
-		margin: 0 auto;
-	}
-
-	h1 {
-		color: #ff3e00;
-		text-transform: uppercase;
-		font-size: 4em;
-		font-weight: 100;
-	}
-
-	@media (min-width: 640px) {
-		main {
-			max-width: none;
-		}
-	}
-</style>
+  <FanSlider />
+  <HeaterSlider />
+  <TemperatureReadout />
+  <RoastGraph />
+  <EventButtons />
+  <SettingsDialog />
+  <RoastSettingsDialog />
+</div>
