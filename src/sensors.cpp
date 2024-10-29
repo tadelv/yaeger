@@ -1,11 +1,11 @@
+#include "FreeRTOS.h"
 #include "config.h"
+#include "freertos/portmacro.h"
+#include "freertos/semphr.h"
 #include "logging.h"
 #include <Adafruit_MAX31855.h>
-#include <Arduino.h>
 #include <NexgenFilter.h>
 #include <SPI.h>
-#include <cstring>
-#include <mutex>
 
 void getChipTemp() {
   // Get Ambient Temp from DS18B20
@@ -21,7 +21,8 @@ SimpleKalmanFilter exhaustFilter(80, 80, 3);
 SimpleKalmanFilter beansFilter(80, 80, 3);
 unsigned long lastReadTime = 0;
 
-std::mutex mtx;
+SemaphoreHandle_t mtx;
+StaticSemaphore_t mtx_buffer;
 
 float readings[3] = {0, 0, 0};
 
@@ -30,6 +31,10 @@ void takeBTReadings(float dt);
 
 void startSensors() {
   log("Initializing sensors");
+  mtx = xSemaphoreCreateRecursiveMutexStatic(&mtx_buffer);
+  if (mtx == NULL) {
+    log("could not create mutex");
+  }
   delay(500); // Give the sensors time to settle
   bool allGood = true;
   allGood &= tcExhaust.begin();
@@ -38,17 +43,19 @@ void startSensors() {
 }
 
 void takeReadings() {
-  std::lock_guard<std::mutex> lock(mtx);
   float dt = (millis() - lastReadTime);
   if (dt < 500) {
     return;
   }
-  takeETReadings(dt);
-  takeBTReadings(dt);
-  lastReadTime = millis();
-  float internal = tcExhaust.readInternal();
-  logf("internal: %.2f\n", internal);
-  readings[2] = internal;
+  if (xSemaphoreTakeRecursive(mtx, portMAX_DELAY) == pdTRUE) {
+    takeETReadings(dt);
+    takeBTReadings(dt);
+    lastReadTime = millis();
+    float internal = tcExhaust.readInternal();
+    logf("internal: %.2f\n", internal);
+    readings[2] = internal;
+    xSemaphoreGiveRecursive(mtx);
+  }
 }
 
 void takeETReadings(float dt) {
@@ -86,6 +93,8 @@ void takeBTReadings(float dt) {
 }
 
 void getETBTReadings(float *readingsBuf) {
-  std::lock_guard<std::mutex> lock(mtx);
-  memcpy(readingsBuf, readings, 3 * sizeof(float));
+  if (xSemaphoreTakeRecursive(mtx, portMAX_DELAY) == pdTRUE) {
+    memcpy(readingsBuf, readings, 3 * sizeof(float));
+    xSemaphoreGiveRecursive(mtx);
+  }
 }
