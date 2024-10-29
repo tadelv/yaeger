@@ -2,7 +2,7 @@
   import Slider from "@smui/slider";
   import TextField from "@smui/textfield";
   import Button from "@smui/button";
-  import { heaterPower, updateHeaterPower } from '../store.js';
+  import { heaterPower, updateHeaterPower } from '../store.ts';
 
   function increment() { updateHeaterPower(heaterPower + 1); }
   function decrement() { updateHeaterPower(heaterPower - 1); }

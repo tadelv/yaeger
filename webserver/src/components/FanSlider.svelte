@@ -2,10 +2,10 @@
   import Slider from "@smui/slider";
   import TextField from "@smui/textfield";
   import Button from "@smui/button";
-  import { fanPower, updateFanPower } from '../store.js';
+  import { fanPower, updateFanPower } from '../store.ts';
 
-  function increment() { updateFanPower(fanPower + 1); }
-  function decrement() { updateFanPower(fanPower - 1); }
+  function increment() { updateFanPower({$fanPower} + 1 ); }
+  function decrement() { updateFanPower({$fanPower} - 1); }
 </script>
 
 <div>

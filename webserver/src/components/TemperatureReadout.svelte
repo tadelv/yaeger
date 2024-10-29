@@ -1,6 +1,6 @@
 
 <script lang="ts">
-  import { readings } from '../store.js';
+  import { readings } from '../store.ts';
 	import TextField from "@smui/textfield"
 </script>
 

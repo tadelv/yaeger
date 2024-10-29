@@ -6,8 +6,8 @@
   import EventButtons from './components/EventButtons.svelte';
   import SettingsDialog from './components/SettingsDialog.svelte';
   import RoastSettingsDialog from './components/RoastSettingsDialog.svelte';
-  import { startRoast, stopRoast, resetRoast } from './store.js';
-  import { readings } from './store.js';
+  import { startRoast, stopRoast, resetRoast } from './store.ts';
+  import { readings } from './store.ts';
 
   let showStart = true;
   let showStop = false;
@@ -43,7 +43,6 @@
 
   <FanSlider />
   <HeaterSlider />
-  <TemperatureReadout />
   <RoastGraph />
   <EventButtons />
   <SettingsDialog />
