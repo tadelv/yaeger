@@ -1,4 +1,3 @@
-#include <Arduino.h>
 #include "fan.h"
 #include "config.h"
 #include "logging.h"

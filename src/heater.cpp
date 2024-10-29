@@ -1,5 +1,3 @@
-
-#include <Arduino.h>
 #include "heater.h"
 #include "config.h"
 #include "logging.h"

@@ -2,12 +2,9 @@
 #include "heater.h"
 #include "logging.h"
 #include "sensors.h"
-#include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 
-float BeanTemp = 22.2;
-float exhaustTemp = 22.2;
 
 void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                AwsEventType type, void *arg, uint8_t *data, size_t len) {
@@ -74,9 +71,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     JsonObject root = doc.to<JsonObject>();
     JsonObject data = root.createNestedObject("data");
     if (command == "getData") {
+      root["id"] = ln_id;
       float etbt[3];
       getETBTReadings(etbt);
-      root["id"] = ln_id;
       data["ET"] = etbt[0]; // Med_ExhaustTemp.getMedian()
       data["BT"] = etbt[1]; // Med_BeanTemp.getMedian();
       data["Amb"] = etbt[2];

@@ -1,6 +1,4 @@
 #include "Credentials.h"
-#include <Arduino.h>
-// lib for wifi
 #include <WiFi.h>
 
 // lib for Over the Air (ota) programming
@@ -40,7 +38,7 @@ void onOTAProgress(size_t current, size_t final) {
   // Log every 1 second
   if (millis() - ota_progress_millis > 1000) {
     ota_progress_millis = millis();
-    Serial.printf("OTA Progress Current: %u bytes, Final: %u bytes\n", current,
+    logf("OTA Progress Current: %u bytes, Final: %u bytes\n", current,
                   final);
   }
 }
@@ -60,7 +58,6 @@ void onOTAEnd(bool success) {
 void setup(void) {
   Serial.begin(115200);
   delay(1000); // Take some time to open up the Serial Monitor
-  Serial.println("");
   startSensors();
   pixels.begin();
   pixels.clear();
