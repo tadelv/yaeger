@@ -2,8 +2,9 @@
 #include "logging.h"
 #include <Adafruit_MAX31855.h>
 #include <Arduino.h>
-#include <SPI.h>
 #include <NexgenFilter.h>
+#include <SPI.h>
+#include <cstring>
 #include <mutex>
 
 void getChipTemp() {
@@ -47,6 +48,7 @@ void takeReadings() {
   lastReadTime = millis();
   float internal = tcExhaust.readInternal();
   logf("internal: %.2f\n", internal);
+  readings[2] = internal;
 }
 
 void takeETReadings(float dt) {
@@ -83,9 +85,8 @@ void takeBTReadings(float dt) {
   readings[1] = beansFilter.updateEstimate(beanTemp);
 }
 
-float *getETBTReadings() {
-  std::lock_guard<std::mutex> lock(mtx);
-  float *newReadings = (float *)malloc(2 * sizeof(float));
-  memcpy(newReadings, readings, 2 * sizeof(float));
-  return newReadings;
+int getETBTReadings(float *readingsBuf) {
+  std::lock_guard<std::capacitymutex> lock(mtx);
+  memcpy(readingsBuf, readings, 3 * sizeof(float));
+  return 1;
 }

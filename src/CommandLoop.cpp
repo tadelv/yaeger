@@ -1,7 +1,7 @@
 #include "fan.h"
 #include "heater.h"
-#include "sensors.h"
 #include "logging.h"
+#include "sensors.h"
 #include <Arduino.h>
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
@@ -29,7 +29,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     AwsFrameInfo *info = (AwsFrameInfo *)arg;
 #ifdef DEBUG
     logf("ws[%s][%u] %s-message[%llu]: ", server->url(), client->id(),
-                  (info->opcode == WS_TEXT) ? "text" : "binary", info->len);
+         (info->opcode == WS_TEXT) ? "text" : "binary", info->len);
     logf("final: %d\n", info->final);
 #endif
     String msg = "";
@@ -53,12 +53,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     // Extract Values lt. https://arduinojson.org/v6/example/http-client/
     // Artisan Anleitung: https://artisan-scope.org/devices/websockets/
 
-    deserializeJson(
-        doc,
-        msg); // 2 Nodes einzeln (Feld: "command"): "getBT" und "getDimmerVal"
-    // oder
-    //  alle Nodes auf einmal (Feld: "command"): "getData"
-    // char* entspricht String
+    deserializeJson(doc, msg);
+
     String command = doc["command"].as<const char *>();
     long ln_id = doc["id"].as<long>();
     // Get BurnerVal from Artisan over Websocket
@@ -78,49 +74,15 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     JsonObject root = doc.to<JsonObject>();
     JsonObject data = root.createNestedObject("data");
     if (command == "getData") {
-      float *etbt = getETBTReadings();
+      float etbt[3];
+      getETBTReadings(etbt);
       root["id"] = ln_id;
-      data["BT"] = etbt[1];                 // Med_BeanTemp.getMedian();
-      data["ET"] = etbt[0];                 // Med_ExhaustTemp.getMedian()
+      data["ET"] = etbt[0]; // Med_ExhaustTemp.getMedian()
+      data["BT"] = etbt[1]; // Med_BeanTemp.getMedian();
+      data["Amb"] = etbt[2];
       data["BurnerVal"] = getHeaterPower(); // float(DimmerVal);
       data["FanVal"] = getFanSpeed();
-      free(etbt);
     }
-
-    //====================================
-    // DEBUG
-    /*
-    if(!doc["command"].isNull())
-    {
-      logf("Command: ");
-      log(doc["command"].as<char*>());
-    }
-    if(!doc["BurnerVal"].isNull())
-    {
-      logf("BurnerVal: ");
-      log(doc["BurnerVal"].as<long>());
-      DimmerVal = doc["BurnerVal"].as<long>();
-    }
-
-    logf("ID: ");
-    log(doc["id"].as<long>());
-    logf("RoasterID: ");
-    log(doc["roasterID"].as<long>());
-
-    //==========================
-    //JETZT JSON-Payload generieren und senden!!!
-    //==========================
-
-    ln_id = doc["id"].as<long>();
-    JsonObject root = doc.to<JsonObject>();
-    JsonObject data = root.createNestedObject("data");
-    root["id"] = ln_id;
-    data["BT"] = BeanTemp;
-    data["Dimmer"] = float(DimmerVal);
-
-    */
-    // DEBUG
-    //====================================
 
     char buffer[200];                        // create temp buffer
     size_t len = serializeJson(doc, buffer); // serialize to buffer
