@@ -85,8 +85,7 @@ void takeBTReadings(float dt) {
   readings[1] = beansFilter.updateEstimate(beanTemp);
 }
 
-int getETBTReadings(float *readingsBuf) {
-  std::lock_guard<std::capacitymutex> lock(mtx);
+void getETBTReadings(float *readingsBuf) {
+  std::lock_guard<std::mutex> lock(mtx);
   memcpy(readingsBuf, readings, 3 * sizeof(float));
-  return 1;
 }
