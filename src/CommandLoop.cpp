@@ -4,7 +4,8 @@
 #include "sensors.h"
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
-
+#include <cmath>
+#include <cstring>
 
 void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                AwsEventType type, void *arg, uint8_t *data, size_t len) {
@@ -52,7 +53,6 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
     deserializeJson(doc, msg);
 
-    String command = doc["command"].as<const char *>();
     long ln_id = doc["id"].as<long>();
     // Get BurnerVal from Artisan over Websocket
     if (!doc["BurnerVal"].isNull()) {
@@ -68,9 +68,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     }
 
     // Send Values to Artisan over Websocket
-    JsonObject root = doc.to<JsonObject>();
-    JsonObject data = root.createNestedObject("data");
-    if (command == "getData") {
+    const char *command = doc["command"].as<const char *>();
+    if (command != NULL && strncmp(command, "getData", 7) == 0) {
+      JsonObject root = doc.to<JsonObject>();
+      JsonObject data = root.createNestedObject("data");
       root["id"] = ln_id;
       float etbt[3];
       getETBTReadings(etbt);
@@ -83,7 +84,6 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
     char buffer[200];                        // create temp buffer
     size_t len = serializeJson(doc, buffer); // serialize to buffer
-
     // DEBUG WEBSOCKET
     log(buffer);
 
