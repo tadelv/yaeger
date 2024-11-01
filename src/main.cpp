@@ -2,6 +2,7 @@
 #include <Arduino.h>
 // lib for wifi
 #include <WiFi.h>
+#include <ESPmDNS.h>
 
 // lib for Over the Air (ota) programming
 #include <Adafruit_NeoPixel.h>
@@ -9,6 +10,7 @@
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA
 
 #include "CommandLoop.h"
+#include "HardwareSerial.h"
 #include "IPAddress.h"
 #include "WiFiType.h"
 #include "fan.h"
@@ -93,6 +95,9 @@ void setup(void) {
   Serial.println(WiFi.SSID());
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
+	if (!MDNS.begin("yaeger")) {
+		Serial.println("could not set up MDNS responder");
+	}
 #endif
 
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
