@@ -10,9 +10,9 @@
 </script>
 
 <div>
-  <Slider min="0" max="100" step="5" bind:value={$heaterPower} on:input={updateHeaterPower} />
 	<HeatWave width=50 height=50 />
   <TextField label="Heater Power" type="number" bind:value={$heaterPower} readonly />
   <Button on:click={increment}>+</Button>
   <Button on:click={decrement}>-</Button>
+  <Slider min="0" max="100" step="5" bind:value={$heaterPower} on:input={updateHeaterPower} />
 </div>
