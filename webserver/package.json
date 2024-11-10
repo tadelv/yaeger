@@ -29,6 +29,7 @@
     "date-fns": "^4.1.0",
     "sirv-cli": "^2.0.0",
     "svelte-chartjs": "^3.1.5",
+    "svelte-material-icons": "^3.0.5",
     "svelte-material-ui": "^7.0.0"
   }
 }

@@ -72,8 +72,8 @@
 				//chart.update()
 				return
 			}
-			etData.push(lastRead.et)
-			btData.push(lastRead.bt)
+			etData.push(lastRead.ET)
+			btData.push(lastRead.BT)
 			fanData.push(lastRead.fanVal);
 			heaterData.push(lastRead.heaterVal);
 			

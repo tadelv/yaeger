@@ -43,6 +43,7 @@
 
   <FanSlider />
   <HeaterSlider />
+	<TemperatureReadout />
   <RoastGraph />
   <EventButtons />
   <SettingsDialog />

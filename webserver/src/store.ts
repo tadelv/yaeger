@@ -48,8 +48,9 @@ function startReadings() {
   timerId = setInterval(() => {
     readings.update((val) => {
       val.push({
-        et: 20,
-        bt: 30,
+				Amb: 22.4,
+        ET: 20,
+        BT: 30,
         fanVal: get(fanPower),
         heaterVal: get(heaterPower),
       });

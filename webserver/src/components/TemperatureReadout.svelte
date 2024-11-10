@@ -5,6 +5,9 @@
 </script>
 
 <div>
-  <TextField label="Bean Temp" value={readings.BT} readonly />
-  <TextField label="Exhaust Temp" value={readings.ET} readonly />
+	{#if $readings.length > 0}
+  <TextField label="Bean Temp" value={$readings[$readings.length - 1].BT} readonly />
+  <TextField label="Exhaust Temp" value={$readings[$readings.length - 1].ET} readonly />
+  <TextField label="Ambient Temp" value={$readings[$readings.length - 1].Amb} readonly />
+{/if}
 </div>
