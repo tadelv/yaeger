@@ -1,12 +1,10 @@
-
-#include <Arduino.h>
 #include "heater.h"
 #include "config.h"
 #include "logging.h"
 
 void initHeater() {
-	pinMode(HEATER_PIN, OUTPUT);
-	digitalWrite(HEATER_PIN, LOW);
+  pinMode(HEATER_PIN, OUTPUT);
+  digitalWrite(HEATER_PIN, LOW);
 }
 
 static int heaterPower = 0;
@@ -19,14 +17,14 @@ unsigned long onTime = 0;
 bool isSSROn = false;
 
 void setHeaterPower(int power) {
-	if (power < 0) {
-		power = 0;
-	} else if (power > 80) {
-		power = 80; // don't go over 80% for safety
-	}
-	heaterPower = power;
-	logf("Heater power set to %d%%\n", power);
-	onTime = (refreshPeriod * heaterPower) / 100;
+  if (power < 0) {
+    power = 0;
+  } else if (power > 80) {
+    power = 80; // don't go over 80% for safety
+  }
+  heaterPower = power;
+  logf("Heater power set to %d%%\n", power);
+  onTime = (refreshPeriod * heaterPower) / 100;
 }
 
 // Update the heater SSR state
@@ -35,7 +33,7 @@ void setHeaterPower(int power) {
 // and the period is 1 second
 // so, if the power is 10%, the heater will be on for 100 ms and off for 900 ms
 void updateHeater() {
-unsigned long currentMillis = millis();
+  unsigned long currentMillis = millis();
 
   // Check if the refresh period has passed
   if (currentMillis - previousMillis >= refreshPeriod) {
@@ -55,10 +53,8 @@ unsigned long currentMillis = millis();
     digitalWrite(HEATER_PIN, HIGH); // Turn SSR on
   } else {
     digitalWrite(HEATER_PIN, LOW); // Turn SSR off
-    isSSROn = false; // Ensure it's off if past onTime
+    isSSROn = false;               // Ensure it's off if past onTime
   }
 }
 
-int getHeaterPower() {
-	return heaterPower;
-}
+int getHeaterPower() { return heaterPower; }
