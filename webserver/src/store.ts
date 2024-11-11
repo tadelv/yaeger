@@ -42,10 +42,13 @@ export function startRoast(params) {
 export function stopRoast(params) {
   isRoasting.set(false);
   clearInterval(timerId);
+	console.log('stopped');
 }
 
 export function resetRoast(params) {
+  console.log("reseting roast");
   readings.set([]);
+  events.set([]);
 }
 
 function sendCommand(data) {

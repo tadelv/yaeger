@@ -32,6 +32,7 @@
 
 		 beforeDatasetsDraw: function (chart, easing) {
 				if(chart.config._config.lineAtIndex) {
+				console.log("doing ", chart.config._config.lineAtIndex)
 				  chart.config._config.lineAtIndex.forEach(pointIndex => {
 					  this.renderVerticalLine(chart, pointIndex)
 				  })
@@ -42,19 +43,15 @@
   let canvas;
 
 
-	let etData = []
-	let btData = []
-	let fanData = []
-	let heaterData = []
 
-	$: data = {
+	const data = {
 		labels: [
 		],
         datasets: [
-			{ label: 'Bean Temp', borderColor: 'blue', data: etData },
-          { label: 'Exhaust Temp', borderColor: 'red', data: btData  },
-          { label: 'Fan Power', borderColor: 'green', data: fanData },
-          { label: 'Heater Power', borderColor: 'orange', data: heaterData }
+			{ label: 'Bean Temp', borderColor: 'orange', data: [] },
+          { label: 'Exhaust Temp', borderColor: 'green', data: []  },
+          { label: 'Fan Power', borderColor: 'blue', data: [] },
+          { label: 'Heater Power', borderColor: 'red', data: [] }
         ]
       }
   onMount(() => {
@@ -77,7 +74,7 @@
 				//	}
 				//}
       },
-			lineAtIndex: get(events),
+			lineAtIndex: [],
 			plugins: [verticalLinePlugin]
     });
 
@@ -86,36 +83,31 @@
       // Update chart data dynamically
 			var lastRead = inData[inData.length - 1]
 			console.log('last read:', lastRead)
-			if (inData.length == 0) {
-				console.log('resetting')
-			//	// Clear all data
-			//	etData = []
-			//	btData = []
-			//	fanData = []
-			//	heaterData = []
-				data.labels = []
-				chart.update()
-			}
 			if (lastRead == undefined) {
 				console.log('resetting')
-				// Clear all data
-				//etData = []
-				//btData = []
-				//fanData = []
-				//heaterData = []
-				//data.labels = []
-				//chart.update()
-				return
-			}
-			etData.push(lastRead.ET)
-			btData.push(lastRead.BT)
-			fanData.push(lastRead.fanVal);
-			heaterData.push(lastRead.heaterVal);
+				chart.data.labels = []
+				chart.data.datasets.forEach((dataset) => {
+					dataset.data = []
+				})
+				chart.config._config.lineAtIndex = []
+				chart.update()
+			} else {
+			chart.data.datasets[1].data.push(lastRead.ET)
+			chart.data.datasets[0].data.push(lastRead.BT)
+			chart.data.datasets[2].data.push(lastRead.fanVal);
+			chart.data.datasets[3].data.push(lastRead.heaterVal);
 			
 			
 			data.labels.push(`${Math.floor(new Date().getTime() / 1000 - get(roastStart))}`)
 			chart.update()
+			}
     });
+
+		events.subscribe(((inEvents) => {
+			console.log("got ", inEvents)
+			chart.config._config.lineAtIndex = inEvents
+			console.log(chart.lineAtIndex)
+		}))
 //startRoast()
   });
 </script>
