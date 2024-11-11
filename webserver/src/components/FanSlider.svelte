@@ -7,6 +7,9 @@
 
   function increment() { updateFanPower($fanPower + 1 ); }
   function decrement() { updateFanPower($fanPower - 1); }
+	function handleInput(_) {
+		updateFanPower($fanPower)
+  }
 </script>
 <style>
   /* Change the primary color for this slider */
@@ -17,7 +20,7 @@
 
 <div>
 	<div class="custom-slider">
-  <Slider min=0 max=100 step=5 bind:value={$fanPower} on:input={updateFanPower} discrete tickMarks />
+  <Slider min=0 max=100 step=5 on:click={handleInput} bind:value={$fanPower} discrete tickMarks />
 	</div>
 	<Fan width=50 height=50 />
   <TextField label="Fan Power" type="number" bind:value={$fanPower} readonly />

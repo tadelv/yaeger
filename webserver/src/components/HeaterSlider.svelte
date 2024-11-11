@@ -7,6 +7,9 @@
 
   function increment() { updateHeaterPower($heaterPower + 1); }
   function decrement() { updateHeaterPower($heaterPower - 1); }
+	function handleInput(_) {
+		updateHeaterPower($heaterPower)
+  }
 </script>
 
 <div>
@@ -14,5 +17,5 @@
   <TextField label="Heater Power" type="number" bind:value={$heaterPower} readonly />
   <Button on:click={increment}>+</Button>
   <Button on:click={decrement}>-</Button>
-  <Slider min="0" max="100" step="5" bind:value={$heaterPower} on:input={updateHeaterPower} />
+  <Slider min="0" max="100" step="5" bind:value={$heaterPower} on:click={handleInput} discrete tickMarks />
 </div>

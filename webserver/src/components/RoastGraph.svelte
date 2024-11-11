@@ -94,8 +94,8 @@
 			} else {
 			chart.data.datasets[1].data.push(lastRead.ET)
 			chart.data.datasets[0].data.push(lastRead.BT)
-			chart.data.datasets[2].data.push(lastRead.fanVal);
-			chart.data.datasets[3].data.push(lastRead.heaterVal);
+			chart.data.datasets[2].data.push(lastRead.FanVal);
+			chart.data.datasets[3].data.push(lastRead.BurnerVal);
 			
 			
 			data.labels.push(`${Math.floor(new Date().getTime() / 1000 - get(roastStart))}`)

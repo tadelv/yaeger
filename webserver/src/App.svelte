@@ -6,8 +6,8 @@
   import EventButtons from './components/EventButtons.svelte';
   import SettingsDialog from './components/SettingsDialog.svelte';
   import RoastSettingsDialog from './components/RoastSettingsDialog.svelte';
-  import { startRoast, stopRoast, resetRoast } from './store.ts';
-  import { readings } from './store.ts';
+  import { startRoast, stopRoast, resetRoast, connectWebSocket } from './store.ts';
+	import { onMount,  onDestroy } from 'svelte';
 
   let showStart = true;
   let showStop = false;
@@ -30,6 +30,18 @@
     showReset = false;
     showStart = true;
   }
+
+	let socket;
+
+	onMount(() => {
+		console.log("connecting")
+		socket = connectWebSocket()
+	})
+
+	onDestroy(() => {
+		console.log("destroying")
+		socket?.close()
+	})
 </script>
 
 <div>
