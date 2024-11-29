@@ -125,3 +125,18 @@ export function connectWebSocket() {
   });
   return socket;
 }
+
+export function downloadRoast() {
+	return JSON.stringify(
+		{
+			events: get(events),
+			readings: get(readings)
+		}
+	)
+}
+
+export function uploadRoast(json) {
+	console.log("uploading: ", json)
+	readings.set(json.readings)
+  events.set(json.events)
+}
