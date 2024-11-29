@@ -2,6 +2,7 @@
 <script lang="ts">
 	import { onMount } from 'svelte'
   import Chart from 'chart.js/auto';
+	import chartTrendline from 'chartjs-plugin-trendline';
 	import 'chartjs-adapter-date-fns';
   import { readings, events, roastStart } from '../store.ts';
 	import { get } from 'svelte/store';
@@ -48,10 +49,36 @@
 		labels: [
 		],
         datasets: [
-			{ label: 'Bean Temp', borderColor: 'orange', data: [] },
-          { label: 'Exhaust Temp', borderColor: 'green', data: []  },
-          { label: 'Fan Power', borderColor: 'blue', data: [] },
-          { label: 'Heater Power', borderColor: 'red', data: [] }
+			{ 
+				label: 'Bean Temp', 
+				borderColor: 'blue', 
+				data: [],
+				trendlineLinear: {
+					colorMin: '#0f0588',
+					colorMax: '#00f0ff',
+					lineStyle: 'dotted',
+					width: 1
+				}
+			},
+          { 
+				label: 'Exhaust Temp', 
+				borderColor: 'red', 
+				data: [],
+				trendlineLinear: {
+					colorMin: '#666099',
+					colorMax: '#f770aa',
+					lineStyle: 'dotted',
+					projection: false,
+					width: 3
+				}
+
+			},
+          {
+				label: 'Fan Power',
+				borderColor: '#055088', 
+				data: [],
+			},
+          { label: 'Heater Power', borderColor: 'orange', data: [] }
         ]
       }
   onMount(() => {
@@ -75,7 +102,7 @@
 				//}
       },
 			lineAtIndex: [],
-			plugins: [verticalLinePlugin]
+			plugins: [verticalLinePlugin, chartTrendline]
     });
 
 

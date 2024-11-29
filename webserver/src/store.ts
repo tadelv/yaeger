@@ -70,16 +70,15 @@ class YaegerMessage {
 }
 
 let socket: WebSocket;
+const readingInterval = 1000;
 
 function startReadings() {
   console.log("startReadings");
   timerId = setInterval(() => {
-    console.log("timer fire");
     const cmd = JSON.stringify({
       id: 1,
       command: "getData",
     });
-    console.log("sending ", cmd);
     socket?.send(cmd);
     //readings.update((val) => {
     //  val.push({
@@ -91,7 +90,7 @@ function startReadings() {
     //  });
     //  return val;
     //});
-  }, 1000);
+  }, readingInterval);
 }
 
 export function connectWebSocket() {

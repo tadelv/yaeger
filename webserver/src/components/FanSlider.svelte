@@ -23,7 +23,7 @@
   <Slider min=0 max=100 step=5 on:click={handleInput} bind:value={$fanPower} discrete tickMarks />
 	</div>
 	<Fan width=50 height=50 />
-  <TextField label="Fan Power" type="number" bind:value={$fanPower} readonly />
+  <TextField label="Fan Power" type="number" value={$fanPower} input$readonly />
   <Button on:click={increment}>+</Button>
   <Button on:click={decrement}>-</Button>
 </div>
