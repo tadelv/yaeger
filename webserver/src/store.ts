@@ -1,4 +1,5 @@
 import { writable, get } from "svelte/store";
+import { YaegerMessage } from "./model.ts";
 
 export const readings = writable([]);
 export const fanPower = writable(Number(0));
@@ -6,6 +7,8 @@ export const heaterPower = writable(0);
 export const roastStart = writable(0);
 export const events = writable([]);
 export const messageStore = writable([]);
+
+
 
 export function updateFanPower(value) {
 	console.log('updateFanPower', value)
@@ -60,14 +63,6 @@ function sendCommand(data) {
   socket?.send(msg);
 }
 
-class YaegerMessage {
-  ET: Number;
-  BT: Number;
-  Amb: Number;
-  FanVal: Number;
-  BurnerVal: Number;
-  id: Number;
-}
 
 let socket: WebSocket;
 const readingInterval = 1000;
