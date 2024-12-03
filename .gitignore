@@ -3,3 +3,4 @@
 *.alog
 src/Credentials.h
 node_modules
+.nvim
