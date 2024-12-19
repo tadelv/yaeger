@@ -1,6 +1,7 @@
 #include "Credentials.h"
-#include <WiFi.h>
 #include <ESPmDNS.h>
+#include <SPIFFS.h>
+#include <WiFi.h>
 
 // lib for Over the Air (ota) programming
 #include <Adafruit_NeoPixel.h>
@@ -11,11 +12,11 @@
 #include "HardwareSerial.h"
 #include "IPAddress.h"
 #include "WiFiType.h"
+#include "config.h"
 #include "fan.h"
 #include "heater.h"
 #include "logging.h"
 #include "sensors.h"
-#include "config.h"
 
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
@@ -32,16 +33,15 @@ void onOTAStart() {
   // Log when OTA has started
   log("OTA update started!");
   // <Add your own code here>
-	/*pixels.setPixelColor(0, pixels.Color(5,5,0));*/
-	/*pixels.show();*/
+  /*pixels.setPixelColor(0, pixels.Color(5,5,0));*/
+  /*pixels.show();*/
 }
 
 void onOTAProgress(size_t current, size_t final) {
   // Log every 1 second
   if (millis() - ota_progress_millis > 1000) {
     ota_progress_millis = millis();
-    logf("OTA Progress Current: %u bytes, Final: %u bytes\n", current,
-                  final);
+    logf("OTA Progress Current: %u bytes, Final: %u bytes\n", current, final);
   }
 }
 
@@ -53,8 +53,8 @@ void onOTAEnd(bool success) {
     log("There was an error during OTA update!");
   }
   // <Add your own code here>
-	/*pixels.setPixelColor(0, pixels.Color(0,0,0));*/
-	/*pixels.show();*/
+  /*pixels.setPixelColor(0, pixels.Color(0,0,0));*/
+  /*pixels.show();*/
 }
 
 void setup(void) {
@@ -92,14 +92,15 @@ void setup(void) {
   Serial.println(WiFi.SSID());
   Serial.print("IP address: ");
   Serial.println(WiFi.localIP());
-	if (!MDNS.begin("yaeger")) {
-		Serial.println("could not set up MDNS responder");
-	}
+  if (!MDNS.begin("yaeger")) {
+    Serial.println("could not set up MDNS responder");
+  }
 #endif
 
-  server.on("/", HTTP_GET, [](AsyncWebServerRequest *request) {
-    request->send(200, "text/plain", "Hi! This is ElegantOTA AsyncDemo.");
-  });
+  if (!SPIFFS.begin()) {
+    Serial.println("SPIFFS failed");
+  }
+  server.serveStatic("/", SPIFFS, "/").setDefaultFile("index.html");
 
   ElegantOTA.begin(&server); // Start ElegantOTA
   // ElegantOTA callbacks
