@@ -13,6 +13,7 @@
 #include "IPAddress.h"
 #include "WiFiType.h"
 #include "config.h"
+#include "display.h"
 #include "fan.h"
 #include "heater.h"
 #include "logging.h"
@@ -96,6 +97,9 @@ void setup(void) {
     Serial.println("could not set up MDNS responder");
   }
 #endif
+
+  initDisplay();
+  setWifiIP();
 
   if (!SPIFFS.begin()) {
     Serial.println("SPIFFS failed");

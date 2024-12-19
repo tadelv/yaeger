@@ -13,8 +13,8 @@
 #define MAX2CS 39
 #define MAX2CLK 33
 
-#define DISPLAY_1 41
-#define DISPLAY_2 42
+#define DISPLAY_DA 41
+#define DISPLAY_CL 42
 
 #else
 
@@ -31,8 +31,8 @@
 #define MAX2CS 16
 #define MAX2CLK 6
 
-#define DISPLAY_1 41
-#define DISPLAY_2 42
+#define DISPLAY_DA 41
+#define DISPLAY_CL 42
 #endif
 
 #define DEBUG
