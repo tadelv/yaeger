@@ -5,9 +5,14 @@ import { Chart } from "chart.js/auto";
 const { div, input, h1, canvas } = van.tags;
 
 // WebSocket message type
-type WebSocketMessage = {
-  values: number[];
-};
+export interface YaegerMessage {
+  ET: number;
+  BT: number;
+  Amb: number;
+  FanVal: number;
+  BurnerVal: number;
+  id: number;
+}
 
 // State variables
 let chartData: number[] = [0, 0, 0, 0, 0, 0];
@@ -15,11 +20,11 @@ const slider1Value = van.state(50);
 const slider2Value = van.state(50);
 
 // Initialize WebSocket
-//const socket = new WebSocket("wss://your-websocket-server");
+const socket = new WebSocket("ws://" + location.host + "/ws");
 
-//socket.onopen = () => console.log("WebSocket connection established");
-//socket.onclose = () => console.log("WebSocket connection closed");
-//socket.onerror = (error) => console.error("WebSocket error:", error);
+socket.onopen = () => console.log("WebSocket connection established");
+socket.onclose = () => console.log("WebSocket connection closed");
+socket.onerror = (error) => console.error("WebSocket error:", error);
 
 // Chart.js setup
 const chartElement = canvas({ id: "liveChart" });
@@ -45,16 +50,15 @@ const chart = new Chart(ctx, {
 });
 
 // WebSocket message handling
-//socket.onmessage = (event) => {
-//  try {
-//    const data: WebSocketMessage = JSON.parse(event.data);
-//    chartData = data.values;
-//    chart.data.datasets[0].data = chartData;
-//    chart.update();
-//  } catch (error) {
-//    console.error("Error parsing WebSocket message:", error);
-//  }
-//};
+socket.onmessage = (event) => {
+ try {
+   const data: YaegerMessage = JSON.parse(event.data);
+   chart.data.datasets[0].data.push(data.FanVal);
+   chart.update();
+ } catch (error) {
+   console.error("Error parsing WebSocket message:", error);
+ }
+};
 
 // Slider change handler
 const onSliderChange = (slider: string, value: number) => {
@@ -67,7 +71,7 @@ const app = div(
   h1("VanJS WebSocket Live Chart"),
   chartElement,
   div(
-    "Slider 1:",
+    "FAN 1:",
     input({
       type: "range",
       min: "0",

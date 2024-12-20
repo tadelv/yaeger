@@ -15,6 +15,7 @@
   "dependencies": {
     "chart.js": "^4.4.7",
     "vanjs-core": "^1.5.2",
-    "vanjs-ext": "^0.6.2"
+    "vanjs-ext": "^0.6.2",
+    "vite-plugin-pwa": "^0.21.1"
   }
 }
