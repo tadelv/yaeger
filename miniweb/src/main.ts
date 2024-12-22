@@ -1,14 +1,14 @@
 import "./style.css";
 import van from "vanjs-core";
 import { initializeChart, updateChart } from "./chart";
-import { YaegerMessage } from "./model.ts"
+import { YaegerMessage, YaegerState, Measurement } from "./model.ts";
 
-const { div, input, h1, canvas } = van.tags;
-
+const { button, div, input, h1, canvas, p, span } = van.tags;
 
 // State variables
 const slider1Value = van.state(50);
 const slider2Value = van.state(50);
+const state = van.state(new YaegerState());
 
 // Initialize WebSocket
 const socket = new WebSocket("ws://" + location.host + "/ws");
@@ -24,7 +24,7 @@ socket.onerror = (error) => console.error("WebSocket error:", error);
 const chartElement = canvas({ id: "liveChart" });
 const ctx = chartElement.getContext("2d") as CanvasRenderingContext2D;
 
-const chart = initializeChart(ctx)
+const chart = initializeChart(ctx);
 
 // WebSocket message handling
 socket.onmessage = (event) => {
@@ -33,9 +33,33 @@ socket.onmessage = (event) => {
     const data = JSON.parse(event.data);
     const message: YaegerMessage = data.data;
     if (message != undefined) {
-      slider1Value.val = message.FanVal
-			slider2Value.val = message.BurnerVal
-			updateChart(chart, message)
+      slider1Value.val = message.FanVal;
+      slider2Value.val = message.BurnerVal;
+      const timestamp = new Date();
+      state.val = {
+        ...state.val,
+        currentState: {
+          lastMessage: message,
+          lastUpdate: timestamp,
+        },
+      };
+      if (state.val.roast != null) {
+        const newMeasurement: [Measurement] = [
+          {
+            timestamp: timestamp,
+            message: message,
+          },
+        ];
+        state.val = {
+          ...state.val,
+          roast: {
+            ...state.val.roast,
+            measurements: [...state.val.roast?.measurements, ...newMeasurement],
+          },
+        };
+        updateChart(chart, state.val.roast!);
+      }
+      console.log(state.val);
     }
   } catch (error) {
     console.error("Error parsing WebSocket message:", error);
@@ -92,7 +116,7 @@ const app = div(
     }),
   ),
   div(
-    "Slider 2:",
+    "HEATER:",
     input({
       type: "range",
       min: "0",
@@ -104,6 +128,33 @@ const app = div(
         onSliderChange("slider2", slider2Value.val);
       },
     }),
+  ),
+  div(
+    button(
+      {
+        onclick: () => {
+          state.val = {
+            ...state.val,
+            roast: {
+              startDate: new Date(),
+              measurements: [],
+            },
+          };
+        },
+      },
+      "Start",
+    ),
+  ),
+  div(
+    span("ET: ", () => {
+      console.log("upd");
+      return state.val.currentState.lastMessage?.ET ?? "N/A";
+    }),
+    p(),
+    span("BT: ", () => state.val.currentState.lastMessage?.BT ?? "N/A"),
+    p(),
+    "Last update: ",
+    p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
   ),
 );
 
