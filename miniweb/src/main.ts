@@ -1,14 +1,12 @@
 import "./style.css";
 import van from "vanjs-core";
-import { Chart } from "chart.js/auto";
+import { initializeChart, updateChart } from "./chart";
 import { YaegerMessage } from "./model.ts"
 
 const { div, input, h1, canvas } = van.tags;
 
 
 // State variables
-let chartData: number[] = [1];
-let heatData: number[] = [0];
 const slider1Value = van.state(50);
 const slider2Value = van.state(50);
 
@@ -26,31 +24,7 @@ socket.onerror = (error) => console.error("WebSocket error:", error);
 const chartElement = canvas({ id: "liveChart" });
 const ctx = chartElement.getContext("2d") as CanvasRenderingContext2D;
 
-const chart = new Chart(ctx, {
-  type: "line",
-  data: {
-    labels: ["0"],
-    datasets: [
-      {
-        label: "Live Data",
-        data: chartData,
-        borderColor: "blue",
-        borderWidth: 2,
-      },
-			{
-
-        label: "heat Data",
-        data: heatData,
-        borderColor: "red",
-        borderWidth: 2,
-			}
-    ],
-  },
-  options: {
-    responsive: true,
-    animation: false,
-  },
-});
+const chart = initializeChart(ctx)
 
 // WebSocket message handling
 socket.onmessage = (event) => {
@@ -61,11 +35,7 @@ socket.onmessage = (event) => {
     if (message != undefined) {
       slider1Value.val = message.FanVal
 			slider2Value.val = message.BurnerVal
-      chart.data.datasets[0].data.push(message.FanVal);
-			chart.data.datasets[1].data.push(message.BurnerVal)
-      chart.data.labels.push(`${Math.floor(new Date().getTime())}`);
-      chart.update();
-
+			updateChart(chart, message)
     }
   } catch (error) {
     console.error("Error parsing WebSocket message:", error);
