@@ -12,7 +12,7 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
         {
           label: "Bean Temp",
           borderColor: "blue",
-					pointStyle: false,
+          pointStyle: false,
           data: [],
           trendlineLinear: {
             colorMin: "#0f0588",
@@ -20,39 +20,39 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
             lineStyle: "dotted",
             width: 1,
           },
-					yAxisID: 'y1',
-					tension: 0.4
+          yAxisID: "y1",
+          tension: 0.4,
         },
         {
           label: "Exhaust Temp",
           borderColor: "red",
-					pointStyle: false,
+          pointStyle: false,
           data: [],
           trendlineLinear: {
             colorMin: "#666099",
             colorMax: "#f770aa",
             lineStyle: "dotted",
-            projection: false,
+            projection: true,
             width: 3,
           },
-					yAxisID: 'y1',
-					tension: 0.4
+          yAxisID: "y1",
+          tension: 0.4,
         },
         {
           label: "Fan Power",
           borderColor: "#055088",
-					pointStyle: false,
+          pointStyle: false,
           data: [],
           yAxisID: "y2",
-					tension: 0.1
+          tension: 0.1,
         },
         {
           label: "Heater Power",
-					pointStyle: false,
+          pointStyle: false,
           borderColor: "orange",
           data: [],
           yAxisID: "y2",
-					tension: 0.1
+          tension: 0.1,
         },
       ],
     },
@@ -61,25 +61,25 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
         x: { grace: 5, type: "linear", bounds: "ticks", beginAtZero: true },
         //x: { type: 'time', time: { unit: 'minute' } },
         y1: {
-					min: 0,
-					max: 300,
-					type: 'linear',
-					position: 'left',
-					title: {
-						display: true,
-						text: 'Temperature (°C)'
-					}
-				},
-				y2: {
-					min: 0,
-					max: 100,
-					type: 'linear',
-					position: 'right',
-					title: {
-						display: true,
-						text: 'Fan/Heater power (%)'
-					}
-				}
+          min: 0,
+          max: 300,
+          type: "linear",
+          position: "left",
+          title: {
+            display: true,
+            text: "Temperature (°C)",
+          },
+        },
+        y2: {
+          min: 0,
+          max: 100,
+          type: "linear",
+          position: "right",
+          title: {
+            display: true,
+            text: "Fan/Heater power (%)",
+          },
+        },
       },
       responsive: true,
       animation: false,
