@@ -4,3 +4,4 @@
 src/Credentials.h
 node_modules
 .nvim
+**/.DS_Store
