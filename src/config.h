@@ -20,13 +20,16 @@
 
 #define FAN_PIN 8
 
-#define HEATER_PIN 3
+#define HEATER_PIN 4 //changed to pin 4 as pin 3 is EN
 
 // temp sensor pins
+
+//Exhaust
 #define MAX1DO 5
 #define MAX1CS 15
 #define MAX1CLK 6
 
+//Beans
 #define MAX2DO 5
 #define MAX2CS 16
 #define MAX2CLK 6
