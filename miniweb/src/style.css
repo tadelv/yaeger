@@ -24,7 +24,7 @@ a:hover {
 
 body {
   margin: 0;
-  display: flex;
+  /*display: flex;*/
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
@@ -38,7 +38,7 @@ h1 {
 #app {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  /*padding: 5rem;*/
   text-align: center;
 }
 
@@ -94,3 +94,40 @@ button:focus-visible {
     background-color: #f9f9f9;
   }
 }
+
+/* Style the slider */
+input[type="range"] {
+  -webkit-appearance: none;
+  width: 90%;
+  height: 6px;
+  /*background: #ddd;*/
+  border-radius: 3px;
+  position: relative;
+  margin: 20px 0;
+}
+
+/* Remove default outline on focus */
+input[type="range"]:focus {
+  outline: none;
+}
+
+/* Track styles */
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 6px;
+  background: #ddd;
+  border-radius: 3px;
+}
+
+/* Thumb styles */
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  height: 20px;
+  width: 20px;
+  border-radius: 50%;
+  background: #007BFF;
+  border: 2px solid #fff;
+  cursor: pointer;
+  margin-top: -7px; /* Center thumb */
+}
+
+

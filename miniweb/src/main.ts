@@ -99,7 +99,6 @@ function sendCommand(data: any) {
 
 // UI creation
 const app = div(
-  h1("VanJS WebSocket Live Chart"),
   chartElement,
   div(
     "FAN 1:",
