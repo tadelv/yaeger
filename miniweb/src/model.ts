@@ -11,12 +11,20 @@ export type YaegerMessage = {
 
 export class YaegerState  {
 	roast?: RoastState
-	currentState: CurrentState = {};
+	currentState: CurrentState =  {
+		status: RoasterStatus.idle
+	};
+}
+
+export enum RoasterStatus {
+	idle,
+	roasting
 }
 
 export type CurrentState = {
 	lastMessage?: YaegerMessage 
 	lastUpdate?: Date
+	status: RoasterStatus 
 }
 
 export type Measurement = {

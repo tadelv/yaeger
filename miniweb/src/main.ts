@@ -1,7 +1,12 @@
 import "./style.css";
 import van from "vanjs-core";
 import { initializeChart, updateChart } from "./chart";
-import { YaegerMessage, YaegerState, Measurement } from "./model.ts";
+import {
+  YaegerMessage,
+  YaegerState,
+  Measurement,
+  RoasterStatus,
+} from "./model.ts";
 
 const { button, div, input, h1, canvas, p, span } = van.tags;
 
@@ -39,11 +44,15 @@ socket.onmessage = (event) => {
       state.val = {
         ...state.val,
         currentState: {
+          ...state.val.currentState,
           lastMessage: message,
           lastUpdate: timestamp,
         },
       };
-      if (state.val.roast != null) {
+      if (
+        state.val.roast != null &&
+        state.val.currentState.status == RoasterStatus.roasting
+      ) {
         const newMeasurement: [Measurement] = [
           {
             timestamp: timestamp,
@@ -97,11 +106,32 @@ function sendCommand(data: any) {
   socket?.send(msg);
 }
 
+var DownloadButton = () => {
+  const shouldShowButton = van.derive(() => {
+    const c =
+      state.val.currentState.status == RoasterStatus.idle &&
+      (state.val.roast?.measurements.length ?? 0) > 0;
+    console.log("c: ", c);
+    return !c;
+  });
+  return button(
+    {
+      onclick: () => {
+        console.log("download");
+      },
+      disabled: () => shouldShowButton.val,
+    },
+    "Download",
+  );
+};
+
 // UI creation
 const app = div(
   chartElement,
   div(
     "FAN 1:",
+		() => slider1Value.val,
+		"%",
     input({
       type: "range",
       min: "0",
@@ -116,6 +146,8 @@ const app = div(
   ),
   div(
     "HEATER:",
+		() => slider2Value.val,
+		"%",
     input({
       type: "range",
       min: "0",
@@ -129,19 +161,18 @@ const app = div(
     }),
   ),
   div(
-    button(
-      {
-        onclick: () => {
-          state.val = {
-            ...state.val,
-            roast: {
-              startDate: new Date(),
-              measurements: [],
-            },
-          };
+    span(
+      button(
+        {
+          onclick: () => toggleRoastStart(),
         },
-      },
-      "Start",
+        () =>
+          state.val.currentState.status == RoasterStatus.idle
+            ? "Start"
+            : "Stop",
+      ),
+      DownloadButton,
+			"Roast time: ",
     ),
   ),
   div(
@@ -156,6 +187,33 @@ const app = div(
     p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
   ),
 );
+
+function toggleRoastStart() {
+  switch (state.val.currentState.status) {
+    case RoasterStatus.idle:
+      state.val = {
+        ...state.val,
+        currentState: {
+          ...state.val.currentState,
+          status: RoasterStatus.roasting,
+        },
+        roast: {
+          startDate: new Date(),
+          measurements: [],
+        },
+      };
+      break;
+    case RoasterStatus.roasting:
+      state.val = {
+        ...state.val,
+        currentState: {
+          ...state.val.currentState,
+          status: RoasterStatus.idle,
+        },
+      };
+      break;
+  }
+}
 
 function startPeriodicWebSocketMessages(interval: number) {
   if (socket.readyState === WebSocket.OPEN) {
