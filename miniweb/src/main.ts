@@ -7,6 +7,7 @@ import {
   Measurement,
   RoasterStatus,
 } from "./model.ts";
+import { getFormattedTimeDifference } from "./util.ts";
 
 const { button, div, input, h1, canvas, p, span } = van.tags;
 
@@ -111,7 +112,6 @@ var DownloadButton = () => {
     const c =
       state.val.currentState.status == RoasterStatus.idle &&
       (state.val.roast?.measurements.length ?? 0) > 0;
-    console.log("c: ", c);
     return !c;
   });
   return button(
@@ -124,6 +124,13 @@ var DownloadButton = () => {
     "Download",
   );
 };
+
+const RoastTime = () => {
+		const start = state.val.roast?.startDate ?? new Date()
+		const last = state.val.roast!.measurements[state.val.roast!.measurements.length - 1].timestamp
+		console.log("eval roast time")
+		return getFormattedTimeDifference(start, last)
+}
 
 // UI creation
 const app = div(
@@ -173,6 +180,7 @@ const app = div(
       ),
       DownloadButton,
 			"Roast time: ",
+			() => state.val.roast != undefined ? RoastTime() : "00:00"
     ),
   ),
   div(
@@ -187,6 +195,7 @@ const app = div(
     p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
   ),
 );
+
 
 function toggleRoastStart() {
   switch (state.val.currentState.status) {
