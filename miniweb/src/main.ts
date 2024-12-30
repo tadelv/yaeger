@@ -35,7 +35,6 @@ const chart = initializeChart(ctx);
 // WebSocket message handling
 socket.onmessage = (event) => {
   try {
-    console.log(event.data);
     const data = JSON.parse(event.data);
     const message: YaegerMessage = data.data;
     if (message != undefined) {
@@ -69,7 +68,6 @@ socket.onmessage = (event) => {
         };
         updateChart(chart, state.val.roast!);
       }
-      console.log(state.val);
     }
   } catch (error) {
     console.error("Error parsing WebSocket message:", error);
@@ -114,6 +112,30 @@ function appendCommand(label: String, value: number) {
             type: label,
             value: value,
             timestamp: new Date(),
+          },
+        ],
+      ],
+    },
+  };
+}
+
+function appendEvent(label: String) {
+  if (state.val.currentState.status == RoasterStatus.idle) {
+    return;
+  }
+  state.val = {
+    ...state.val,
+    roast: {
+      ...state.val.roast,
+      events: [
+        ...state.val.roast?.events,
+        ...[
+          {
+            label: label,
+            measurement: {
+              message: state.val.currentState.lastMessage,
+              timestamp: state.val.currentState.lastUpdate,
+            },
           },
         ],
       ],
@@ -204,6 +226,16 @@ const app = div(
       DownloadButton,
       "Roast time: ",
       () => (state.val.roast != undefined ? RoastTime() : "00:00"),
+    ),
+  ),
+  div(
+    span(
+      button(
+        {
+          onclick: () => appendEvent("charge"),
+        },
+        "Charge",
+      ),
     ),
   ),
   div(
