@@ -34,5 +34,18 @@ export type Measurement = {
 
 export type RoastState = {
 	startDate: Date
-	measurements: [Measurement] | []
+	measurements: Measurement[] | []
+	events: RoastEvent[] | []
+	commands: RoastCommand[] | []
+}
+
+export type RoastEvent = {
+	label: String
+	measurement: Measurement
+}
+
+export type RoastCommand = {
+	type: 'fan' | 'heater'
+	value: number
+	timestamp: Date
 }

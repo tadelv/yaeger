@@ -81,11 +81,9 @@ const onSliderChange = (slider: string, value: number) => {
   console.log("slider: ", JSON.stringify({ slider, value }));
   switch (slider) {
     case "slider1":
-      console.log("fan");
       updateFanPower(value);
       break;
     case "slider2":
-      console.log("heat");
       updateHeaterPower(value);
       break;
     default:
@@ -93,11 +91,34 @@ const onSliderChange = (slider: string, value: number) => {
   }
 };
 export function updateFanPower(value: number) {
-  console.log("updateFanPower", value);
   sendCommand({ id: 1, FanVal: value });
+  appendCommand("fan", value);
 }
 export function updateHeaterPower(value: number) {
   sendCommand({ id: 1, BurnerVal: value });
+  appendCommand("heater", value);
+}
+
+function appendCommand(label: String, value: number) {
+  if (state.val.currentState.status == RoasterStatus.idle) {
+    return;
+  }
+  state.val = {
+    ...state.val,
+    roast: {
+      ...state.val.roast,
+      commands: [
+        ...state.val.roast?.commands,
+        ...[
+          {
+            type: label,
+            value: value,
+            timestamp: new Date(),
+          },
+        ],
+      ],
+    },
+  };
 }
 
 function sendCommand(data: any) {
@@ -126,19 +147,21 @@ var DownloadButton = () => {
 };
 
 const RoastTime = () => {
-		const start = state.val.roast?.startDate ?? new Date()
-		const last = state.val.roast!.measurements[state.val.roast!.measurements.length - 1].timestamp
-		console.log("eval roast time")
-		return getFormattedTimeDifference(start, last)
-}
+  const start = state.val.roast?.startDate ?? new Date();
+  const last =
+    state.val.roast!.measurements[state.val.roast!.measurements.length - 1]
+      .timestamp;
+  console.log("eval roast time");
+  return getFormattedTimeDifference(start, last);
+};
 
 // UI creation
 const app = div(
   chartElement,
   div(
     "FAN 1:",
-		() => slider1Value.val,
-		"%",
+    () => slider1Value.val,
+    "%",
     input({
       type: "range",
       min: "0",
@@ -153,8 +176,8 @@ const app = div(
   ),
   div(
     "HEATER:",
-		() => slider2Value.val,
-		"%",
+    () => slider2Value.val,
+    "%",
     input({
       type: "range",
       min: "0",
@@ -179,13 +202,12 @@ const app = div(
             : "Stop",
       ),
       DownloadButton,
-			"Roast time: ",
-			() => state.val.roast != undefined ? RoastTime() : "00:00"
+      "Roast time: ",
+      () => (state.val.roast != undefined ? RoastTime() : "00:00"),
     ),
   ),
   div(
     span("ET: ", () => {
-      console.log("upd");
       return state.val.currentState.lastMessage?.ET ?? "N/A";
     }),
     p(),
@@ -195,7 +217,6 @@ const app = div(
     p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
   ),
 );
-
 
 function toggleRoastStart() {
   switch (state.val.currentState.status) {
@@ -209,6 +230,8 @@ function toggleRoastStart() {
         roast: {
           startDate: new Date(),
           measurements: [],
+          events: [],
+          commands: [],
         },
       };
       break;
