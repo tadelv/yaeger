@@ -20,7 +20,7 @@
 
 #define FAN_PIN 8
 
-#define HEATER_PIN 4 //changed to pin 4 as pin 3 is EN
+#define HEATER_PIN 3
 
 // temp sensor pins
 
