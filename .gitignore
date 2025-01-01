@@ -5,3 +5,5 @@ src/Credentials.h
 node_modules
 .nvim
 **/.DS_Store
+local.config.ts
+data/

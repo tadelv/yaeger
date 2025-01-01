@@ -36,7 +36,7 @@ export default defineConfig(async () => ({
         secure: false,
       },
     },
-    host: '0.0.0.0',
+    host: 'localhost',
     port: 3000,
   },
   plugins: [
@@ -52,8 +52,8 @@ export default defineConfig(async () => ({
     //     skipWaiting: true,
     //   },
       manifest: {
-        short_name: 'Gaggiuino',
-        name: 'Gaggiuino web portal',
+        short_name: 'Yaeger',
+        name: 'Yaeger web interface',
         protocol_handlers: [
           {
             protocol: 'web+http',

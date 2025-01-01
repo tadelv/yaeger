@@ -1,16 +1,21 @@
 import "./style.css";
 import van from "vanjs-core";
-import { Chart } from "chart.js/auto";
-import { YaegerMessage } from "./model.ts"
+import { initializeChart, updateChart } from "./chart";
+import {
+  YaegerMessage,
+  YaegerState,
+  Measurement,
+  RoasterStatus,
+  RoastState,
+} from "./model.ts";
+import { getFormattedTimeDifference } from "./util.ts";
 
-const { div, input, h1, canvas } = van.tags;
-
+const { button, div, input, h1, canvas, p, span } = van.tags;
 
 // State variables
-let chartData: number[] = [1];
-let heatData: number[] = [0];
 const slider1Value = van.state(50);
 const slider2Value = van.state(50);
+const state = van.state(new YaegerState());
 
 // Initialize WebSocket
 const socket = new WebSocket("ws://" + location.host + "/ws");
@@ -26,46 +31,44 @@ socket.onerror = (error) => console.error("WebSocket error:", error);
 const chartElement = canvas({ id: "liveChart" });
 const ctx = chartElement.getContext("2d") as CanvasRenderingContext2D;
 
-const chart = new Chart(ctx, {
-  type: "line",
-  data: {
-    labels: ["0"],
-    datasets: [
-      {
-        label: "Live Data",
-        data: chartData,
-        borderColor: "blue",
-        borderWidth: 2,
-      },
-			{
-
-        label: "heat Data",
-        data: heatData,
-        borderColor: "red",
-        borderWidth: 2,
-			}
-    ],
-  },
-  options: {
-    responsive: true,
-    animation: false,
-  },
-});
+const chart = initializeChart(ctx);
 
 // WebSocket message handling
 socket.onmessage = (event) => {
   try {
-    console.log(event.data);
     const data = JSON.parse(event.data);
     const message: YaegerMessage = data.data;
     if (message != undefined) {
-      slider1Value.val = message.FanVal
-			slider2Value.val = message.BurnerVal
-      chart.data.datasets[0].data.push(message.FanVal);
-			chart.data.datasets[1].data.push(message.BurnerVal)
-      chart.data.labels.push(`${Math.floor(new Date().getTime())}`);
-      chart.update();
-
+      slider1Value.val = message.FanVal;
+      slider2Value.val = message.BurnerVal;
+      const timestamp = new Date();
+      state.val = {
+        ...state.val,
+        currentState: {
+          ...state.val.currentState,
+          lastMessage: message,
+          lastUpdate: timestamp,
+        },
+      };
+      if (
+        state.val.roast != null &&
+        state.val.currentState.status == RoasterStatus.roasting
+      ) {
+        const newMeasurement: [Measurement] = [
+          {
+            timestamp: timestamp,
+            message: message,
+          },
+        ];
+        state.val = {
+          ...state.val,
+          roast: {
+            ...state.val.roast,
+            measurements: [...state.val.roast?.measurements, ...newMeasurement],
+          },
+        };
+        updateChart(chart, state.val.roast!);
+      }
     }
   } catch (error) {
     console.error("Error parsing WebSocket message:", error);
@@ -77,11 +80,9 @@ const onSliderChange = (slider: string, value: number) => {
   console.log("slider: ", JSON.stringify({ slider, value }));
   switch (slider) {
     case "slider1":
-      console.log("fan");
       updateFanPower(value);
       break;
     case "slider2":
-      console.log("heat");
       updateHeaterPower(value);
       break;
     default:
@@ -89,11 +90,58 @@ const onSliderChange = (slider: string, value: number) => {
   }
 };
 export function updateFanPower(value: number) {
-  console.log("updateFanPower", value);
   sendCommand({ id: 1, FanVal: value });
+  appendCommand("fan", value);
 }
 export function updateHeaterPower(value: number) {
   sendCommand({ id: 1, BurnerVal: value });
+  appendCommand("heater", value);
+}
+
+function appendCommand(label: String, value: number) {
+  if (state.val.currentState.status == RoasterStatus.idle) {
+    return;
+  }
+  state.val = {
+    ...state.val,
+    roast: {
+      ...state.val.roast,
+      commands: [
+        ...state.val.roast?.commands,
+        ...[
+          {
+            type: label,
+            value: value,
+            timestamp: new Date(),
+          },
+        ],
+      ],
+    },
+  };
+}
+
+function appendEvent(label: String) {
+  if (state.val.currentState.status == RoasterStatus.idle) {
+    return;
+  }
+  state.val = {
+    ...state.val,
+    roast: {
+      ...state.val.roast,
+      events: [
+        ...state.val.roast?.events,
+        ...[
+          {
+            label: label,
+            measurement: {
+              message: state.val.currentState.lastMessage,
+              timestamp: state.val.currentState.lastUpdate,
+            },
+          },
+        ],
+      ],
+    },
+  };
 }
 
 function sendCommand(data: any) {
@@ -103,12 +151,122 @@ function sendCommand(data: any) {
   socket?.send(msg);
 }
 
+var DownloadButton = () => {
+  const shouldShowButton = van.derive(() => {
+    const c =
+      state.val.currentState.status == RoasterStatus.idle &&
+      (state.val.roast?.measurements.length ?? 0) > 0;
+    return !c;
+  });
+  return button(
+    {
+      onclick: () => {
+        console.log("download");
+        const blob = new Blob([JSON.stringify(state.val.roast!)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "roast.json";
+        a.click();
+
+        URL.revokeObjectURL(url);
+      },
+      disabled: () => shouldShowButton.val,
+    },
+    "Download",
+  );
+};
+
+const UploadButton = () => {
+  return button(
+    {
+      onclick: () => {
+        const fileInput = document.getElementById("fileInput");
+        fileInput?.click();
+      },
+      disabled: () => state.val.currentState.status == RoasterStatus.roasting,
+    },
+    "Upload",
+  );
+};
+
+const RoastTime = () => {
+  const start = state.val.roast?.startDate ?? new Date();
+  const last =
+    state.val.roast!.measurements[state.val.roast!.measurements.length - 1]
+      .timestamp;
+  return getFormattedTimeDifference(start, last);
+};
+function dateReviver(key: string, value: any): any {
+  // Check if the value is a string that looks like an ISO 8601 date
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/.test(value)) {
+    return new Date(value); // Convert to Date object
+  }
+  return value; // Otherwise, return the value as-is
+}
+
+const UploadRoastInput = () => {
+  const fileInput = input({
+    type: "file",
+    id: "fileInput",
+    accept: "application/json",
+    style: "display: none;",
+  });
+  fileInput.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        console.log("reading: ", e.target.result);
+        const jsonData = JSON.parse<RoastState>(e.target.result, dateReviver);
+				console.log(typeof(jsonData))
+				console.log(jsonData as RoastState)
+        state.val = {
+          ...state.val,
+          roast: jsonData,
+        };
+				updateChart(chart, state.val.roast!)
+      } catch (error) {
+        console.log("upload failed:", error);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  return div(fileInput);
+};
+
 // UI creation
 const app = div(
-  h1("VanJS WebSocket Live Chart"),
+  div(
+    span(
+      button(
+        {
+          onclick: () => toggleRoastStart(),
+        },
+        () =>
+          state.val.currentState.status == RoasterStatus.idle
+            ? "Start"
+            : "Stop",
+      ),
+      DownloadButton,
+      UploadButton,
+      "Roast time: ",
+      () => (state.val.roast != undefined ? RoastTime() : "00:00"),
+    ),
+  ),
   chartElement,
   div(
     "FAN 1:",
+    () => slider1Value.val,
+    "%",
     input({
       type: "range",
       min: "0",
@@ -122,7 +280,9 @@ const app = div(
     }),
   ),
   div(
-    "Slider 2:",
+    "HEATER:",
+    () => slider2Value.val,
+    "%",
     input({
       type: "range",
       min: "0",
@@ -135,7 +295,93 @@ const app = div(
       },
     }),
   ),
+  div(
+    span(
+      button(
+        {
+          onclick: () => appendEvent("charge"),
+        },
+        "Charge",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("dry-end"),
+        },
+        "Dry End",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("first-crack-start"),
+        },
+        "First crack start",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("first-crack-end"),
+        },
+        "First crack end",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("second-crack start"),
+        },
+        "Second crack start",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("second-crack-end"),
+        },
+        "Second crack end",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("drop"),
+        },
+        "Drop",
+      ),
+    ),
+  ),
+  div(
+    span("ET: ", () => {
+      return state.val.currentState.lastMessage?.ET ?? "N/A";
+    }),
+    p(),
+    span("BT: ", () => state.val.currentState.lastMessage?.BT ?? "N/A"),
+    p(),
+    "Last update: ",
+    p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
+  ),
+	UploadRoastInput
 );
+
+function toggleRoastStart() {
+  switch (state.val.currentState.status) {
+    case RoasterStatus.idle:
+      state.val = {
+        ...state.val,
+        currentState: {
+          ...state.val.currentState,
+          status: RoasterStatus.roasting,
+        },
+        roast: {
+          startDate: new Date(),
+          measurements: [],
+          events: [],
+          commands: [],
+        },
+      };
+      break;
+    case RoasterStatus.roasting:
+      state.val = {
+        ...state.val,
+        currentState: {
+          ...state.val.currentState,
+          status: RoasterStatus.idle,
+        },
+      };
+      break;
+  }
+}
 
 function startPeriodicWebSocketMessages(interval: number) {
   if (socket.readyState === WebSocket.OPEN) {
