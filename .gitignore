@@ -4,3 +4,5 @@
 src/Credentials.h
 node_modules
 .nvim
+local.config.ts
+data/
