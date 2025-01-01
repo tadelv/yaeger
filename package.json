@@ -1,0 +1,9 @@
+{
+  "dependencies": {
+    "chartjs-plugin-trendline": "^2.1.6"
+  },
+  "devDependencies": {
+    "prettier": "^3.4.2",
+    "prettier-plugin-svelte": "^3.3.2"
+  }
+}

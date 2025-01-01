@@ -14,7 +14,7 @@ roasting small batches of coffee at a time.
 
 ### Suported hardware:
 
-* ESP32-S3 (devkit-1)
+* ESP32-S3 (devkit-1) or an S3-mini
 * 1 or 2 MAX31855 thermocouple chips
 * 1 DC pwm capable dimmer for the fan (must support 3.3v control)
 * 1 DC controlled AC SSR for controling the heating element (same as above)
