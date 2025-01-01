@@ -236,6 +236,42 @@ const app = div(
         },
         "Charge",
       ),
+      button(
+        {
+          onclick: () => appendEvent("dry-end"),
+        },
+        "Dry End",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("first-crack-start"),
+        },
+        "First crack start",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("first-crack-end"),
+        },
+        "First crack end",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("second-crack start"),
+        },
+					"Second crack start",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("second-crack-end"),
+        },
+        "Second crack end",
+      ),
+      button(
+        {
+          onclick: () => appendEvent("drop"),
+        },
+        "Drop",
+      ),
     ),
   ),
   div(

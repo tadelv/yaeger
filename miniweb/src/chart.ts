@@ -101,6 +101,14 @@ export function updateChart(chart: Chart, roast: RoastState) {
   chart.data.labels = roast.measurements.map(
     (el) => `${(el.timestamp.getTime() - roast.startDate.getTime()) / 1000}`,
   );
+	chart.config._config.lineAtIndex = roast.events.map((event) => {
+		return {
+			label: event.label,
+			idx: roast.measurements.findIndex((el) => {
+				return Math.abs(el.timestamp.getTime() - event.measurement.timestamp.getTime()) < 500
+			})
+		}
+	})
   chart.update();
 }
 
@@ -113,7 +121,7 @@ const verticalLinePlugin = {
 
   renderVerticalLine: function (chartInstance, pointIndex) {
     const lineLeftOffset = this.getLinePosition(chartInstance, pointIndex);
-    const scale = chartInstance.scales.y;
+    const scale = chartInstance.scales.y1;
     const context = chartInstance.ctx;
     // render vertical line
     context.beginPath();
