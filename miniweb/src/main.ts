@@ -6,6 +6,7 @@ import {
   YaegerState,
   Measurement,
   RoasterStatus,
+  RoastState,
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
 
@@ -161,10 +162,34 @@ var DownloadButton = () => {
     {
       onclick: () => {
         console.log("download");
+        const blob = new Blob([JSON.stringify(state.val.roast!)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "roast.json";
+        a.click();
+
+        URL.revokeObjectURL(url);
       },
       disabled: () => shouldShowButton.val,
     },
     "Download",
+  );
+};
+
+const UploadButton = () => {
+  return button(
+    {
+      onclick: () => {
+        const fileInput = document.getElementById("fileInput");
+        fileInput?.click();
+      },
+      disabled: () => state.val.currentState.status == RoasterStatus.roasting,
+    },
+    "Upload",
   );
 };
 
@@ -173,12 +198,70 @@ const RoastTime = () => {
   const last =
     state.val.roast!.measurements[state.val.roast!.measurements.length - 1]
       .timestamp;
-  console.log("eval roast time");
   return getFormattedTimeDifference(start, last);
+};
+function dateReviver(key: string, value: any): any {
+  // Check if the value is a string that looks like an ISO 8601 date
+  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/.test(value)) {
+    return new Date(value); // Convert to Date object
+  }
+  return value; // Otherwise, return the value as-is
+}
+
+const UploadRoastInput = () => {
+  const fileInput = input({
+    type: "file",
+    id: "fileInput",
+    accept: "application/json",
+    style: "display: none;",
+  });
+  fileInput.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        console.log("reading: ", e.target.result);
+        const jsonData = JSON.parse<RoastState>(e.target.result, dateReviver);
+				console.log(typeof(jsonData))
+				console.log(jsonData as RoastState)
+        state.val = {
+          ...state.val,
+          roast: jsonData,
+        };
+				updateChart(chart, state.val.roast!)
+      } catch (error) {
+        console.log("upload failed:", error);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  return div(fileInput);
 };
 
 // UI creation
 const app = div(
+  div(
+    span(
+      button(
+        {
+          onclick: () => toggleRoastStart(),
+        },
+        () =>
+          state.val.currentState.status == RoasterStatus.idle
+            ? "Start"
+            : "Stop",
+      ),
+      DownloadButton,
+      UploadButton,
+      "Roast time: ",
+      () => (state.val.roast != undefined ? RoastTime() : "00:00"),
+    ),
+  ),
   chartElement,
   div(
     "FAN 1:",
@@ -216,22 +299,6 @@ const app = div(
     span(
       button(
         {
-          onclick: () => toggleRoastStart(),
-        },
-        () =>
-          state.val.currentState.status == RoasterStatus.idle
-            ? "Start"
-            : "Stop",
-      ),
-      DownloadButton,
-      "Roast time: ",
-      () => (state.val.roast != undefined ? RoastTime() : "00:00"),
-    ),
-  ),
-  div(
-    span(
-      button(
-        {
           onclick: () => appendEvent("charge"),
         },
         "Charge",
@@ -258,7 +325,7 @@ const app = div(
         {
           onclick: () => appendEvent("second-crack start"),
         },
-					"Second crack start",
+        "Second crack start",
       ),
       button(
         {
@@ -284,6 +351,7 @@ const app = div(
     "Last update: ",
     p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
   ),
+	UploadRoastInput
 );
 
 function toggleRoastStart() {
