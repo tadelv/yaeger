@@ -24,10 +24,12 @@ jobs:
             ~/.platformio/.cache
           key: ${{ runner.os }}-pio
       - uses: actions/setup-node@v4.1.
-        run: cd miniweb && npm i && vite build;
+        
       - uses: actions/setup-python@v4
         with:
           python-version: '3.11'
+      - name: Build webUI
+        run: cd miniweb && npm i && vite build;
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
