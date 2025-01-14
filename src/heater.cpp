@@ -10,6 +10,7 @@ void initHeater() {
 static int heaterPower = 0;
 // Refresh period in milliseconds
 const unsigned long refreshPeriod = 1000; // 1 second (1000 milliseconds)
+const float powerLimitFactor = 0.9;
 
 // Variables to keep track of time
 unsigned long previousMillis = 0;
@@ -19,10 +20,10 @@ bool isSSROn = false;
 void setHeaterPower(int power) {
   if (power < 0) {
     power = 0;
-  } else if (power > 80) {
-    power = 80; // don't go over 80% for safety
+  } else if (power > 100) {
+    power = 100; 
   }
-  heaterPower = power;
+  heaterPower = power * powerLimitFactor;
   logf("Heater power set to %d%%\n", power);
   onTime = (refreshPeriod * heaterPower) / 100;
 }
@@ -57,4 +58,4 @@ void updateHeater() {
   }
 }
 
-int getHeaterPower() { return heaterPower; }
+int getHeaterPower() { return heaterPower / powerLimitFactor; }
