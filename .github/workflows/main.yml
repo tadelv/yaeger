@@ -34,7 +34,8 @@ jobs:
         run: pip install --upgrade platformio
 
       - name: Build PlatformIO Project
-        run: pio run -e ${{ github.event.inputs.board }} &&
+        run: touch src/Credentials.h && 
+             pio run -e ${{ github.event.inputs.board }} &&
              pio run -e ${{ github.event.inputs.board }} -t buildfs
 
       - name: Save firmware file
