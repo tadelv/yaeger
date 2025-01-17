@@ -1,22 +1,22 @@
 name: Build firmware
 
-on: 
-  workflow_dispatch:
-    inputs:
-      board:
-        type: choice
-        description: Choose board
-        options:
-        - esp32-s3
-        - esp32-s3-mini
-        required: true
+on:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        board:
+          - esp32-s3
+          - esp32-s3-mini
 
     steps:
       - uses: actions/checkout@v3
+
       - uses: actions/cache@v3
         with:
           path: |
@@ -24,25 +24,27 @@ jobs:
             ~/.platformio/.cache
           key: ${{ runner.os }}-pio
       - uses: actions/setup-node@v4.1.0
-        
+
       - uses: actions/setup-python@v4
         with:
-          python-version: '3.11'
+          python-version: "3.11"
+
       - name: Build webUI
         run: cd miniweb && npm i && npm run build;
+
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
 
       - name: Build PlatformIO Project
-        run: touch src/Credentials.h && 
-             pio run -e ${{ github.event.inputs.board }} &&
-             pio run -e ${{ github.event.inputs.board }} -t buildfs
+        run: |
+          touch src/Credentials.h 
+          pio run -e ${{ matrix.board }} 
+          pio run -e ${{ matrix.board }} -t buildfs
 
       - name: Save firmware file
         uses: actions/upload-artifact@v4
         with:
-          name: firmware
+          name: firmware-${{ matrix.board }}
           path: |
-            .pio/build/${{ github.event.inputs.board }}/firmware.bin
-            .pio/build/${{ github.event.inputs.board }}/spiffs.bin
-          
+            .pio/build/${{ matrix.board }}/firmware.bin
+            .pio/build/${{ matrix.board }}/spiffs.bin
