@@ -46,7 +46,7 @@ export default defineConfig(async () => ({
     // viteCompression(),
 
     VitePWA({
-    //   registerType: 'autoUpdate',
+      registerType: 'autoUpdate',
     //   workbox: {
     //     clientsClaim: true,
     //     skipWaiting: true,

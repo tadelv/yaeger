@@ -80,12 +80,17 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
             text: "Fan/Heater power (%)",
           },
         },
+        y3: {
+          min: 0,
+          max: 10,
+          type: "logarithmic",
+        },
       },
       responsive: true,
       animation: false,
     },
     lineAtIndex: [],
-    plugins: [verticalLinePlugin, chartTrendline],
+    plugins: [verticalLinePlugin],
   });
 }
 
@@ -95,20 +100,58 @@ export function updateChart(chart: Chart, roast: RoastState) {
   chart.data.datasets[2].data = roast.measurements.map(
     (el) => el.message.FanVal,
   );
+
+  const beanTemps = roast.measurements.map((el) => el.message.ET);
+  const timestamps = roast.measurements.map(
+    (el) => (el.timestamp.getTime() - roast.startDate.getTime()) / 1000,
+  );
+
+  // Calculate RoR (assume timestamps are in seconds)
+  const ror = [];
+  for (let i = 1; i < beanTemps.length; i++) {
+    // TODO: clamp delta temp to a reasonable value?
+    const deltaTemp = beanTemps[i] - beanTemps[i - 1];
+    const deltaTime = timestamps[i] - timestamps[i - 1];
+    var ror_calc = deltaTime > 0 ? deltaTemp / deltaTime : 0;
+    if (deltaTemp > 3) {
+      console.log("tN: ", beanTemps[i], "tP", beanTemps[i - 1]);
+      console.log("d6: ", deltaTime, "dTmp:", deltaTemp);
+      console.log("ror:", ror_calc);
+    }
+    if (ror.length > 1) {
+      ror_calc = ror[ror.length - 1] * 0.8 + ror_calc * 0.2;
+    }
+    ror.push(ror_calc);
+  }
+
+  // Add the RoR dataset
+  chart.data.datasets[4] = {
+    label: "Rate of Rise (°C/s)",
+    borderColor: "green",
+    pointStyle: false,
+    data: [null, ...ror], // Align with timestamps
+    yAxisID: "y3",
+    tension: 0.5,
+  };
+
   chart.data.datasets[3].data = roast.measurements.map(
     (el) => el.message.BurnerVal,
   );
   chart.data.labels = roast.measurements.map(
     (el) => `${(el.timestamp.getTime() - roast.startDate.getTime()) / 1000}`,
   );
-	chart.config._config.lineAtIndex = roast.events.map((event) => {
-		return {
-			label: event.label,
-			idx: roast.measurements.findIndex((el) => {
-				return Math.abs(el.timestamp.getTime() - event.measurement.timestamp.getTime()) < 500
-			})
-		}
-	})
+  chart.config._config.lineAtIndex = roast.events.map((event) => {
+    return {
+      label: event.label,
+      idx: roast.measurements.findIndex((el) => {
+        return (
+          Math.abs(
+            el.timestamp.getTime() - event.measurement.timestamp.getTime(),
+          ) < 500
+        );
+      }),
+    };
+  });
   chart.update();
 }
 
@@ -132,11 +175,12 @@ const verticalLinePlugin = {
 
     // write label
     context.fillStyle = "#ff0000";
-    context.textAlign = "center";
+    context.textAlign = "trailing";
     context.fillText(
       pointIndex.label,
       lineLeftOffset,
-      (scale.bottom - scale.top) / 2 + scale.top,
+      scale.bottom - 20,
+      // (scale.bottom - scale.top) / 2 + scale.top,
     );
   },
 
