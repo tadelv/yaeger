@@ -1,3 +1,3 @@
 void startSensors();
 void takeReadings();
-float* getETBTReadings();
+void getETBTReadings(float *readings);
