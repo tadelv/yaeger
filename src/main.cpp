@@ -20,6 +20,7 @@
 #include "heater.h"
 #include "logging.h"
 #include "sensors.h"
+#include "api.h"
 
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
@@ -119,6 +120,10 @@ void setup(void) {
   // WebSocket handler
   setupMainLoop(&ws);
   server.addHandler(&ws);
+
+
+	// API
+	setupApi(&server);
 
   server.begin();
   log("HTTP server started");
