@@ -1,4 +1,6 @@
+#ifndef EASY_AP
 #include "Credentials.h"
+#endif
 #include <ESPmDNS.h>
 #include <SPIFFS.h>
 #include <WiFi.h>
