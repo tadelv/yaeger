@@ -20,8 +20,7 @@ void setupApi(AsyncWebServer *server) {
     prefs.begin(wifiPrefsKey, false);
     prefs.putString(wifiSSIDKey, ssid);
     prefs.putString(wifiPassKey, pass);
-    log("saving to prefs");
-    logf("ss %s, p: %s", ssid, pass);
+    logf("saving to prefs, ssid: %s", ssid);
 
     prefs.end();
     request->send(200);
