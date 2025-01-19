@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
 
 jobs:
   build:
@@ -37,7 +38,6 @@ jobs:
 
       - name: Build PlatformIO Project
         run: |
-          touch src/Credentials.h 
           pio run -e ${{ matrix.board }} 
           pio run -e ${{ matrix.board }} -t buildfs
 

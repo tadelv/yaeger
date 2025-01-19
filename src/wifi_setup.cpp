@@ -2,6 +2,7 @@
 #include <ESPmDNS.h>
 #include <Preferences.h>
 #include <WiFi.h>
+#include "logging.h"
 
 const char *wifiPrefsKey = "wifi";
 const char *wifiSSIDKey = "ssid";
@@ -38,23 +39,23 @@ void connectToWifi() {
   int wifiCounter = 0;
   while (WiFi.status() != WL_CONNECTED) {
 		if (WiFi.status() == WL_CONNECT_FAILED) {
-		  Serial.print("Connect failed, restoring AP");
+		  log("Connect failed, restoring AP");
 			setupAP();
 			break;
 		}
     wifiCounter++;
     delay(1000);
-    Serial.print(".");
+    log(".");
     if (wifiCounter > 10) {
 			setupAP();
       break;
     }
   }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(WiFi.SSID());
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
+  log("");
+  log("Connected to ");
+  log(WiFi.SSID().c_str());
+  log("IP address: ");
+  log(WiFi.localIP().toString().c_str());
 }
 
 void setupWifi() {
@@ -68,15 +69,15 @@ void setupWifi() {
   WiFi.setHostname(hostname);
 
   if (params.hasCredentials()) {
-		Serial.println("trying to connect to wifi");
+		log("trying to connect to wifi");
 		connectToWifi();
   } else {
-		Serial.println("no wifi data found, setting up AP");
+		log("no wifi data found, setting up AP");
     setupAP();
   }
 
   if (!MDNS.begin("yaeger")) {
-    Serial.println("could not set up MDNS responder");
+    log("could not set up MDNS responder");
   }
 }
 
