@@ -17,6 +17,24 @@ const slider1Value = van.state(50);
 const slider2Value = van.state(50);
 const state = van.state(new YaegerState());
 
+// Wifi
+const ssidField = van.state("");
+const passField = van.state("");
+
+const updateWifiSettings = async () => {
+  const ssid = ssidField.val;
+  const pass = passField.val;
+
+  try {
+    const response = await fetch(
+      `http://${location.host}/api/wifi?ssid=${encodeURIComponent(ssid)}&pass=${encodeURIComponent(pass)}`,
+    );
+    alert("Wifi settings updated!\nPlease restart for the new settings to take effect");
+  } catch (error) {
+    alert(`Error: ${error.message}`);
+  }
+};
+
 // Initialize WebSocket
 const socket = new WebSocket("ws://" + location.host + "/ws");
 
@@ -202,7 +220,10 @@ const RoastTime = () => {
 };
 function dateReviver(key: string, value: any): any {
   // Check if the value is a string that looks like an ISO 8601 date
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/.test(value)) {
+  if (
+    typeof value === "string" &&
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/.test(value)
+  ) {
     return new Date(value); // Convert to Date object
   }
   return value; // Otherwise, return the value as-is
@@ -226,13 +247,13 @@ const UploadRoastInput = () => {
       try {
         console.log("reading: ", e.target.result);
         const jsonData = JSON.parse<RoastState>(e.target.result, dateReviver);
-				console.log(typeof(jsonData))
-				console.log(jsonData as RoastState)
+        console.log(typeof jsonData);
+        console.log(jsonData as RoastState);
         state.val = {
           ...state.val,
           roast: jsonData,
         };
-				updateChart(chart, state.val.roast!)
+        updateChart(chart, state.val.roast!);
       } catch (error) {
         console.log("upload failed:", error);
       }
@@ -351,7 +372,16 @@ const app = div(
     "Last update: ",
     p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
   ),
-	UploadRoastInput
+  UploadRoastInput,
+	div(
+		"Wifi ssid:",
+		input({ type: "text", oninput: (e: Event) => {ssidField.val = e.target.value }} ),
+		p(),
+		"Wifi pass (if any)",
+		input({ type: "password", oninput: (e: Event) => {passField.val = e.target.value }}),
+		p(),
+		button({ onclick: updateWifiSettings }, "Update")
+	)
 );
 
 function toggleRoastStart() {
