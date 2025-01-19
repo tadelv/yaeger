@@ -106,6 +106,8 @@ export function updateChart(chart: Chart, roast: RoastState) {
     (el) => (el.timestamp.getTime() - roast.startDate.getTime()) / 1000,
   );
 
+  const windowSize = 10;
+
   // Calculate RoR (assume timestamps are in seconds)
   const ror = [];
   for (let i = 1; i < beanTemps.length; i++) {
@@ -118,10 +120,18 @@ export function updateChart(chart: Chart, roast: RoastState) {
       console.log("d6: ", deltaTime, "dTmp:", deltaTemp);
       console.log("ror:", ror_calc);
     }
-    if (ror.length > 1) {
-      ror_calc = ror[ror.length - 1] * 0.8 + ror_calc * 0.2;
-    }
+    // if (ror.length > 1) {
+    //   ror_calc = ror[ror.length - 1] * 0.4 + ror_calc * 0.6;
+    // }
     ror.push(ror_calc);
+
+    if (ror.length >= windowSize) {
+      const rollingAverage =
+        ror
+          .slice(ror.length - windowSize) // Take the last `windowSize` elements
+          .reduce((sum, val) => sum + val, 0) / windowSize; // Calculate their average
+      ror[ror.length - 1] = rollingAverage; // Replace the last value with the rolling average
+    }
   }
 
   // Add the RoR dataset
@@ -131,7 +141,7 @@ export function updateChart(chart: Chart, roast: RoastState) {
     pointStyle: false,
     data: [null, ...ror], // Align with timestamps
     yAxisID: "y3",
-    tension: 0.5,
+    tension: 0.2,
   };
 
   chart.data.datasets[3].data = roast.measurements.map(

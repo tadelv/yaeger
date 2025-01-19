@@ -1,12 +1,9 @@
-#include "Credentials.h"
-#include <ESPmDNS.h>
-#include <SPIFFS.h>
-#include <WiFi.h>
 
 // lib for Over the Air (ota) programming
 #include <Adafruit_NeoPixel.h>
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA
+#include <SPIFFS.h>
 
 #include "CommandLoop.h"
 #include "HardwareSerial.h"
@@ -18,6 +15,8 @@
 #include "heater.h"
 #include "logging.h"
 #include "sensors.h"
+#include "api.h"
+#include "wifi_setup.h"
 
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
@@ -68,36 +67,7 @@ void setup(void) {
   pixels.show();
 
   // Wait for connection
-#ifdef EASY_AP
-  WiFi.softAP("Yaeger");
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
-#else
-  const char *hostname = "yaeger.local";
-  WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-  WiFi.setHostname(hostname);
-  WiFi.mode(WIFI_STA);
-  /*WiFi.softAP("YAEGER");*/
-  WiFi.begin(ssid, password);
-  WiFi.setTxPower(WIFI_POWER_8_5dBm);
-  int wifiCounter = 0;
-  while (WiFi.status() != WL_CONNECTED) {
-    wifiCounter++;
-    delay(500);
-    Serial.print(".");
-    if (wifiCounter > 15) {
-      break;
-    }
-  }
-  Serial.println("");
-  Serial.print("Connected to ");
-  Serial.println(WiFi.SSID());
-  Serial.print("IP address: ");
-  Serial.println(WiFi.localIP());
-  if (!MDNS.begin("yaeger")) {
-    Serial.println("could not set up MDNS responder");
-  }
-#endif
-
+  setupWifi();
   initDisplay();
   setWifiIP();
 
@@ -117,6 +87,10 @@ void setup(void) {
   // WebSocket handler
   setupMainLoop(&ws);
   server.addHandler(&ws);
+
+
+	// API
+	setupApi(&server);
 
   server.begin();
   log("HTTP server started");
