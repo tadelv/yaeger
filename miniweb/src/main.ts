@@ -29,7 +29,13 @@ const updateWifiSettings = async () => {
     const response = await fetch(
       `http://${location.host}/api/wifi?ssid=${encodeURIComponent(ssid)}&pass=${encodeURIComponent(pass)}`,
     );
-    alert("Wifi settings updated!\nPlease restart for the new settings to take effect");
+    if (response.ok) {
+      alert(
+        "Wifi settings updated!\nPlease restart for the new settings to take effect",
+      );
+    } else {
+      alert(`Something happened: ${response.status}`);
+    }
   } catch (error) {
     alert(`Error: ${error.message}`);
   }
@@ -373,15 +379,25 @@ const app = div(
     p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
   ),
   UploadRoastInput,
-	div(
-		"Wifi ssid:",
-		input({ type: "text", oninput: (e: Event) => {ssidField.val = e.target.value }} ),
-		p(),
-		"Wifi pass (if any)",
-		input({ type: "password", oninput: (e: Event) => {passField.val = e.target.value }}),
-		p(),
-		button({ onclick: updateWifiSettings }, "Update")
-	)
+  div(
+    "Wifi ssid:",
+    input({
+      type: "text",
+      oninput: (e: Event) => {
+        ssidField.val = e.target.value;
+      },
+    }),
+    p(),
+    "Wifi pass (if any)",
+    input({
+      type: "password",
+      oninput: (e: Event) => {
+        passField.val = e.target.value;
+      },
+    }),
+    p(),
+    button({ onclick: updateWifiSettings }, "Update"),
+  ),
 );
 
 function toggleRoastStart() {
