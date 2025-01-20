@@ -6,6 +6,8 @@
 #include <Adafruit_MAX31855.h>
 #include <NexgenFilter.h>
 #include <SPI.h>
+#include <MovingAverageFilter.h>
+#include <cstdint>
 
 void getChipTemp() {
   // Get Ambient Temp from DS18B20
@@ -17,8 +19,13 @@ void getChipTemp() {
 Adafruit_MAX31855 tcExhaust(MAX1CLK, MAX1CS, MAX1DO);
 Adafruit_MAX31855 tcBeans(MAX2CLK, MAX2CS, MAX2DO);
 
-SimpleKalmanFilter exhaustFilter(80, 80, 3);
-SimpleKalmanFilter beansFilter(80, 80, 3);
+const uint8_t kMovingAverageWindowSize = 10;
+const uint8_t kSamplingWindowDuration = 100;
+
+MovingAverageFilter exhaustFilter(kMovingAverageWindowSize);
+MovingAverageFilter beansFilter(kMovingAverageWindowSize);
+/*SimpleKalmanFilter exhaustFilter(80, 80, 3);*/
+/*SimpleKalmanFilter beansFilter(80, 80, 3);*/
 unsigned long lastReadTime = 0;
 
 SemaphoreHandle_t mtx;
@@ -44,7 +51,7 @@ void startSensors() {
 
 void takeReadings() {
   float dt = (millis() - lastReadTime);
-  if (dt < 500) {
+  if (dt < kSamplingWindowDuration) {
     return;
   }
   if (xSemaphoreTakeRecursive(mtx, portMAX_DELAY) == pdTRUE) {
@@ -72,7 +79,7 @@ void takeETReadings(float dt) {
     return;
   }
   logf("Exhaust Temp: %.2f\n", exhaustTemp);
-  readings[0] = exhaustFilter.updateEstimate(exhaustTemp);
+  readings[0] = exhaustFilter.process(exhaustTemp);
 }
 
 void takeBTReadings(float dt) {
@@ -89,7 +96,7 @@ void takeBTReadings(float dt) {
     return;
   }
   logf("Bean Temp: %.2f\n", beanTemp);
-  readings[1] = beansFilter.updateEstimate(beanTemp);
+  readings[1] = beansFilter.process(beanTemp);
 }
 
 void getETBTReadings(float *readingsBuf) {
