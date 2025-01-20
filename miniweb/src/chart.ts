@@ -1,6 +1,6 @@
 import chartTrendline from "chartjs-plugin-trendline";
 import "chartjs-adapter-date-fns";
-import { Chart } from "chart.js/auto";
+import { Chart, plugins } from "chart.js/auto";
 import { RoastState, YaegerMessage } from "./model.ts";
 
 export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
@@ -44,6 +44,24 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
       ],
     },
     options: {
+      interaction: {
+        intersect: false,
+        mode: "index",
+        axis: "xy",
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            title: function (item) {
+              const x = item[0].parsed.x;
+              if (x < 60) {
+                return `${x} seconds`;
+              }
+              return `${Math.floor(x / 60)} minutes, ${(x % 60).toFixed(2)} seconds`;
+            },
+          },
+        },
+      },
       scales: {
         x: {
           grace: 5,
@@ -56,10 +74,7 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
           },
           ticks: {
             stepSize: 60,
-            callback: function (value: any, index, ticks) {
-              console.log("val", value);
-              console.log("idx", index);
-              console.log("ticks", ticks);
+            callback: function (value: any, __, _) {
               if (value <= 60) {
                 return `${value}s`;
               } else {
