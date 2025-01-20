@@ -14,12 +14,6 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
           borderColor: "blue",
           pointStyle: false,
           data: [],
-          trendlineLinear: {
-            colorMin: "#0f0588",
-            colorMax: "#00f0ff",
-            lineStyle: "dotted",
-            width: 1,
-          },
           yAxisID: "y1",
           tension: 0.4,
         },
@@ -28,13 +22,6 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
           borderColor: "red",
           pointStyle: false,
           data: [],
-          trendlineLinear: {
-            colorMin: "#666099",
-            colorMax: "#f770aa",
-            lineStyle: "dotted",
-            projection: true,
-            width: 3,
-          },
           yAxisID: "y1",
           tension: 0.4,
         },
@@ -58,7 +45,30 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
     },
     options: {
       scales: {
-        x: { grace: 5, type: "linear", bounds: "ticks", beginAtZero: true },
+        x: {
+          grace: 5,
+          type: "linear",
+          bounds: "ticks",
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: "Time",
+          },
+          ticks: {
+            stepSize: 60,
+            callback: function (value: any, index, ticks) {
+              console.log("val", value);
+              console.log("idx", index);
+              console.log("ticks", ticks);
+              if (value <= 60) {
+                return `${value}s`;
+              } else {
+                const minutes = Math.floor(value / 60);
+                return `${minutes}m`;
+              }
+            },
+          },
+        },
         //x: { type: 'time', time: { unit: 'minute' } },
         y1: {
           min: 0,
