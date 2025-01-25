@@ -23,22 +23,25 @@ roasting small batches of coffee at a time.
 
 ### Other required hardware for the build:
 
-* 18V DC PSU for driving the fan
+* 18V DC PSU for driving the fan (be careful how you wire this)
 * regular wire K-type thermocouple probe (the one that comes with your multimeter)
 * flexible K-type thermocouple probe, 1x50/1.5x50 (sometimes difficult to source, they come and go on aliexpress, search for
-flexible thermocouple 1x100 - this usually works)
+flexible thermocouple 1x100 - this usually works) 
+
+**NOTE**
+We don't have enough data if there is enough difference between ET and BT to justify two thermocouples. You might use
+just one. 
 
 #### Optional upgrades:
 
 * 24V DC PSU for more fan power
 
 ### Command and control
-This repo includes a sample config for Artisan-Scope. In order for Yaeger to connect to your wifi, add a `Credentials.h`
-file in the `src` dir and add data in the following format:
-```
-const char *ssid = "Wifi";
-const char *password = "WifiPassword";
-```
+Upon first launch, Yaeger will set up its own access point. You can then configure the preferred wifi for Yaeger to
+connect to from the Web UI (see below). After setting up the preffered Wifi, Yaeger will try to connect to it on every
+boot. If it can't connect to the preffered Wifi, Yaeger will fallback to its own access point (so you can set up Wifi
+again).
+This repo also includes a sample config for Artisan-Scope. 
 
 #### Artisan Scope
 Load the config, found in `./artisan-settings.aset` into Artisan-Scope, change the server ip to match yours and click the on button. 
@@ -49,13 +52,18 @@ your home wifi, or `192.168.4.1` if Yaeger creates its own access point.
 ![yaeger webui](./assets/yaeger-webui.png)
 
 #### Using Yaeger on the go
-If you're out and about, without access to a Wifi, Yaeger can create its own access point. Add a define `#define EASY_AP` in the `config.h` file and you will be able to join the Yaeger wifi network. The ip of Yaeger is in this case `192.168.4.1`. 
-
+If Yaeger can't connect to your preferred Wifi, it will create its own access point. Perfect for when out and about :)
 
 ## Build guide (WIP)
 
 ### Schema
 ![schema](./schema/Schematic_Yaeger_2024-12-24.svg)
+
+Additional info for the v1 pcb can be found in the schema folder, along with a BOM for the pcb. Courtesy of [@dlisec](https://github.com/dlisec)
+
+### Building and flashing
+A build script has been provided by [@matthew73210](https://github.com/matthew73210), so to get up and running on the
+ESP, just run `./build_and_flash.sh`.
 
 # Disclaimer
 Be careful when messing about with electronics and high voltage. I can not and will not take any responsibility for any
