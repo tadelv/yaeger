@@ -126,7 +126,7 @@ export function updateChart(chart: Chart, roast: RoastState) {
     (el) => el.message.FanVal,
   );
 
-  const beanTemps = roast.measurements.map((el) => el.message.ET);
+  const beanTemps = roast.measurements.map((el) => el.message.BT);
   const timestamps = roast.measurements.map(
     (el) => (el.timestamp.getTime() - roast.startDate.getTime()) / 1000,
   );
@@ -140,14 +140,6 @@ export function updateChart(chart: Chart, roast: RoastState) {
     const deltaTemp = beanTemps[i] - beanTemps[i - 1];
     const deltaTime = timestamps[i] - timestamps[i - 1];
     var ror_calc = deltaTime > 0 ? deltaTemp / deltaTime : 0;
-    if (deltaTemp > 3) {
-      console.log("tN: ", beanTemps[i], "tP", beanTemps[i - 1]);
-      console.log("d6: ", deltaTime, "dTmp:", deltaTemp);
-      console.log("ror:", ror_calc);
-    }
-    // if (ror.length > 1) {
-    //   ror_calc = ror[ror.length - 1] * 0.4 + ror_calc * 0.6;
-    // }
     ror.push(ror_calc);
 
     if (ror.length >= windowSize) {
