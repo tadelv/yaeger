@@ -1,6 +1,6 @@
 import chartTrendline from "chartjs-plugin-trendline";
 import "chartjs-adapter-date-fns";
-import { Chart } from "chart.js/auto";
+import { Chart, plugins } from "chart.js/auto";
 import { RoastState, YaegerMessage } from "./model.ts";
 
 export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
@@ -14,12 +14,6 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
           borderColor: "blue",
           pointStyle: false,
           data: [],
-          trendlineLinear: {
-            colorMin: "#0f0588",
-            colorMax: "#00f0ff",
-            lineStyle: "dotted",
-            width: 1,
-          },
           yAxisID: "y1",
           tension: 0.4,
         },
@@ -28,13 +22,6 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
           borderColor: "red",
           pointStyle: false,
           data: [],
-          trendlineLinear: {
-            colorMin: "#666099",
-            colorMax: "#f770aa",
-            lineStyle: "dotted",
-            projection: true,
-            width: 3,
-          },
           yAxisID: "y1",
           tension: 0.4,
         },
@@ -57,8 +44,46 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
       ],
     },
     options: {
+      interaction: {
+        intersect: false,
+        mode: "index",
+        axis: "xy",
+      },
+      plugins: {
+        tooltip: {
+          callbacks: {
+            title: function (item) {
+              const x = item[0].parsed.x;
+              if (x < 60) {
+                return `${x} seconds`;
+              }
+              return `${Math.floor(x / 60)} minutes, ${(x % 60).toFixed(2)} seconds`;
+            },
+          },
+        },
+      },
       scales: {
-        x: { grace: 5, type: "linear", bounds: "ticks", beginAtZero: true },
+        x: {
+          grace: 5,
+          type: "linear",
+          bounds: "ticks",
+          beginAtZero: true,
+          title: {
+            display: true,
+            text: "Time",
+          },
+          ticks: {
+            stepSize: 60,
+            callback: function (value: any, __, _) {
+              if (value <= 60) {
+                return `${value}s`;
+              } else {
+                const minutes = Math.floor(value / 60);
+                return `${minutes}m`;
+              }
+            },
+          },
+        },
         //x: { type: 'time', time: { unit: 'minute' } },
         y1: {
           min: 0,
@@ -101,45 +126,58 @@ export function updateChart(chart: Chart, roast: RoastState) {
     (el) => el.message.FanVal,
   );
 
-  const beanTemps = roast.measurements.map((el) => el.message.ET);
-  const timestamps = roast.measurements.map(
-    (el) => (el.timestamp.getTime() - roast.startDate.getTime()) / 1000,
+  const { measurements, startDate } = roast;
+  const timestamps = measurements.map(
+    (el) => (el.timestamp.getTime() - startDate.getTime()) / 1000,
+  );
+  const beanTemps = measurements.map((el) => el.message.BT);
+  const envTemps = measurements.map((el) => el.message.ET);
+
+  const windowSize = 20;
+
+  // Helper to calculate rate of rise (RoR)
+  const calculateRoR = (temps: number[], times: number[]) =>
+    temps.map((temp, i) => {
+      if (i === 0) return null; // No RoR for the first data point
+      const deltaTemp = temp - temps[i - 1];
+      const deltaTime = times[i] - times[i - 1];
+      return deltaTime > 0 ? deltaTemp / deltaTime : 0;
+    });
+
+  // Helper to calculate rolling average
+  const applyRollingAverage = (values: (number | null)[], size: number) => {
+    return values.map((val, i, arr) => {
+      if (val === null || i < size - 1) return val; // Skip if insufficient data
+      const window = arr.slice(i - size + 1, i + 1) as number[];
+      return window.reduce((sum, v) => sum + v, 0) / size;
+    });
+  };
+
+  // Calculate RoR and apply rolling averages
+  const btRor = applyRollingAverage(
+    calculateRoR(beanTemps, timestamps),
+    windowSize,
+  );
+  const etRor = applyRollingAverage(
+    calculateRoR(envTemps, timestamps),
+    windowSize,
   );
 
-  const windowSize = 10;
-
-  // Calculate RoR (assume timestamps are in seconds)
-  const ror = [];
-  for (let i = 1; i < beanTemps.length; i++) {
-    // TODO: clamp delta temp to a reasonable value?
-    const deltaTemp = beanTemps[i] - beanTemps[i - 1];
-    const deltaTime = timestamps[i] - timestamps[i - 1];
-    var ror_calc = deltaTime > 0 ? deltaTemp / deltaTime : 0;
-    if (deltaTemp > 3) {
-      console.log("tN: ", beanTemps[i], "tP", beanTemps[i - 1]);
-      console.log("d6: ", deltaTime, "dTmp:", deltaTemp);
-      console.log("ror:", ror_calc);
-    }
-    // if (ror.length > 1) {
-    //   ror_calc = ror[ror.length - 1] * 0.4 + ror_calc * 0.6;
-    // }
-    ror.push(ror_calc);
-
-    if (ror.length >= windowSize) {
-      const rollingAverage =
-        ror
-          .slice(ror.length - windowSize) // Take the last `windowSize` elements
-          .reduce((sum, val) => sum + val, 0) / windowSize; // Calculate their average
-      ror[ror.length - 1] = rollingAverage; // Replace the last value with the rolling average
-    }
-  }
-
-  // Add the RoR dataset
+  // Add datasets to chart
   chart.data.datasets[4] = {
-    label: "Rate of Rise (°C/s)",
+    label: "BT Rate of Rise (°C/s)",
     borderColor: "green",
     pointStyle: false,
-    data: [null, ...ror], // Align with timestamps
+    data: btRor,
+    yAxisID: "y3",
+    tension: 0.2,
+  };
+
+  chart.data.datasets[5] = {
+    label: "ET Rate of Rise (°C/s)",
+    borderColor: "purple",
+    pointStyle: false,
+    data: etRor,
     yAxisID: "y3",
     tension: 0.2,
   };
