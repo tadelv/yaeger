@@ -59,7 +59,9 @@ If Yaeger can't connect to your preferred Wifi, it will create its own access po
 ### Schema
 ![schema](./schema/Schematic_Yaeger_2024-12-24.svg)
 
-Additional info for the v1 pcb can be found in the schema folder, along with a BOM for the pcb. Courtesy of [@dlisec](https://github.com/dlisec)
+Kicad projects for the S3 and S3 mini versions of the PCB, can be found in the PCB folder, along with a BOM for the pcb.
+
+Courtesy of [@dlisec](https://github.com/dlisec)
 
 ### Building and flashing
 A build script has been provided by [@matthew73210](https://github.com/matthew73210), so to get up and running on the
