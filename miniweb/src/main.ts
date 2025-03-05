@@ -369,6 +369,53 @@ const app = div(
     ),
   ),
   div(
+    "PID Control:",
+    input({
+      type: "checkbox",
+      onchange: (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        // Handle PID control toggle
+        console.log("PID Control:", target.checked);
+      },
+    }),
+    "Temp Target:",
+    input({
+      type: "number",
+      oninput: (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        // Handle temp target input
+        console.log("Temp Target:", target.value);
+      },
+    }),
+    "P:",
+    input({
+      type: "number",
+      oninput: (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        // Handle P input
+        console.log("P:", target.value);
+      },
+    }),
+    "I:",
+    input({
+      type: "number",
+      oninput: (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        // Handle I input
+        console.log("I:", target.value);
+      },
+    }),
+    "D:",
+    input({
+      type: "number",
+      oninput: (e: Event) => {
+        const target = e.target as HTMLInputElement;
+        // Handle D input
+        console.log("D:", target.value);
+      },
+    }),
+  ),
+  div(
     span("ET: ", () => {
       return state.val.currentState.lastMessage?.ET ?? "N/A";
     }),
