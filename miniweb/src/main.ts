@@ -9,6 +9,7 @@ import {
   RoastState,
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
+import { PIDController } from "./pid.ts";
 
 const { button, div, input, h1, canvas, p, span } = van.tags;
 
@@ -16,6 +17,9 @@ const { button, div, input, h1, canvas, p, span } = van.tags;
 const slider1Value = van.state(50);
 const slider2Value = van.state(50);
 const state = van.state(new YaegerState());
+
+const setpoint = van.state(20);
+const pid = new PIDController(1.0, 0.1, 0.01);
 
 // Wifi
 const ssidField = van.state("");
@@ -92,6 +96,7 @@ socket.onmessage = (event) => {
           },
         };
         updateChart(chart, state.val.roast!);
+        controlHeater();
       }
     }
   } catch (error) {
@@ -270,6 +275,34 @@ const UploadRoastInput = () => {
   return div(fileInput);
 };
 
+// Update setpoint through a slider or input
+const SetpointControl = () =>
+  div(
+    "Setpoint (°C): ",
+    () => setpoint.val,
+    input({
+      type: "range",
+      min: "0",
+      max: "300",
+      value: setpoint,
+      oninput: (e: Event) => {
+        setpoint.val = parseInt((e.target as HTMLInputElement).value, 10);
+      },
+    }),
+  );
+
+function controlHeater() {
+  const currentTemp = state.val.currentState.lastMessage?.ET ?? 0; // Assuming ET = environment temperature
+
+  const output = pid.compute(setpoint.val, currentTemp);
+
+  // Clamp output to 0–100% range
+  const heaterPower = Math.min(100, Math.max(0, Math.round(output)));
+
+  updateHeaterPower(heaterPower);
+  slider2Value.val = heaterPower; // Reflect change in the UI
+}
+
 // UI creation
 const app = div(
   div(
@@ -290,6 +323,7 @@ const app = div(
     ),
   ),
   chartElement,
+  SetpointControl,
   div(
     "FAN 1:",
     () => slider1Value.val,
