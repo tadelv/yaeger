@@ -19,7 +19,10 @@ const slider2Value = van.state(50);
 const state = van.state(new YaegerState());
 
 const setpoint = van.state(20);
-const pid = new PIDController(1.0, 0.1, 0.01);
+const pidPFactor = van.state(1.0);
+const pidIFactor = van.state(0.1);
+const pidDFactor = van.state(0.01);
+var pid = new PIDController(1.0, 0.1, 0.01);
 
 // Wifi
 const ssidField = van.state("");
@@ -290,9 +293,64 @@ const SetpointControl = () =>
       },
     }),
   );
+let tempP = pidPFactor.val;
+let tempI = pidIFactor.val;
+let tempD = pidDFactor.val;
+const PIDConfig = () =>
+  div(
+    "PID Factors",
+    p(),
+    "P:",
+    input({
+      type: "number",
+      value: tempP,
+      oninput: (e: Event) => {
+        tempP = parseFloat((e.target as HTMLInputElement).value) || 0;
+      },
+    }),
+    "I:",
+    input({
+      type: "number",
+      value: tempI,
+      oninput: (e: Event) => {
+        tempI = parseFloat((e.target as HTMLInputElement).value) || 0;
+      },
+    }),
+    "D:",
+    input({
+      type: "number",
+      value: tempD,
+      oninput: (e: Event) => {
+        tempD = parseFloat((e.target as HTMLInputElement).value) || 0;
+      },
+    }),
+    p(),
+    button(
+      {
+        onclick: () => {
+          pidPFactor.val = tempP;
+          pidIFactor.val = tempI;
+          pidDFactor.val = tempD;
+
+          pid = new PIDController(
+            pidPFactor.val,
+            pidIFactor.val,
+            pidDFactor.val,
+          );
+          console.log("New PID values set:", {
+            P: pidPFactor.val,
+            I: pidIFactor.val,
+            D: pidDFactor.val,
+          });
+					console.log("PID:", JSON.stringify(pid));
+        },
+      },
+      "Apply pid",
+    ),
+  );
 
 function controlHeater() {
-  const currentTemp = state.val.currentState.lastMessage?.ET ?? 0; // Assuming ET = environment temperature
+  const currentTemp = state.val.currentState.lastMessage?.BT ?? 0; 
 
   const output = pid.compute(setpoint.val, currentTemp);
 
@@ -413,7 +471,12 @@ const app = div(
     p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
   ),
   UploadRoastInput,
+  p(),
+  PIDConfig,
+  p(),
   div(
+    "Wifi settings:",
+    p(),
     "Wifi ssid:",
     input({
       type: "text",
