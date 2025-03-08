@@ -30,6 +30,11 @@ export type CurrentState = {
 export type Measurement = {
 	timestamp: Date
 	message: YaegerMessage
+	extra?: MeasurementExtra
+}
+
+export type MeasurementExtra = {
+	setpoint: number
 }
 
 export type RoastState = {

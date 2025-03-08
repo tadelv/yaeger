@@ -89,6 +89,9 @@ socket.onmessage = (event) => {
           {
             timestamp: timestamp,
             message: message,
+            extra: {
+              setpoint: setpoint.val,
+            },
           },
         ];
         state.val = {
@@ -342,7 +345,7 @@ const PIDConfig = () =>
             I: pidIFactor.val,
             D: pidDFactor.val,
           });
-					console.log("PID:", JSON.stringify(pid));
+          console.log("PID:", JSON.stringify(pid));
         },
       },
       "Apply pid",
@@ -350,7 +353,7 @@ const PIDConfig = () =>
   );
 
 function controlHeater() {
-  const currentTemp = state.val.currentState.lastMessage?.BT ?? 0; 
+  const currentTemp = state.val.currentState.lastMessage?.BT ?? 0;
 
   const output = pid.compute(setpoint.val, currentTemp);
 

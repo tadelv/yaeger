@@ -182,6 +182,15 @@ export function updateChart(chart: Chart, roast: RoastState) {
     tension: 0.2,
   };
 
+  chart.data.datasets[6] = {
+    label: "Setpoint (°C)",
+    borderColor: "#03fc7b",
+    pointStyle: false,
+    data: roast.measurements.map((el) => el.extra?.setpoint ?? 0),
+    yAxisID: "y1",
+    tension: 0.1,
+  };
+
   chart.data.datasets[3].data = roast.measurements.map(
     (el) => el.message.BurnerVal,
   );
