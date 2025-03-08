@@ -35,6 +35,7 @@ export type Measurement = {
 
 export type MeasurementExtra = {
 	setpoint: number
+	pidData?: PIDData
 }
 
 export type RoastState = {
@@ -53,4 +54,11 @@ export type RoastCommand = {
 	type: 'fan' | 'heater'
 	value: number
 	timestamp: Date
+}
+
+export type PIDData = {
+	enabled: boolean
+	kp: number
+	ki: number
+	kd: number
 }

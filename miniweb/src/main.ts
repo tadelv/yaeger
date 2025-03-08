@@ -11,7 +11,7 @@ import {
 import { getFormattedTimeDifference } from "./util.ts";
 import { PIDController } from "./pid.ts";
 
-const { button, div, input, select, option, canvas, p, span } = van.tags;
+const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
 // State variables
 const slider1Value = van.state(50);
@@ -91,6 +91,12 @@ socket.onmessage = (event) => {
             message: message,
             extra: {
               setpoint: setpoint.val,
+              pidData: {
+                enabled: pidEnabled,
+                kp: pidPFactor.val,
+                ki: pidIFactor.val,
+                kd: pidDFactor.val,
+              },
             },
           },
         ];
@@ -301,6 +307,7 @@ let tempI = pidIFactor.val;
 let tempD = pidDFactor.val;
 
 let tempTarget = "BT";
+let pidEnabled = true;
 
 const PIDConfig = () =>
   div(
@@ -365,6 +372,14 @@ const PIDConfig = () =>
       },
       "Apply pid",
     ),
+    label(
+      input({
+        type: "checkbox",
+        checked: pidEnabled,
+        oninput: (e) => (pidEnabled = e.target.checked),
+      }),
+      "PID Enabled",
+    ),
   );
 
 function controlHeater() {
@@ -379,6 +394,9 @@ function controlHeater() {
   // Clamp output to 0–100% range
   const heaterPower = Math.min(100, Math.max(0, Math.round(output)));
 
+  if (pidEnabled == false) {
+    return;
+  }
   updateHeaterPower(heaterPower);
   slider2Value.val = heaterPower; // Reflect change in the UI
 }
