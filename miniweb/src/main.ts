@@ -11,7 +11,7 @@ import {
 import { getFormattedTimeDifference } from "./util.ts";
 import { PIDController } from "./pid.ts";
 
-const { button, div, input, h1, canvas, p, span } = van.tags;
+const { button, div, input, select, option, canvas, p, span } = van.tags;
 
 // State variables
 const slider1Value = van.state(50);
@@ -299,6 +299,9 @@ const SetpointControl = () =>
 let tempP = pidPFactor.val;
 let tempI = pidIFactor.val;
 let tempD = pidDFactor.val;
+
+let tempTarget = "BT";
+
 const PIDConfig = () =>
   div(
     "PID Factors",
@@ -328,6 +331,18 @@ const PIDConfig = () =>
       },
     }),
     p(),
+    "Target:",
+    select(
+      {
+        value: tempTarget,
+        onchange: (e: Event) => {
+          tempTarget = (e.target as HTMLSelectElement).value;
+        },
+      },
+      option({ value: "BT" }, "BT"),
+      option({ value: "ET" }, "ET"),
+    ),
+    p(),
     button(
       {
         onclick: () => {
@@ -353,8 +368,12 @@ const PIDConfig = () =>
   );
 
 function controlHeater() {
-  const currentTemp = state.val.currentState.lastMessage?.BT ?? 0;
-
+  let currentTemp: number;
+  if (tempTarget == "BT") {
+    currentTemp = state.val.currentState.lastMessage?.BT ?? 0;
+  } else {
+    currentTemp = state.val.currentState.lastMessage?.ET ?? 0;
+  }
   const output = pid.compute(setpoint.val, currentTemp);
 
   // Clamp output to 0–100% range
