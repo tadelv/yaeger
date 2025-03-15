@@ -107,7 +107,7 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
         },
         y3: {
           min: 0,
-          max: 100,
+          max: 60,
           //type: "logarithmic",
         },
       },
