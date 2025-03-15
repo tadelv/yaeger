@@ -1,3 +1,6 @@
+import van from "vanjs-core";
+const { label, button, div, input, select, option, canvas, p, span } = van.tags;
+
 import { Profile, RoastState } from "./model";
 
 export function followProfile(
@@ -56,3 +59,9 @@ function interpolateSetpoint(
       return end;
   }
 }
+
+// TODO: profile follow toggle
+// also state for loaded profile?
+// anything else?
+export const ProfileControl = () =>
+  div("Profile:", button("Load"), button("Clear"));

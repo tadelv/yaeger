@@ -11,7 +11,7 @@ import {
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
 import { PIDController } from "./pid.ts";
-import { followProfile } from "./profiling.ts";
+import { followProfile, ProfileControl } from "./profiling.ts";
 
 const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
@@ -525,6 +525,8 @@ const app = div(
   p(),
   PIDConfig,
   p(),
+	ProfileControl,
+	p(),
   div(
     "Wifi settings:",
     p(),
