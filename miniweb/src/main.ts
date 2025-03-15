@@ -7,9 +7,11 @@ import {
   Measurement,
   RoasterStatus,
   RoastState,
+  Profile,
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
 import { PIDController } from "./pid.ts";
+import { followProfile } from "./profiling.ts";
 
 const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
@@ -108,6 +110,15 @@ socket.onmessage = (event) => {
           },
         };
         updateChart(chart, state.val.roast!);
+        if (state.val.profile != undefined) {
+          var profiledSetpoint = followProfile(
+            state.val.profile!,
+            state.val.roast!,
+          );
+          if (profiledSetpoint != undefined) {
+            setpoint.val = profiledSetpoint;
+          }
+        }
         controlHeater();
       }
     }
@@ -551,6 +562,30 @@ function toggleRoastStart() {
           measurements: [],
           events: [],
           commands: [],
+        },
+        profile: {
+          steps: [
+            {
+              duration: 10,
+              setpoint: 40,
+              interpolation: "linear",
+            },
+            {
+              duration: 30,
+              setpoint: 80,
+              interpolation: "ease-out",
+            },
+            {
+              duration: 33,
+              setpoint: 150,
+              interpolation: "ease-in",
+            },
+            {
+              duration: 15,
+              setpoint: 210,
+              interpolation: "linear",
+            },
+          ],
         },
       };
       break;

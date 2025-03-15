@@ -14,6 +14,7 @@ export class YaegerState  {
 	currentState: CurrentState =  {
 		status: RoasterStatus.idle
 	};
+	profile?: Profile
 }
 
 export enum RoasterStatus {
@@ -61,4 +62,14 @@ export type PIDData = {
 	kp: number
 	ki: number
 	kd: number
+}
+
+export type Profile = {
+	steps: ProfileStep[]
+}
+
+export type ProfileStep = {
+	interpolation: 'linear' | 'ease-in' | 'ease-out'
+	setpoint: number
+	duration: number
 }
