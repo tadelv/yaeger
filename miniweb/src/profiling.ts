@@ -3,6 +3,8 @@ const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
 import { Profile, RoastState } from "./model";
 
+export const profile = van.state<Profile | undefined>();
+
 export function followProfile(
   profile: Profile,
   roast: RoastState,
@@ -64,4 +66,56 @@ function interpolateSetpoint(
 // also state for loaded profile?
 // anything else?
 export const ProfileControl = () =>
-  div("Profile:", button("Load"), button("Clear"));
+  div(
+    "Profile:",
+    profile.val ? "loaded" : "waiting",
+    p(),
+    UploadProfileInput,
+    button(
+      {
+        onclick: () => {
+          const fileInput = document.getElementById("profileInput");
+          fileInput?.click();
+        },
+      },
+      "Load",
+    ),
+    button(
+      {
+        onclick: () => {
+          profile.val = undefined;
+        },
+      },
+      "Clear",
+    ),
+  );
+
+const UploadProfileInput = () => {
+  const fileInput = input({
+    type: "file",
+    id: "profileInput",
+    accept: "application/json",
+    style: "display: none;",
+  });
+  fileInput.addEventListener("change", (event) => {
+    const file = event.target.files[0];
+    if (!file) {
+      return;
+    }
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      try {
+        console.log("reading: ", e.target.result);
+        const jsonData = JSON.parse<Profile>(e.target.result);
+        console.log(typeof jsonData);
+        profile.val = jsonData;
+      } catch (error) {
+        console.log("upload failed:", error);
+      }
+    };
+    reader.readAsText(file);
+  });
+
+  return div(fileInput);
+};

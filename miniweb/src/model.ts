@@ -44,6 +44,7 @@ export type RoastState = {
 	measurements: Measurement[] | []
 	events: RoastEvent[] | []
 	commands: RoastCommand[] | []
+	profile?: Profile
 }
 
 export type RoastEvent = {

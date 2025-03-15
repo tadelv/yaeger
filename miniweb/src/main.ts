@@ -11,7 +11,7 @@ import {
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
 import { PIDController } from "./pid.ts";
-import { followProfile, ProfileControl } from "./profiling.ts";
+import { followProfile, profile, ProfileControl } from "./profiling.ts";
 
 const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
@@ -525,8 +525,8 @@ const app = div(
   p(),
   PIDConfig,
   p(),
-	ProfileControl,
-	p(),
+  ProfileControl,
+  p(),
   div(
     "Wifi settings:",
     p(),
@@ -565,30 +565,7 @@ function toggleRoastStart() {
           events: [],
           commands: [],
         },
-        profile: {
-          steps: [
-            {
-              duration: 10,
-              setpoint: 40,
-              interpolation: "linear",
-            },
-            {
-              duration: 30,
-              setpoint: 80,
-              interpolation: "ease-out",
-            },
-            {
-              duration: 33,
-              setpoint: 150,
-              interpolation: "ease-in",
-            },
-            {
-              duration: 15,
-              setpoint: 210,
-              interpolation: "linear",
-            },
-          ],
-        },
+        profile: profile.val,
       };
       break;
     case RoasterStatus.roasting:
@@ -597,6 +574,10 @@ function toggleRoastStart() {
         currentState: {
           ...state.val.currentState,
           status: RoasterStatus.idle,
+        },
+        roast: {
+          ...state.val.roast!,
+          profile: state.val.profile,
         },
       };
       break;
