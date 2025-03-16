@@ -5,6 +5,7 @@ import { Profile, RoastState } from "./model";
 
 export const profile = van.state<Profile | undefined>();
 export const followProfileEnabled = van.state(true);
+const profileName = van.state("");
 
 export function followProfile(
   profile: Profile,
@@ -71,13 +72,10 @@ function interpolateSetpoint(
   }
 }
 
-// TODO: profile follow toggle
-// also state for loaded profile?
-// anything else?
 export const ProfileControl = () =>
   div(
     "Profile:",
-    profile.val ? "loaded" : "waiting",
+    profile.val ? profileName.val : "waiting",
     p(),
     UploadProfileInput,
     button(
@@ -108,6 +106,10 @@ export const ProfileControl = () =>
     ),
   );
 
+function isValidProfile(obj: any): obj is Profile {
+  return obj && typeof obj.steps === "object";
+}
+
 const UploadProfileInput = () => {
   const fileInput = input({
     type: "file",
@@ -126,8 +128,12 @@ const UploadProfileInput = () => {
       try {
         console.log("reading: ", e.target.result);
         const jsonData = JSON.parse<Profile>(e.target.result);
-        console.log(typeof jsonData);
-        profile.val = jsonData;
+        const jsonProfile: Profile = jsonData as Profile;
+        if (isValidProfile(jsonProfile) == false) {
+          throw "Invalid profile";
+        }
+        profileName.val = file.name;
+        profile.val = jsonProfile;
       } catch (error) {
         console.log("upload failed:", error);
       }

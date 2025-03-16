@@ -243,7 +243,6 @@ const verticalLinePlugin = {
 
   beforeDatasetsDraw: function (chart, easing) {
     if (chart.config._config.lineAtIndex) {
-      console.log("doing ", chart.config._config.lineAtIndex);
       chart.config._config.lineAtIndex.forEach((pointIndex) => {
         this.renderVerticalLine(chart, pointIndex);
       });
