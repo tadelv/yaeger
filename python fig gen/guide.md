@@ -23,11 +23,11 @@ pdm venv activate
 Then
 
 ```bash
-python3 fig-gen.py roast.json
+python3 fig-gen.py ex_roast.json
 ```
 
 ### Directly through PDM
 
 ```bash
-pdm run python3 fig-gen.py roast.json
+pdm run python3 fig-gen.py ex_roast.json
 ```
