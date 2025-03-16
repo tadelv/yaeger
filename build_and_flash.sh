@@ -1,7 +1,18 @@
 #!/bin/bash
 
 # The script will build and flash Yaeger to your ESP device.
-# Ensure this script is executable (`chmod +x script.sh`) and has the correct permissions.
+# Ensure this script is executable (`chmod +x build_and_flash.sh`) and has the correct permissions.
+#
+# Usage:
+#   ./build_and_flash.sh <s3 | s3-mini>
+#
+# Example:
+#   ./build_and_flash.sh s3      # For ESP32-S3
+#   ./build_and_flash.sh s3-mini # For ESP32-S3 Mini
+#
+# If you cloned the project from GitHub, ensure all folders have the correct permissions:
+#   chmod -R u+rwX .
+# The SPIFFS filesystem might fail if permissions are incorrect.
 
 # Step 0: Check for required parameter (s3 or s3-mini)
 if [[ -z "$1" ]]; then
