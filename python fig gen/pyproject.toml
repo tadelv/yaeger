@@ -1,0 +1,33 @@
+[project]
+name = "yaeger-profiler"
+version = "0.1.0"
+description = "Default template for PDM package"
+authors = [
+    {name = "Matthew Burton", email = "19491784+matthew73210@users.noreply.github.com"},
+]
+dependencies = [
+    "jupyter",
+    "pandas",
+    "matplotlib",
+    "scipy",
+    "plotly>=6.0.0",
+]
+requires-python = ">=3.13"
+readme = "README.md"
+license = {text = "MIT"}
+
+
+[tool.pdm]
+distribution = false
+
+[[tool.pdm.source]]
+url = "https://pypi.org/simple"
+verify_ssl = true
+name = "pypi"
+
+[dependency-groups]
+dev = []
+
+[build-system]
+requires = ["pdm-backend"]
+build-backend = "pdm.backend"
