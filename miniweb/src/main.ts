@@ -7,9 +7,11 @@ import {
   Measurement,
   RoasterStatus,
   RoastState,
+  Profile,
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
 import { PIDController } from "./pid.ts";
+import { followProfile, followProfileEnabled, profile, ProfileControl } from "./profiling.ts";
 
 const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
@@ -108,6 +110,15 @@ socket.onmessage = (event) => {
           },
         };
         updateChart(chart, state.val.roast!);
+        if (state.val.profile != undefined && followProfileEnabled.val == true) {
+          var profiledSetpoint = followProfile(
+            state.val.profile!,
+            state.val.roast!,
+          );
+          if (profiledSetpoint != undefined) {
+            setpoint.val = profiledSetpoint;
+          }
+        }
         controlHeater();
       }
     }
@@ -514,6 +525,8 @@ const app = div(
   p(),
   PIDConfig,
   p(),
+  ProfileControl,
+  p(),
   div(
     "Wifi settings:",
     p(),
@@ -552,6 +565,7 @@ function toggleRoastStart() {
           events: [],
           commands: [],
         },
+        profile: profile.val,
       };
       break;
     case RoasterStatus.roasting:
@@ -560,6 +574,10 @@ function toggleRoastStart() {
         currentState: {
           ...state.val.currentState,
           status: RoasterStatus.idle,
+        },
+        roast: {
+          ...state.val.roast!,
+          profile: state.val.profile,
         },
       };
       break;
