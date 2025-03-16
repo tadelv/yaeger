@@ -86,6 +86,26 @@ PID temp follower, set the temperature setpoint and the PID controller will try 
 
 Still in the works, but there is now a profile follower, it follows a simple .json format. You can have a go at [Gaggiuino web profiler](https://matthew73210.github.io/Gaggiuino-web-profiler/) under the _pun_ "Yägermeister Mode"
 
+
+#### An example of a roast profile
+
+```
+{
+  "steps": [
+    {
+      "duration": 10,
+      "setpoint": 40,
+      "interpolation": "linear"
+    },
+    {
+      "duration": 360,
+      "setpoint": 217,
+      "interpolation": "ease-out"
+    }
+  ]
+}
+```
+
 ## Disclaimer
 
 Be careful when messing about with electronics and high voltage. I can not and will not take any responsibility for any
