@@ -59,7 +59,7 @@ your home wifi, or `192.168.4.1` if Yaeger creates its own access point.
 
 #### Using Yaeger on the go
 
-If Yaeger can't connect to your preferred Wifi, it will create its own access point. Perfect for when out and about :
+If Yaeger can't connect to your preferred Wifi, it will create its own access point. Perfect for when out and about :grin:
 
 ## Build guide (WIP)
 
