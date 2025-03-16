@@ -49,7 +49,7 @@ function interpolateSetpoint(
   start: number,
   end: number,
   progress: number,
-  type: "linear" | "ease-in" | "ease-out",
+  type: "linear" | "ease-in" | "ease-out" | "ease-in-out",
 ): number {
   switch (type) {
     case "linear":
@@ -58,6 +58,14 @@ function interpolateSetpoint(
       return start + (end - start) * Math.pow(progress, 2);
     case "ease-out":
       return start + (end - start) * (1 - Math.pow(1 - progress, 2));
+    case "ease-in-out":
+      return (
+        start +
+        (end - start) *
+          (progress < 0.5
+            ? 2 * Math.pow(progress, 2)
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2)
+      );
     default:
       return end;
   }
