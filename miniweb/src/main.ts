@@ -11,7 +11,7 @@ import {
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
 import { PIDController } from "./pid.ts";
-import { followProfile, profile, ProfileControl } from "./profiling.ts";
+import { followProfile, followProfileEnabled, profile, ProfileControl } from "./profiling.ts";
 
 const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
@@ -110,7 +110,7 @@ socket.onmessage = (event) => {
           },
         };
         updateChart(chart, state.val.roast!);
-        if (state.val.profile != undefined) {
+        if (state.val.profile != undefined && followProfileEnabled.val == true) {
           var profiledSetpoint = followProfile(
             state.val.profile!,
             state.val.roast!,

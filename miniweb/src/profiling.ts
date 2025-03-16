@@ -4,6 +4,7 @@ const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 import { Profile, RoastState } from "./model";
 
 export const profile = van.state<Profile | undefined>();
+export const followProfileEnabled = van.state(true);
 
 export function followProfile(
   profile: Profile,
@@ -87,6 +88,15 @@ export const ProfileControl = () =>
         },
       },
       "Clear",
+    ),
+    p(),
+    label(
+      input({
+        type: "checkbox",
+        checked: followProfileEnabled,
+        oninput: (e) => (followProfileEnabled.val = e.target.checked),
+      }),
+      "Follow Profile Enabled",
     ),
   );
 
