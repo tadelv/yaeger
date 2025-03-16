@@ -1,9 +1,23 @@
 #!/bin/bash
 
 # The script will build and flash Yaeger to your ESP device.
-# Make sure the file is executable (`chmod +x script.sh`) and that you have read/write permissions on the folder.
-# If cloned from GitHub and not downloaded, ensure all folders have the correct permissions (`chmod -R u+rwX .`), 
-# as the SPIFFS filesystem will probably fail otherwise.
+# Ensure this script is executable (`chmod +x script.sh`) and has the correct permissions.
+
+# Step 0: Check for required parameter (s3 or s3-mini)
+if [[ -z "$1" ]]; then
+    echo "Usage: $0 <s3 | s3-mini>"
+    exit 1
+fi
+
+PIO_ENV="esp32-$1"
+
+# Validate the provided environment
+if [[ "$PIO_ENV" != "esp32-s3" && "$PIO_ENV" != "esp32-s3-mini" ]]; then
+    echo "Invalid argument: '$1'. Use 's3' or 's3-mini'."
+    exit 1
+fi
+
+echo "Using PlatformIO environment: $PIO_ENV"
 
 # Step 1: Navigate to the miniweb directory
 echo "Navigating to miniweb..."
@@ -12,7 +26,6 @@ cd miniweb || { echo "miniweb folder not found!"; exit 1; }
 # Step 2: Install dependencies
 echo "Installing dependencies with npm..."
 npm install || { echo "npm install failed!"; exit 1; }
-# If npm is not installed, you may need to install it first (`sudo apt install npm` or `brew install npm` on macOS).
 
 # Step 3: Build the web assets
 echo "Building the web project..."
@@ -22,20 +35,16 @@ npm run build || { echo "npm build failed!"; exit 1; }
 echo "Returning to the project root..."
 cd .. || exit 1
 
-# Step 5: Erase the device memory (optional, but recommended)
+# Step 5: Erase the device memory (optional but recommended)
 echo "Erasing the device memory..."
-pio run -t erase || { echo "Memory erase failed!"; exit 1; }
-# Ensure PlatformIO is installed before running this script (`pip install platformio`).
+pio run -e "$PIO_ENV" -t erase || { echo "Memory erase failed!"; exit 1; }
 
 # Step 6: Build and upload the SPIFFS filesystem
 echo "Building and uploading SPIFFS filesystem..."
-pio run -t buildfs -t uploadfs || { echo "SPIFFS upload failed!"; exit 1; }
-# If the filesystem upload fails, you may need to check permissions or run `pio run -t menuconfig` to configure flash settings.
+pio run -e "$PIO_ENV" -t buildfs -t uploadfs || { echo "SPIFFS upload failed!"; exit 1; }
 
 # Step 7: Build and upload the firmware
 echo "Building and uploading the firmware..."
-pio run -t upload || { echo "Firmware build or upload failed!"; exit 1; }
-# If the upload fails, ensure your device is properly connected and in flashing mode.
+pio run -e "$PIO_ENV" -t upload || { echo "Firmware build or upload failed!"; exit 1; }
 
 echo "All tasks completed successfully!"
-
