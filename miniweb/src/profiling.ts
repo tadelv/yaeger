@@ -31,11 +31,15 @@ export function followProfile(
               ?.setpoint || step.setpoint;
       const nextSetpoint = step.setpoint;
 
-      return interpolateSetpoint(
-        prevSetpoint,
-        nextSetpoint,
-        progress,
-        step.interpolation,
+      return (
+        Math.floor(
+          interpolateSetpoint(
+            prevSetpoint,
+            nextSetpoint,
+            progress,
+            step.interpolation,
+          ) * 10,
+        ) / 10
       );
     }
   }

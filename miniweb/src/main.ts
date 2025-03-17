@@ -11,7 +11,12 @@ import {
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
 import { PIDController } from "./pid.ts";
-import { followProfile, followProfileEnabled, profile, ProfileControl } from "./profiling.ts";
+import {
+  followProfile,
+  followProfileEnabled,
+  profile,
+  ProfileControl,
+} from "./profiling.ts";
 
 const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
@@ -94,7 +99,7 @@ socket.onmessage = (event) => {
             extra: {
               setpoint: setpoint.val,
               pidData: {
-                enabled: pidEnabled,
+                enabled: pidEnabled.val,
                 kp: pidPFactor.val,
                 ki: pidIFactor.val,
                 kd: pidDFactor.val,
@@ -110,7 +115,10 @@ socket.onmessage = (event) => {
           },
         };
         updateChart(chart, state.val.roast!);
-        if (state.val.profile != undefined && followProfileEnabled.val == true) {
+        if (
+          state.val.profile != undefined &&
+          followProfileEnabled.val == true
+        ) {
           var profiledSetpoint = followProfile(
             state.val.profile!,
             state.val.roast!,
@@ -307,6 +315,7 @@ const SetpointControl = () =>
       type: "range",
       min: "0",
       max: "300",
+      disabled: followProfileEnabled.val,
       value: setpoint,
       oninput: (e: Event) => {
         setpoint.val = parseInt((e.target as HTMLInputElement).value, 10);
@@ -318,7 +327,7 @@ let tempI = pidIFactor.val;
 let tempD = pidDFactor.val;
 
 let tempTarget = "BT";
-let pidEnabled = true;
+const pidEnabled = van.state(true);
 
 const PIDConfig = () =>
   div(
@@ -386,8 +395,8 @@ const PIDConfig = () =>
     label(
       input({
         type: "checkbox",
-        checked: pidEnabled,
-        oninput: (e) => (pidEnabled = e.target.checked),
+        checked: pidEnabled.val,
+        oninput: (e) => (pidEnabled.val = e.target.checked),
       }),
       "PID Enabled",
     ),
@@ -405,7 +414,7 @@ function controlHeater() {
   // Clamp output to 0–100% range
   const heaterPower = Math.min(100, Math.max(0, Math.round(output)));
 
-  if (pidEnabled == false) {
+  if (pidEnabled.val == false) {
     return;
   }
   updateHeaterPower(heaterPower);
@@ -457,6 +466,7 @@ const app = div(
       type: "range",
       min: "0",
       max: "100",
+      disabled: () => pidEnabled.val,
       value: slider2Value,
       oninput: (e: Event) => {
         const target = e.target as HTMLInputElement;
@@ -512,14 +522,20 @@ const app = div(
     ),
   ),
   div(
-    span("ET: ", () => {
-      return state.val.currentState.lastMessage?.ET ?? "N/A";
-    }),
-    p(),
-    span("BT: ", () => state.val.currentState.lastMessage?.BT ?? "N/A"),
-    p(),
-    "Last update: ",
-    p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
+    span(
+      "ET: ",
+      () => {
+        return state.val.currentState.lastMessage?.ET ?? "N/A";
+      },
+      " ",
+      "BT: ",
+      () => state.val.currentState.lastMessage?.BT ?? "N/A",
+    ),
+    " ",
+    p(
+      "Last update: ",
+      () => state.val.currentState.lastUpdate?.toString() ?? "N/A",
+    ),
   ),
   UploadRoastInput,
   p(),
