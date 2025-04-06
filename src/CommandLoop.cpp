@@ -95,7 +95,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     // webSocket.broadcastTXT("message here");
   } break;
   default: // send message to client
-    logf("msg: tp: %d", type);
+    logf("unhandled message type: %d\n", type);
     // webSocket.sendBIN(num, payload, length);
     break;
   }
