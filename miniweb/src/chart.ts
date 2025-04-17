@@ -189,6 +189,7 @@ export function updateChart(chart: Chart, roast: RoastState) {
     data: roast.measurements.map((el) => el.extra?.setpoint ?? 0),
     yAxisID: "y1",
     tension: 0.1,
+
   };
 
   chart.data.datasets[3].data = roast.measurements.map(

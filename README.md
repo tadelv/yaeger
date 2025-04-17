@@ -41,6 +41,7 @@ just one.
 
 ### Command and control
 
+
 Upon first launch, Yaeger will set up its own access point. You can then configure the preferred wifi for Yaeger to
 connect to from the Web UI (see below). After setting up the preffered Wifi, Yaeger will try to connect to it on every
 boot. If it can't connect to the preffered Wifi, Yaeger will fallback to its own access point (so you can set up Wifi
