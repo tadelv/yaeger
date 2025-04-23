@@ -1,0 +1,21 @@
+Reference,Manufacturer part number,Description,Qty
+"J1,J13",61300411121,"Male vertical header 4 position, used for LCD and PWM",2
+"J2,J5,J6,J7,J8,J9",2376591-2,Terminals for high voltage,6
+"J3,J4",PPTC061LFBN-RC,"Female header 6 position, used for thermocouple boards",2
+PS1,IRM-10-3.3,AC DC converter 3.3V,1
+J10,22035025,"2 Pin header for SSR connection, Molex",1
+,2196762125,"Cable with crimped ends for 50375023 housing, 450mm",2
+,50375023,Connector housing for 2196762125,1
+,PPTC041LFBN-RC,"Female header 4 position, used for PWM ",1
+,,,
+,MAX31855 K Type Thermocouple Breakout Board,https://www.aliexpress.com/item/1005006381598473.html,2
+,PWM for fan control,https://www.aliexpress.com/item/1005006457613501.html,1
+,SSR for heater control,https://www.aliexpress.com/item/4000045425145.html,1
+,,,
+,,,
+,ESP32-S3 Mini,https://www.aliexpress.com/item/1005006177646698.html,1
+"J11,J12",PPPC102LFBN-RC,"Female header 20 position, used for S3 Mini",2
+,,,
+,,,
+,ESP32-S3,https://www.aliexpress.com/item/1005006266375800.html,1
+U1,PPTC221LFBN-RC,"Female header 22 position, used for S3",2

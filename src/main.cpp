@@ -1,5 +1,4 @@
 
-// lib for Over the Air (ota) programming
 #include <Adafruit_NeoPixel.h>
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA

@@ -107,8 +107,8 @@ export function initializeChart(ctx: CanvasRenderingContext2D): Chart {
         },
         y3: {
           min: 0,
-          max: 10,
-          type: "logarithmic",
+          max: 60,
+          //type: "logarithmic",
         },
       },
       responsive: true,
@@ -133,7 +133,7 @@ export function updateChart(chart: Chart, roast: RoastState) {
   const beanTemps = measurements.map((el) => el.message.BT);
   const envTemps = measurements.map((el) => el.message.ET);
 
-  const windowSize = 20;
+  const windowSize = 30;
 
   // Helper to calculate rate of rise (RoR)
   const calculateRoR = (temps: number[], times: number[]) =>
@@ -149,7 +149,7 @@ export function updateChart(chart: Chart, roast: RoastState) {
     return values.map((val, i, arr) => {
       if (val === null || i < size - 1) return val; // Skip if insufficient data
       const window = arr.slice(i - size + 1, i + 1) as number[];
-      return window.reduce((sum, v) => sum + v, 0) / size;
+      return window.reduce((sum, v) => sum + v * 60, 0) / size;
     });
   };
 
@@ -165,7 +165,7 @@ export function updateChart(chart: Chart, roast: RoastState) {
 
   // Add datasets to chart
   chart.data.datasets[4] = {
-    label: "BT Rate of Rise (°C/s)",
+    label: "BT Rate of Rise (°C/min)",
     borderColor: "green",
     pointStyle: false,
     data: btRor,
@@ -174,12 +174,22 @@ export function updateChart(chart: Chart, roast: RoastState) {
   };
 
   chart.data.datasets[5] = {
-    label: "ET Rate of Rise (°C/s)",
+    label: "ET Rate of Rise (°C/min)",
     borderColor: "purple",
     pointStyle: false,
     data: etRor,
     yAxisID: "y3",
     tension: 0.2,
+  };
+
+  chart.data.datasets[6] = {
+    label: "Setpoint (°C)",
+    borderColor: "#03fc7b",
+    pointStyle: false,
+    data: roast.measurements.map((el) => el.extra?.setpoint ?? 0),
+    yAxisID: "y1",
+    tension: 0.1,
+
   };
 
   chart.data.datasets[3].data = roast.measurements.map(
@@ -234,7 +244,6 @@ const verticalLinePlugin = {
 
   beforeDatasetsDraw: function (chart, easing) {
     if (chart.config._config.lineAtIndex) {
-      console.log("doing ", chart.config._config.lineAtIndex);
       chart.config._config.lineAtIndex.forEach((pointIndex) => {
         this.renderVerticalLine(chart, pointIndex);
       });

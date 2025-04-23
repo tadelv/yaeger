@@ -14,6 +14,7 @@ export class YaegerState  {
 	currentState: CurrentState =  {
 		status: RoasterStatus.idle
 	};
+	profile?: Profile
 }
 
 export enum RoasterStatus {
@@ -30,6 +31,12 @@ export type CurrentState = {
 export type Measurement = {
 	timestamp: Date
 	message: YaegerMessage
+	extra?: MeasurementExtra
+}
+
+export type MeasurementExtra = {
+	setpoint: number
+	pidData?: PIDData
 }
 
 export type RoastState = {
@@ -37,6 +44,7 @@ export type RoastState = {
 	measurements: Measurement[] | []
 	events: RoastEvent[] | []
 	commands: RoastCommand[] | []
+	profile?: Profile
 }
 
 export type RoastEvent = {
@@ -48,4 +56,21 @@ export type RoastCommand = {
 	type: 'fan' | 'heater'
 	value: number
 	timestamp: Date
+}
+
+export type PIDData = {
+	enabled: boolean
+	kp: number
+	ki: number
+	kd: number
+}
+
+export type Profile = {
+	steps: ProfileStep[]
+}
+
+export type ProfileStep = {
+	interpolation: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out'
+	setpoint: number
+	duration: number
 }

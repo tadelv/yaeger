@@ -7,15 +7,30 @@ import {
   Measurement,
   RoasterStatus,
   RoastState,
+  Profile,
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
+import { PIDController } from "./pid.ts";
+import {
+  followProfile,
+  followProfileEnabled,
+  profile,
+  ProfileControl,
+} from "./profiling.ts";
 
-const { button, div, input, h1, canvas, p, span } = van.tags;
+const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
 // State variables
 const slider1Value = van.state(50);
 const slider2Value = van.state(50);
 const state = van.state(new YaegerState());
+
+const setpoint = van.state(20);
+const pidPFactor = van.state(1.0);
+const pidIFactor = van.state(0.1);
+const pidDFactor = van.state(0.01);
+var pid = new PIDController(1.0, 0.1, 0.01);
+
 
 // Wifi
 const ssidField = van.state("");
@@ -82,6 +97,15 @@ socket.onmessage = (event) => {
           {
             timestamp: timestamp,
             message: message,
+            extra: {
+              setpoint: setpoint.val,
+              pidData: {
+                enabled: pidEnabled.val,
+                kp: pidPFactor.val,
+                ki: pidIFactor.val,
+                kd: pidDFactor.val,
+              },
+            },
           },
         ];
         state.val = {
@@ -92,6 +116,19 @@ socket.onmessage = (event) => {
           },
         };
         updateChart(chart, state.val.roast!);
+        if (
+          state.val.profile != undefined &&
+          followProfileEnabled.val == true
+        ) {
+          var profiledSetpoint = followProfile(
+            state.val.profile!,
+            state.val.roast!,
+          );
+          if (profiledSetpoint != undefined) {
+            setpoint.val = profiledSetpoint;
+          }
+        }
+        controlHeater();
       }
     }
   } catch (error) {
@@ -270,6 +307,121 @@ const UploadRoastInput = () => {
   return div(fileInput);
 };
 
+// Update setpoint through a slider or input
+const SetpointControl = () =>
+  div(
+    "Setpoint (°C): ",
+    () => setpoint.val,
+    input({
+      type: "range",
+      min: "0",
+      max: "300",
+      disabled: followProfileEnabled.val,
+      value: setpoint,
+      oninput: (e: Event) => {
+        setpoint.val = parseInt((e.target as HTMLInputElement).value, 10);
+      },
+    }),
+  );
+let tempP = pidPFactor.val;
+let tempI = pidIFactor.val;
+let tempD = pidDFactor.val;
+
+let tempTarget = "BT";
+const pidEnabled = van.state(true);
+
+const PIDConfig = () =>
+  div(
+    "PID Factors",
+    p(),
+    "P:",
+    input({
+      type: "number",
+      value: tempP,
+      oninput: (e: Event) => {
+        tempP = parseFloat((e.target as HTMLInputElement).value) || 0;
+      },
+    }),
+    "I:",
+    input({
+      type: "number",
+      value: tempI,
+      oninput: (e: Event) => {
+        tempI = parseFloat((e.target as HTMLInputElement).value) || 0;
+      },
+    }),
+    "D:",
+    input({
+      type: "number",
+      value: tempD,
+      oninput: (e: Event) => {
+        tempD = parseFloat((e.target as HTMLInputElement).value) || 0;
+      },
+    }),
+    p(),
+    "Target:",
+    select(
+      {
+        value: tempTarget,
+        onchange: (e: Event) => {
+          tempTarget = (e.target as HTMLSelectElement).value;
+        },
+      },
+      option({ value: "BT" }, "BT"),
+      option({ value: "ET" }, "ET"),
+    ),
+    p(),
+    button(
+      {
+        onclick: () => {
+          pidPFactor.val = tempP;
+          pidIFactor.val = tempI;
+          pidDFactor.val = tempD;
+
+          pid = new PIDController(
+            pidPFactor.val,
+            pidIFactor.val,
+            pidDFactor.val,
+          );
+          console.log("New PID values set:", {
+            P: pidPFactor.val,
+            I: pidIFactor.val,
+            D: pidDFactor.val,
+          });
+          console.log("PID:", JSON.stringify(pid));
+        },
+      },
+      "Apply pid",
+    ),
+    label(
+      input({
+        type: "checkbox",
+        checked: pidEnabled.val,
+        oninput: (e) => (pidEnabled.val = e.target.checked),
+      }),
+      "PID Enabled",
+    ),
+  );
+
+function controlHeater() {
+  let currentTemp: number;
+  if (tempTarget == "BT") {
+    currentTemp = state.val.currentState.lastMessage?.BT ?? 0;
+  } else {
+    currentTemp = state.val.currentState.lastMessage?.ET ?? 0;
+  }
+  const output = pid.compute(setpoint.val, currentTemp);
+
+  // Clamp output to 0–100% range
+  const heaterPower = Math.min(100, Math.max(0, Math.round(output)));
+
+  if (pidEnabled.val == false) {
+    return;
+  }
+  updateHeaterPower(heaterPower);
+  slider2Value.val = heaterPower; // Reflect change in the UI
+}
+
 // UI creation
 const app = div(
   div(
@@ -290,6 +442,7 @@ const app = div(
     ),
   ),
   chartElement,
+  SetpointControl,
   div(
     "FAN 1:",
     () => slider1Value.val,
@@ -314,6 +467,7 @@ const app = div(
       type: "range",
       min: "0",
       max: "100",
+      disabled: () => pidEnabled.val,
       value: slider2Value,
       oninput: (e: Event) => {
         const target = e.target as HTMLInputElement;
@@ -369,17 +523,30 @@ const app = div(
     ),
   ),
   div(
-    span("ET: ", () => {
-      return state.val.currentState.lastMessage?.ET ?? "N/A";
-    }),
-    p(),
-    span("BT: ", () => state.val.currentState.lastMessage?.BT ?? "N/A"),
-    p(),
-    "Last update: ",
-    p(() => state.val.currentState.lastUpdate?.toString() ?? "N/A"),
+    span(
+      "ET: ",
+      () => {
+        return state.val.currentState.lastMessage?.ET ?? "N/A";
+      },
+      " ",
+      "BT: ",
+      () => state.val.currentState.lastMessage?.BT ?? "N/A",
+    ),
+    " ",
+    p(
+      "Last update: ",
+      () => state.val.currentState.lastUpdate?.toString() ?? "N/A",
+    ),
   ),
   UploadRoastInput,
+  p(),
+  PIDConfig,
+  p(),
+  ProfileControl,
+  p(),
   div(
+    "Wifi settings:",
+    p(),
     "Wifi ssid:",
     input({
       type: "text",
@@ -415,6 +582,7 @@ function toggleRoastStart() {
           events: [],
           commands: [],
         },
+        profile: profile.val,
       };
       break;
     case RoasterStatus.roasting:
@@ -423,6 +591,10 @@ function toggleRoastStart() {
         currentState: {
           ...state.val.currentState,
           status: RoasterStatus.idle,
+        },
+        roast: {
+          ...state.val.roast!,
+          profile: state.val.profile,
         },
       };
       break;
