@@ -11,6 +11,25 @@
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+
+  /* === ShadCN design tokens === */
+  --radius: 0.5rem;
+
+  --background: 0 0% 100%;
+  --foreground: 240 10% 3.9%;
+
+  --border: 240 5.9% 90%;
+  --input: 240 5.9% 90%;
+  --ring: 240 5.9% 10%;
+
+  --primary: 240 5.9% 10%;
+  --primary-foreground: 0 0% 98%;
+
+  --secondary: 240 4.8% 95.9%;
+  --secondary-foreground: 240 5.9% 10%;
+
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 0 0% 98%;
 }
 
 a {
@@ -28,6 +47,8 @@ body {
   place-items: center;
   min-width: 320px;
   min-height: 100vh;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
 }
 
 control_cluster {
@@ -68,35 +89,92 @@ h1 {
   color: #888;
 }
 
+/* ------------------- ShadCN-style Button ------------------- */
 button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  height: 2.5rem;
+  padding: 0 1rem;
+  font-size: 0.875rem;
   font-weight: 500;
   font-family: inherit;
-  background-color: #121212;
+
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
   cursor: pointer;
-  transition: border-color 0.25s;
+
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
 }
 button:hover {
-  border-color: #646cff;
+  background: hsl(var(--primary) / 0.9);
 }
-button:focus,
+button:disabled {
+  opacity: 0.5;
+  pointer-events: none;
+}
 button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  box-shadow: 0 0 0 2px hsl(var(--ring));
 }
+/* ------------------- ShadCN-style Inputs ------------------- */
+input:not([type="range"]) {
+  height: 2.5rem;
+  width: 100%;
+  padding: 0 0.75rem;
+  font-size: 0.875rem;
 
-@media (prefers-color-scheme: light) {
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--input));
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+input:not([type="range"]):focus {
+  outline: none;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.4);
+}
+/* ------------------- Card & Section ------------------- */
+.card,
+.section {
+  padding: 1.5rem;
+  margin-top: 1.5rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+}
+.section h2 {
+  margin-top: 0;
+  margin-bottom: 1rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+/* ------------------- Dark-mode token overrides ------------------- */
+@media (prefers-color-scheme: dark) {
   :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #d1d1d1;
+    --background: 240 10% 3.9%;
+    --foreground: 0 0% 98%;
+
+    --border: 240 3.7% 15.9%;
+    --input: 240 3.7% 15.9%;
+    --ring: 240 4.9% 83%;
+
+    --primary: 0 0% 98%;
+    --primary-foreground: 240 5.9% 10%;
+
+    --secondary: 240 3.7% 15.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 0 85.7% 97.3%;
   }
 }
 
