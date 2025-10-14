@@ -131,6 +131,7 @@ van.derive(() => {
           setpoint.val = profileUpdate.setPoint;
           if (profileUpdate.fanValue != undefined) {
             slider1Value.val = profileUpdate.fanValue!
+            updateFanPower(profileUpdate.fanValue!)
           }
         }
       }
@@ -478,6 +479,7 @@ const createApp = () => div(
         type: "range",
         min: "0",
         max: "100",
+        step: "5",
         value: () => {
           console.log("Fan slider value render:", slider1Value.val);
           return slider1Value.val;
@@ -500,6 +502,7 @@ const createApp = () => div(
         type: "range",
         min: "0",
         max: "100",
+        step: "5",
         disabled: () => pidEnabled.val,
         value: () => {
           console.log("Heater slider value render:", slider2Value.val);
