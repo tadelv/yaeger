@@ -122,13 +122,16 @@ van.derive(() => {
         state.val.profile != undefined &&
         followProfileEnabled.val == true
       ) {
-        var profiledSetpoint = followProfile(
+        var profileUpdate = followProfile(
           state.val.profile!,
           newState.roast,
         );
-        if (profiledSetpoint != undefined) {
+        if (profileUpdate != undefined) {
           console.log("Updating setpoint from profile:", profiledSetpoint);
-          setpoint.val = profiledSetpoint;
+          setpoint.val = profileUpdate.setPoint;
+          if (profileUpdate.fanValue != undefined) {
+            slider1Value.val = profileUpdate.fanValue!
+          }
         }
       }
       controlHeater();

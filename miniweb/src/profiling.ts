@@ -10,7 +10,7 @@ const profileName = van.state("");
 export function followProfile(
   profile: Profile,
   roast: RoastState,
-): number | undefined {
+): {setPoint: number, fanValue?: number} | undefined {
   if (!roast.startDate) return undefined;
 
   const elapsedTime = (new Date().getTime() - roast.startDate.getTime()) / 1000; // Elapsed time in seconds
@@ -31,7 +31,8 @@ export function followProfile(
               ?.setpoint || step.setpoint;
       const nextSetpoint = step.setpoint;
 
-      return (
+      return {
+      setPoint: (
         Math.floor(
           interpolateSetpoint(
             prevSetpoint,
@@ -40,7 +41,8 @@ export function followProfile(
             step.interpolation,
           ) * 10,
         ) / 10
-      );
+      ),
+      fanValue: step.fanValue };
     }
   }
 
