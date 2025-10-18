@@ -127,7 +127,7 @@ van.derive(() => {
           newState.roast,
         );
         if (profileUpdate != undefined) {
-          console.log("Updating setpoint from profile:", profiledSetpoint);
+          console.log("Updating setpoint from profile:", profileUpdate.setPoint);
           setpoint.val = profileUpdate.setPoint;
           if (profileUpdate.fanValue != undefined) {
             slider1Value.val = profileUpdate.fanValue!
