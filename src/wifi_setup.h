@@ -7,6 +7,7 @@
 // check if can connect
 // if not, start AP mode
 void setupWifi();
+void maintainWifiConnection();
 
 extern const char *wifiPrefsKey;
 extern const char *wifiSSIDKey;

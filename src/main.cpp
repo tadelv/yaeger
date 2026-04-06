@@ -109,7 +109,9 @@ void setup(void) {
 
 void loop(void) {
   ElegantOTA.loop();
+  maintainWifiConnection();
   ws.cleanupClients();
+  updateConnectionSafety(&ws);
   delay(10);
   takeReadings();
   updateHeater();
