@@ -25,6 +25,20 @@ case "$1" in
     ;;
 esac
 
+map_module_to_package() {
+  case "$1" in
+    littlefs)
+      echo "littlefs-python"
+      ;;
+    fatfs)
+      echo "fatfsgen"
+      ;;
+    *)
+      echo "$1"
+      ;;
+  esac
+}
+
 ensure_ota_venv() {
   local python_cmd="${PYTHON_BIN:-python3}"
 
@@ -43,12 +57,54 @@ ensure_ota_venv() {
 
   echo "Installing OTA toolchain dependencies in venv..."
   pip install --upgrade pip setuptools wheel >/dev/null
-  pip install --upgrade platformio littlefs-python >/dev/null
+  pip install --upgrade platformio littlefs-python fatfsgen >/dev/null
 
   if ! command -v pio >/dev/null 2>&1; then
     echo "Error: 'pio' is not available in $VENV_DIR after install."
     exit 1
   fi
+}
+
+run_pio_with_auto_deps() {
+  local max_attempts=5
+  local attempt=1
+
+  while ((attempt <= max_attempts)); do
+    local log_file
+    log_file=$(mktemp)
+
+    echo "PlatformIO attempt $attempt/$max_attempts..."
+    set +e
+    pio run -e "$PIO_ENV" -t buildfs -t uploadfs -t upload 2>&1 | tee "$log_file"
+    local status=${PIPESTATUS[0]}
+    set -e
+
+    if [[ $status -eq 0 ]]; then
+      rm -f "$log_file"
+      return 0
+    fi
+
+    local missing_module
+    missing_module=$(sed -n "s/.*ModuleNotFoundError: No module named '\([^']\+\)'.*/\1/p" "$log_file" | head -n 1)
+
+    if [[ -z "$missing_module" ]]; then
+      echo "PlatformIO failed, but no missing Python module could be detected."
+      rm -f "$log_file"
+      return "$status"
+    fi
+
+    local missing_package
+    missing_package=$(map_module_to_package "$missing_module")
+
+    echo "Detected missing Python module '$missing_module'. Installing package '$missing_package' and retrying..."
+    pip install --upgrade "$missing_package" >/dev/null
+
+    rm -f "$log_file"
+    attempt=$((attempt + 1))
+  done
+
+  echo "Reached retry limit while trying to resolve PlatformIO Python dependencies."
+  return 1
 }
 
 echo "Using OTA PlatformIO environment: $PIO_ENV"
@@ -62,6 +118,6 @@ npm run build
 popd >/dev/null
 
 echo "Uploading filesystem + firmware via OTA (single run)..."
-pio run -e "$PIO_ENV" -t buildfs -t uploadfs -t upload
+run_pio_with_auto_deps
 
 echo "OTA update complete (web assets + firmware)."
