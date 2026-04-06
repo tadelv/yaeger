@@ -17,6 +17,7 @@ import base64
 import hashlib
 import mimetypes
 import os
+import time
 import urllib.error
 import urllib.parse
 import urllib.request
@@ -65,6 +66,35 @@ def _build_auth_header(username: str | None, password: str | None) -> str | None
     token = base64.b64encode(f"{username}:{password}".encode()).decode()
     return f"Basic {token}"
 
+
+
+
+def _should_retry_http_error(code: int) -> bool:
+    return code in (408, 425, 429, 500, 502, 503, 504)
+
+
+def _with_backoff(request_fn, description: str, max_attempts: int = 5):
+    delay_seconds = 0.5
+
+    for attempt in range(1, max_attempts + 1):
+        try:
+            return request_fn()
+        except urllib.error.HTTPError as exc:
+            if exc.code == 401:
+                raise
+            if attempt == max_attempts or not _should_retry_http_error(exc.code):
+                raise
+            print(f"{description} HTTP {exc.code}; retrying in {delay_seconds:.1f}s (attempt {attempt}/{max_attempts})")
+            time.sleep(delay_seconds)
+            delay_seconds = min(delay_seconds * 2, 8.0)
+        except urllib.error.URLError:
+            if attempt == max_attempts:
+                raise
+            print(f"{description} network error; retrying in {delay_seconds:.1f}s (attempt {attempt}/{max_attempts})")
+            time.sleep(delay_seconds)
+            delay_seconds = min(delay_seconds * 2, 8.0)
+
+    raise RuntimeError(f"{description} failed after retry limit")
 
 def _http_get(url: str, auth_header: str | None) -> tuple[int, bytes]:
     req = urllib.request.Request(url=url, method="GET")
@@ -131,7 +161,7 @@ def on_upload(source, target, env):  # noqa: ANN001 (PlatformIO callback signatu
 
     print(f"ElegantOTA start: {start_url}")
     try:
-        status, _ = _http_get(start_url, auth_header)
+        status, _ = _with_backoff(lambda: _http_get(start_url, auth_header), "ElegantOTA start")
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
             raise RuntimeError(
@@ -153,7 +183,10 @@ def on_upload(source, target, env):  # noqa: ANN001 (PlatformIO callback signatu
 
     print(f"ElegantOTA upload: {upload_url}")
     try:
-        status, response = _http_post(upload_url, body, f"multipart/form-data; boundary={boundary}", auth_header)
+        status, response = _with_backoff(
+            lambda: _http_post(upload_url, body, f"multipart/form-data; boundary={boundary}", auth_header),
+            "ElegantOTA upload",
+        )
     except urllib.error.HTTPError as exc:
         if exc.code == 401:
             raise RuntimeError(
