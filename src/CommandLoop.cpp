@@ -10,6 +10,11 @@
 
 Preferences preferences;
 
+namespace {
+constexpr unsigned long WEB_CLIENT_GRACE_PERIOD_MS = 10000;
+unsigned long lastWebClientDisconnectMs = 0;
+bool webClientGraceActive = false;
+}
 
 void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
                AwsEventType type, void *arg, uint8_t *data, size_t len) {
@@ -17,14 +22,15 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
   switch (type) {
   case WS_EVT_CONNECT:
     logf("[%u] Connected!\n", client->id());
+    webClientGraceActive = false;
+    lastWebClientDisconnectMs = 0;
     // client->text("Connected");
 
     break;
   case WS_EVT_DISCONNECT: {
     logf("[%u] Disconnected!\n", client->id());
-    // turn off heater and set fan to 100%
-    setHeaterPower(0);
-    setFanSpeed(preferences.getLong("coolFanSpeed", 65));
+    webClientGraceActive = true;
+    lastWebClientDisconnectMs = millis();
   } break;
   case WS_EVT_DATA: {
 
@@ -156,4 +162,25 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 void setupMainLoop(AsyncWebSocket *ws) {
   preferences.begin("preferences");
   ws->onEvent(onWsEvent);
+}
+
+void updateConnectionSafety(AsyncWebSocket *ws) {
+  if (ws->count() > 0) {
+    webClientGraceActive = false;
+    return;
+  }
+
+  if (!webClientGraceActive) {
+    return;
+  }
+
+  if (millis() - lastWebClientDisconnectMs < WEB_CLIENT_GRACE_PERIOD_MS) {
+    return;
+  }
+
+  // turn off heater and set fan to configured cooldown only after grace period
+  setHeaterPower(0);
+  setFanSpeed(preferences.getLong("coolFanSpeed", 65));
+  webClientGraceActive = false;
+  log("No websocket clients after grace period, entering cooldown safety mode");
 }

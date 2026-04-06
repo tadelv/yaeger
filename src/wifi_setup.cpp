@@ -27,6 +27,8 @@ public:
 
 WiFiParams params;
 const char *yaegerHostname = "yaeger.local";
+unsigned long lastReconnectAttemptMs = 0;
+constexpr unsigned long WIFI_RECONNECT_INTERVAL_MS = 5000;
 
 void setupAP() {
   WiFi.mode(WIFI_AP);
@@ -144,3 +146,24 @@ String getActiveIP() {
 }
 
 String getConfiguredHostname() { return String(yaegerHostname); }
+
+void maintainWifiConnection() {
+  wifi_mode_t mode = WiFi.getMode();
+  if (mode != WIFI_MODE_STA && mode != WIFI_MODE_APSTA) {
+    return;
+  }
+
+  wl_status_t status = WiFi.status();
+  if (status == WL_CONNECTED || status == WL_IDLE_STATUS) {
+    return;
+  }
+
+  unsigned long now = millis();
+  if (now - lastReconnectAttemptMs < WIFI_RECONNECT_INTERVAL_MS) {
+    return;
+  }
+
+  lastReconnectAttemptMs = now;
+  logf("WiFi not connected (status=%d), attempting reconnect", status);
+  WiFi.reconnect();
+}
