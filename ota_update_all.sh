@@ -88,14 +88,15 @@ ensure_ota_venv() {
 run_pio_with_auto_deps() {
   local max_attempts=5
   local attempt=1
+  local pio_args=("$@")
 
   while ((attempt <= max_attempts)); do
     local log_file
     log_file=$(mktemp)
 
-    echo "PlatformIO attempt $attempt/$max_attempts..."
+    echo "PlatformIO attempt $attempt/$max_attempts: pio run ${pio_args[*]}"
     set +e
-    pio run -e "$PIO_ENV" -t buildfs -t uploadfs -t upload 2>&1 | tee "$log_file"
+    pio run "${pio_args[@]}" 2>&1 | tee "$log_file"
     local status=${PIPESTATUS[0]}
     set -e
 
@@ -137,7 +138,10 @@ npm install --no-audit --no-fund
 npm run build
 popd >/dev/null
 
-echo "Uploading filesystem + firmware via OTA (single run)..."
-run_pio_with_auto_deps
+echo "Step 1/2: Uploading LittleFS image via OTA..."
+run_pio_with_auto_deps -e "$PIO_ENV" -t buildfs -t uploadfs
+
+echo "Step 2/2: Uploading firmware via OTA..."
+run_pio_with_auto_deps -e "$PIO_ENV" -t upload
 
 echo "OTA update complete (web assets + firmware)."
