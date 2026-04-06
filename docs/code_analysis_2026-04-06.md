@@ -60,6 +60,20 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ## 2) **WebSocket robustness and heap stability (high priority)**
 
+### Implementation status (April 6, 2026 update)
+
+- ~~Validate parse result (`DeserializationError`) and reject malformed frames.~~ ✅ Implemented (malformed JSON and unsupported fragmented/non-text frames are rejected).
+- ~~Enforce command schema validation (required fields, ranges).~~ ✅ Implemented (numeric schema checks for mutating commands and preference payloads).
+- ~~Replace fixed-size `char[200]` with `measureJson` + dynamic/streamed response.~~ ✅ Implemented (`measureJson` + dynamically-sized `String` response buffer).
+- ~~Add clamp logic for actuator values (e.g., fan/heater range validation) server-side regardless of client behavior.~~ ✅ Implemented (server-side clamping + logging for burner/fan/cooldown values).
+
+### Updated TODO list
+
+- [x] Reject malformed JSON payloads and unsupported WebSocket frame shapes.
+- [x] Validate command schema for mutating and preference commands.
+- [x] Remove fixed-size WebSocket response buffer usage.
+- [x] Clamp actuator and cooldown values server-side to safe ranges.
+
 ### Findings
 
 - `deserializeJson` return value is not checked before consuming fields.
@@ -68,10 +82,10 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ### Recommendations
 
-1. Validate parse result (`DeserializationError`) and reject malformed frames.
-2. Enforce command schema validation (required fields, ranges).
-3. Replace fixed-size `char[200]` with `measureJson` + dynamic/streamed response.
-4. Add clamp logic for actuator values (e.g., fan/heater range validation) server-side regardless of client behavior.
+1. ~~Validate parse result (`DeserializationError`) and reject malformed frames.~~
+2. ~~Enforce command schema validation (required fields, ranges).~~
+3. ~~Replace fixed-size `char[200]` with `measureJson` + dynamic/streamed response.~~
+4. ~~Add clamp logic for actuator values (e.g., fan/heater range validation) server-side regardless of client behavior.~~
 
 ## 3) **Network resiliency and boot behavior (high priority)**
 
@@ -172,4 +186,3 @@ This is a high-level technical review of the firmware + web clients, with priori
 - `npm run build` (`miniweb`, `webserver`)
 - `npm audit --omit=dev --json` (`webserver`)
 - `pio --version` (tool unavailable in environment)
-

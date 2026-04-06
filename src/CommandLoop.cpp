@@ -14,6 +14,8 @@ Preferences preferences;
 namespace {
 constexpr unsigned long WEB_CLIENT_GRACE_PERIOD_MS = 10000;
 constexpr unsigned long MUTATING_CMD_MIN_INTERVAL_MS = 100;
+constexpr long ACTUATOR_MIN_VALUE = 0;
+constexpr long ACTUATOR_MAX_VALUE = 100;
 unsigned long lastWebClientDisconnectMs = 0;
 unsigned long lastMutatingCommandMs = 0;
 bool webClientGraceActive = false;
@@ -45,6 +47,68 @@ bool enforceMutatingCommandAuth(AsyncWebSocketClient *client,
   lastMutatingCommandMs = now;
   return true;
 }
+
+long clampActuatorValue(long value) {
+  if (value < ACTUATOR_MIN_VALUE) {
+    return ACTUATOR_MIN_VALUE;
+  }
+  if (value > ACTUATOR_MAX_VALUE) {
+    return ACTUATOR_MAX_VALUE;
+  }
+  return value;
+}
+
+bool isActuatorValueInRange(long value) {
+  return value >= ACTUATOR_MIN_VALUE && value <= ACTUATOR_MAX_VALUE;
+}
+
+bool parseActuatorValue(JsonDocument &doc, const char *fieldName, long &valueOut) {
+  JsonVariant field = doc[fieldName];
+  if (field.isNull()) {
+    return false;
+  }
+  if (!field.is<long>()) {
+    return false;
+  }
+  valueOut = field.as<long>();
+  return true;
+}
+
+bool validateCommandSchema(AsyncWebSocketClient *client, JsonDocument &doc,
+                           const char *command) {
+  if (command == NULL) {
+    return true;
+  }
+
+  if (strncmp(command, "setBurner", 9) == 0 || strncmp(command, "setFan", 6) == 0) {
+    JsonVariant valueField = doc["value"];
+    if (valueField.isNull() || !valueField.is<long>()) {
+      client->text("{\"error\":\"invalid schema: numeric value required\"}");
+      return false;
+    }
+  }
+
+  if (strncmp(command, "setPreferences", 14) == 0) {
+    if (!doc["pidKp"].isNull() && !doc["pidKp"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: pidKp must be numeric\"}");
+      return false;
+    }
+    if (!doc["pidKi"].isNull() && !doc["pidKi"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: pidKi must be numeric\"}");
+      return false;
+    }
+    if (!doc["pidKd"].isNull() && !doc["pidKd"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: pidKd must be numeric\"}");
+      return false;
+    }
+    if (!doc["cooldownFanSpeed"].isNull() && !doc["cooldownFanSpeed"].is<long>()) {
+      client->text("{\"error\":\"invalid schema: cooldownFanSpeed must be numeric\"}");
+      return false;
+    }
+  }
+
+  return true;
+}
 } // namespace
 
 void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
@@ -69,18 +133,16 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
          (info->opcode == WS_TEXT) ? "text" : "binary", info->len);
     logf("final: %d\n", info->final);
 #endif
-    String msg = "";
-
-    for (size_t i = 0; i < info->len; i++) {
-      msg += (char)data[i];
+    if (info->opcode != WS_TEXT || !info->final || info->index != 0 || info->len != len) {
+      client->text("{\"error\":\"unsupported websocket frame\"}");
+      return;
     }
 #ifdef DEBUG
-    logf("msg: %s\n", msg.c_str());
+    logf("msg bytes: %d\n", len);
 #endif
 
     JsonDocument doc;
-
-    DeserializationError err = deserializeJson(doc, msg);
+    DeserializationError err = deserializeJson(doc, data, len);
     if (err) {
       client->text("{\"error\":\"invalid json\"}");
       return;
@@ -90,6 +152,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     const char *command = doc["command"].as<const char *>();
     bool hasDirectMutatingFields = !doc["BurnerVal"].isNull() || !doc["FanVal"].isNull();
 
+    if (!validateCommandSchema(client, doc, command)) {
+      return;
+    }
+
     if (hasDirectMutatingFields || isMutatingCommand(command)) {
       if (!enforceMutatingCommandAuth(client, doc)) {
         return;
@@ -97,26 +163,49 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     }
 
     // Get BurnerVal from Artisan over Websocket
-    if (!doc["BurnerVal"].isNull()) {
-      long val = doc["BurnerVal"].as<long>();
-      logf("BurnerVal: %d\n", val);
-      setHeaterPower(val);
+    long burnerVal = 0;
+    if (parseActuatorValue(doc, "BurnerVal", burnerVal)) {
+      if (!isActuatorValueInRange(burnerVal)) {
+        logf("BurnerVal out of range, clamped from %d\n", burnerVal);
+      }
+      long clampedBurnerVal = clampActuatorValue(burnerVal);
+      logf("BurnerVal: %d\n", clampedBurnerVal);
+      setHeaterPower(clampedBurnerVal);
+    } else if (!doc["BurnerVal"].isNull()) {
+      client->text("{\"error\":\"invalid BurnerVal\"}");
+      return;
     }
-    if (!doc["FanVal"].isNull()) {
-      long val = doc["FanVal"].as<long>();
-      logf("FanVal: %d\n", val);
-      setFanSpeed(val);
+
+    long fanVal = 0;
+    if (parseActuatorValue(doc, "FanVal", fanVal)) {
+      if (!isActuatorValueInRange(fanVal)) {
+        logf("FanVal out of range, clamped from %d\n", fanVal);
+      }
+      long clampedFanVal = clampActuatorValue(fanVal);
+      logf("FanVal: %d\n", clampedFanVal);
+      setFanSpeed(clampedFanVal);
+    } else if (!doc["FanVal"].isNull()) {
+      client->text("{\"error\":\"invalid FanVal\"}");
+      return;
     }
 
     if (command != NULL && strncmp(command, "setBurner", 9) == 0) {
       long val = doc["value"].as<long>();
-      logf("BurnerVal: %d\n", val);
-      setHeaterPower(val);
+      if (!isActuatorValueInRange(val)) {
+        logf("setBurner value out of range, clamped from %d\n", val);
+      }
+      long clampedVal = clampActuatorValue(val);
+      logf("BurnerVal: %d\n", clampedVal);
+      setHeaterPower(clampedVal);
     }
     if (command != NULL && strncmp(command, "setFan", 6) == 0) {
       long val = doc["value"].as<long>();
-      logf("FanVal: %d\n", val);
-      setFanSpeed(val);
+      if (!isActuatorValueInRange(val)) {
+        logf("setFan value out of range, clamped from %d\n", val);
+      }
+      long clampedVal = clampActuatorValue(val);
+      logf("FanVal: %d\n", clampedVal);
+      setFanSpeed(clampedVal);
     }
 
     // Safeguard to prevent heater fuse blowout
@@ -139,8 +228,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       }
       if (!doc["cooldownFanSpeed"].isNull()) {
         long cooldownFanSpeed = doc["cooldownFanSpeed"].as<long>();
-        logf("cooldownFanSpeed: %d\n", cooldownFanSpeed);
-        preferences.putLong("coolFanSpeed", cooldownFanSpeed);
+        if (!isActuatorValueInRange(cooldownFanSpeed)) {
+          logf("cooldownFanSpeed out of range, clamped from %d\n", cooldownFanSpeed);
+        }
+        long clampedCooldownFanSpeed = clampActuatorValue(cooldownFanSpeed);
+        logf("cooldownFanSpeed: %d\n", clampedCooldownFanSpeed);
+        preferences.putLong("coolFanSpeed", clampedCooldownFanSpeed);
       }
     }
 
@@ -171,10 +264,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       dataObj["FanVal"] = getFanSpeed();
     }
 
-    char buffer[240];
-    serializeJson(doc, buffer);
-    log(buffer);
-    client->text(buffer);
+    String response;
+    response.reserve(measureJson(doc) + 1);
+    serializeJson(doc, response);
+    log(response.c_str());
+    client->text(response);
   } break;
   default:
     logf("unhandled message type: %d\n", type);
