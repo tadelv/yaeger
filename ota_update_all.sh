@@ -31,12 +31,32 @@ map_module_to_package() {
       echo "littlefs-python"
       ;;
     fatfs)
-      echo "fatfsgen"
+      echo "fatfs-ng"
+      ;;
+    yaml)
+      echo "pyyaml"
       ;;
     *)
       echo "$1"
       ;;
   esac
+}
+
+extract_missing_module() {
+  local log_file="$1"
+  local py_cmd="${PYTHON_BIN:-python3}"
+
+  "$py_cmd" - "$log_file" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+log_path = Path(sys.argv[1])
+text = log_path.read_text(errors="ignore")
+match = re.search(r"ModuleNotFoundError:\s+No module named ['\"]([^'\"]+)['\"]", text)
+if match:
+    print(match.group(1))
+PY
 }
 
 ensure_ota_venv() {
@@ -57,7 +77,7 @@ ensure_ota_venv() {
 
   echo "Installing OTA toolchain dependencies in venv..."
   pip install --upgrade pip setuptools wheel >/dev/null
-  pip install --upgrade platformio littlefs-python fatfsgen >/dev/null
+  pip install --upgrade platformio littlefs-python fatfs-ng pyyaml >/dev/null
 
   if ! command -v pio >/dev/null 2>&1; then
     echo "Error: 'pio' is not available in $VENV_DIR after install."
@@ -85,7 +105,7 @@ run_pio_with_auto_deps() {
     fi
 
     local missing_module
-    missing_module=$(sed -n "s/.*ModuleNotFoundError: No module named '\([^']\+\)'.*/\1/p" "$log_file" | head -n 1)
+    missing_module=$(extract_missing_module "$log_file")
 
     if [[ -z "$missing_module" ]]; then
       echo "PlatformIO failed, but no missing Python module could be detected."
