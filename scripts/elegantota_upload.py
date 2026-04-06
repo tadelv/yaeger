@@ -79,9 +79,9 @@ def _normalise_base_url(custom_upload_url: str) -> str:
     return urllib.parse.urlunparse((parsed.scheme, parsed.netloc, path, "", "", "")).rstrip("/")
 
 
-def on_upload(source, target, env_):  # noqa: ANN001 (PlatformIO callback signature)
+def on_upload(source, target, env):  # noqa: ANN001 (PlatformIO callback signature)
     firmware_path = str(source[0])
-    custom_upload_url = env_.GetProjectOption("custom_upload_url")
+    custom_upload_url = env.GetProjectOption("custom_upload_url")
     base_url = _normalise_base_url(custom_upload_url)
 
     with open(firmware_path, "rb") as firmware_file:
