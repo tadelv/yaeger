@@ -5,7 +5,18 @@ import { profile, ProfileControl } from "./profiling.ts";
 import { PIDController } from "./pid.ts";
 import { connectionStatus, lastMessage, lastUpdate } from "./websocket";
 
-const { label, button, div, input, p, span, h1, h2 } = van.tags;
+declare const __APP_VERSION__: string;
+declare const __BUILD_TIMESTAMP__: string;
+
+interface DeviceInfo {
+  firmwareVersion: string;
+  networkMode: string;
+  ssid: string;
+  ip: string;
+  hostname: string;
+}
+
+const { button, div, input, p, span, h1, h2 } = van.tags;
 
 // State variables
 const pidPFactor = van.state(1.0);
@@ -15,6 +26,34 @@ const pidDFactor = van.state(0.01);
 // Wifi
 const ssidField = van.state("");
 const passField = van.state("");
+
+// Versioning and network details
+const deviceInfo = van.state<DeviceInfo | null>(null);
+const deviceInfoError = van.state<string | null>(null);
+
+const appVersion = __APP_VERSION__;
+const buildTimestamp = new Date(__BUILD_TIMESTAMP__).toLocaleString();
+
+const refreshDeviceInfo = async () => {
+  try {
+    deviceInfoError.val = null;
+    const response = await fetch(`http://${location.host}/api/info`);
+    if (!response.ok) {
+      throw new Error(`API returned ${response.status}`);
+    }
+
+    deviceInfo.val = (await response.json()) as DeviceInfo;
+  } catch (error: unknown) {
+    deviceInfo.val = null;
+    if (error instanceof Error) {
+      deviceInfoError.val = error.message;
+    } else {
+      deviceInfoError.val = "Unknown error";
+    }
+  }
+};
+
+void refreshDeviceInfo();
 
 const updateWifiSettings = async () => {
   const ssid = ssidField.val;
@@ -28,6 +67,7 @@ const updateWifiSettings = async () => {
       alert(
         "Wifi settings updated!\nPlease restart for the new settings to take effect",
       );
+      await refreshDeviceInfo();
     } else {
       alert(`Something happened: ${response.status}`);
     }
@@ -83,8 +123,8 @@ const ConnectionStatus = () =>
             connectionStatus.val === "Connected"
               ? "green"
               : connectionStatus.val === "Error"
-              ? "red"
-              : "orange"
+                ? "red"
+                : "orange"
           }`,
       },
       () => connectionStatus.val,
@@ -96,37 +136,51 @@ const SensorData = () =>
   div(
     { class: "sensor-data" },
     "Current Readings:",
-    p(
-      "ET: ",
-      () => lastMessage.val?.ET ?? "N/A",
-      "°C",
-    ),
-    p(
-      "BT: ",
-      () => lastMessage.val?.BT ?? "N/A",
-      "°C",
-    ),
-    p(
-      "Last update: ",
-      () => lastUpdate.val?.toString() ?? "N/A",
-    ),
+    p("ET: ", () => lastMessage.val?.ET ?? "N/A", "°C"),
+    p("BT: ", () => lastMessage.val?.BT ?? "N/A", "°C"),
+    p("Last update: ", () => lastUpdate.val?.toString() ?? "N/A"),
+  );
+
+const VersionAndNetworkInfo = () =>
+  div(
+    { class: "section" },
+    h2("Version & Network Info"),
+    p("Web UI version: ", appVersion),
+    p("Web UI build: ", buildTimestamp),
+    p("Viewed via: ", location.origin),
+    () =>
+      deviceInfo.val
+        ? div(
+            p("Firmware version: ", deviceInfo.val.firmwareVersion),
+            p("Network mode: ", deviceInfo.val.networkMode),
+            p("SSID: ", deviceInfo.val.ssid || "N/A"),
+            p("IP address: ", deviceInfo.val.ip || "N/A"),
+            p("Hostname: ", deviceInfo.val.hostname || "N/A"),
+          )
+        : p("Device info unavailable"),
+    () =>
+      deviceInfoError.val
+        ? p(
+            { style: "color: #b91c1c;" },
+            "Could not load network info: ",
+            deviceInfoError.val,
+          )
+        : null,
+    button({ onclick: refreshDeviceInfo }, "Refresh Info"),
   );
 
 // Start page UI
 const startPage = div(
-  div({ class: "start-page" },
+  div(
+    { class: "start-page" },
     h1("Yaeger Roaster Control"),
     ConnectionStatus,
     SensorData,
-    div({ class: "section" },
-      h2("Profile Selection"),
-      ProfileControl,
-    ),
-    div({ class: "section" },
-      h2("PID Settings"),
-      PIDConfig,
-    ),
-    div({ class: "section" },
+    VersionAndNetworkInfo,
+    div({ class: "section" }, h2("Profile Selection"), ProfileControl),
+    div({ class: "section" }, h2("PID Settings"), PIDConfig),
+    div(
+      { class: "section" },
       h2("Wifi Settings"),
       p(),
       "Wifi ssid:",
@@ -147,7 +201,8 @@ const startPage = div(
       p(),
       button({ onclick: updateWifiSettings }, "Update Wifi"),
     ),
-    div({ class: "section" },
+    div(
+      { class: "section" },
       button(
         {
           onclick: () => {

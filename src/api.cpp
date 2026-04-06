@@ -1,6 +1,9 @@
+#include "api.h"
+
 #include "logging.h"
-#include "sensors.h"
+#include "version.h"
 #include "wifi_setup.h"
+#include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
 
@@ -24,5 +27,18 @@ void setupApi(AsyncWebServer *server) {
 
     prefs.end();
     request->send(200);
+  });
+
+  server->on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
+    StaticJsonDocument<256> doc;
+    doc["firmwareVersion"] = YAEGER_FW_VERSION;
+    doc["networkMode"] = getWifiModeString();
+    doc["ssid"] = getActiveSSID();
+    doc["ip"] = getActiveIP();
+    doc["hostname"] = getConfiguredHostname();
+
+    String body;
+    serializeJson(doc, body);
+    request->send(200, "application/json", body);
   });
 }

@@ -89,7 +89,7 @@ def on_upload(source, target, env):  # noqa: ANN001 (PlatformIO callback signatu
 
     firmware_md5 = hashlib.md5(firmware_data).hexdigest()
     filename = os.path.basename(firmware_path)
-    mode = "fs" if filename == "spiffs.bin" else "fr"
+    mode = "fs" if filename in ("spiffs.bin", "littlefs.bin") else "fr"
 
     start_url = f"{base_url}/ota/start?mode={mode}&hash={firmware_md5}"
     upload_url = f"{base_url}/ota/upload"

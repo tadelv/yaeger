@@ -26,6 +26,7 @@ public:
 };
 
 WiFiParams params;
+const char *yaegerHostname = "yaeger.local";
 
 void setupAP() {
   WiFi.mode(WIFI_AP);
@@ -69,9 +70,8 @@ void setupWifi() {
 
   params.init();
 
-  const char *hostname = "yaeger.local";
   WiFi.config(INADDR_NONE, INADDR_NONE, INADDR_NONE, INADDR_NONE);
-  WiFi.setHostname(hostname);
+  WiFi.setHostname(yaegerHostname);
 
   if (params.hasCredentials()) {
     log("trying to connect to wifi");
@@ -115,3 +115,32 @@ void WiFiParams::reset() {
   pass = "";
   preferences.clear();
 }
+
+
+const char *getWifiModeString() {
+  wifi_mode_t mode = WiFi.getMode();
+  if (mode == WIFI_MODE_AP)
+    return "AP";
+  if (mode == WIFI_MODE_STA)
+    return "STA";
+  if (mode == WIFI_MODE_APSTA)
+    return "AP+STA";
+
+  return "UNKNOWN";
+}
+
+String getActiveSSID() {
+  if (WiFi.getMode() == WIFI_MODE_AP)
+    return WiFi.softAPSSID();
+
+  return WiFi.SSID();
+}
+
+String getActiveIP() {
+  if (WiFi.getMode() == WIFI_MODE_AP)
+    return WiFi.softAPIP().toString();
+
+  return WiFi.localIP().toString();
+}
+
+String getConfiguredHostname() { return String(yaegerHostname); }

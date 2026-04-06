@@ -58,6 +58,8 @@ You can also control Yaeger from its own web interface without an app. Just poin
 your home wifi, or `192.168.4.1` if Yaeger creates its own access point.
 ![yaeger webui](./assets/yaeger-webui.png)
 
+The web UI now includes a **Version & Network Info** section that shows the Web UI version/build timestamp and device firmware/network details (mode, SSID, IP, hostname) so you can quickly check when the currently loaded build was last updated.
+
 #### Using Yaeger on the go
 
 If Yaeger can't connect to your preferred Wifi, it will create its own access point. Perfect for when out and about :grin:
@@ -86,6 +88,16 @@ For VS Code + PlatformIO uploads via ElegantOTA, use one of these environments:
 
 These use a custom PlatformIO upload script that sends the built firmware to `http://yaeger.local/update` through the
 same ElegantOTA mechanism used by the device web UI.
+
+For a **single-command OTA update of the whole project** (frontend files + firmware), run:
+
+```bash
+./ota_update_all.sh s3
+# or
+./ota_update_all.sh s3-mini
+```
+
+This builds `miniweb`, then runs OTA in two explicit steps: (1) upload LittleFS (`buildfs` + `uploadfs`) and (2) upload firmware (`upload`). The script creates and uses a local Python virtual environment (`.ota-venv`), installs required OTA dependencies (`platformio`, `littlefs-python`, `fatfs-ng`, `pyyaml`), and auto-retries if PlatformIO reports missing Python modules.
 
 ## Latest features
 
