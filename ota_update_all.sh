@@ -5,6 +5,8 @@ set -euo pipefail
 # Usage:
 #   ./ota_update_all.sh <s3|s3-mini>
 
+VENV_DIR=".ota-venv"
+
 if [[ -z "${1:-}" ]]; then
   echo "Usage: $0 <s3|s3-mini>"
   exit 1
@@ -23,11 +25,39 @@ case "$1" in
     ;;
 esac
 
+ensure_ota_venv() {
+  local python_cmd="${PYTHON_BIN:-python3}"
+
+  if ! command -v "$python_cmd" >/dev/null 2>&1; then
+    echo "Error: could not find Python executable '$python_cmd'."
+    exit 1
+  fi
+
+  if [[ ! -d "$VENV_DIR" ]]; then
+    echo "Creating OTA virtual environment in $VENV_DIR..."
+    "$python_cmd" -m venv "$VENV_DIR"
+  fi
+
+  # shellcheck disable=SC1091
+  source "$VENV_DIR/bin/activate"
+
+  echo "Installing OTA toolchain dependencies in venv..."
+  pip install --upgrade pip setuptools wheel >/dev/null
+  pip install --upgrade platformio littlefs-python >/dev/null
+
+  if ! command -v pio >/dev/null 2>&1; then
+    echo "Error: 'pio' is not available in $VENV_DIR after install."
+    exit 1
+  fi
+}
+
 echo "Using OTA PlatformIO environment: $PIO_ENV"
+
+ensure_ota_venv
 
 echo "Building miniweb assets..."
 pushd miniweb >/dev/null
-npm install
+npm install --no-audit --no-fund
 npm run build
 popd >/dev/null
 

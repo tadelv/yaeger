@@ -97,7 +97,7 @@ For a **single-command OTA update of the whole project** (frontend files + firmw
 ./ota_update_all.sh s3-mini
 ```
 
-This builds `miniweb`, uploads LittleFS (`uploadfs`), then uploads firmware (`upload`) over ElegantOTA in one fell swoop.
+This builds `miniweb`, uploads LittleFS (`uploadfs`), then uploads firmware (`upload`) over ElegantOTA in one fell swoop. The script also creates and uses a local Python virtual environment (`.ota-venv`) and installs required OTA dependencies (`platformio`, `littlefs-python`) automatically.
 
 ## Latest features
 
