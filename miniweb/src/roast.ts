@@ -18,6 +18,7 @@ import {
   ProfileControl,
 } from "./profiling.ts";
 import { socket, lastMessage, lastUpdate } from "./websocket";
+import { getAdminSecret } from "./auth";
 
 const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 
@@ -225,7 +226,8 @@ function appendEvent(label: string) {
 }
 
 function sendCommand(data: any) {
-  let msg = JSON.stringify(data);
+  const authToken = getAdminSecret();
+  const msg = JSON.stringify({ ...data, authToken });
   console.log("sending command: ", msg);
   socket?.send(msg);
 }

@@ -26,8 +26,8 @@ This is a high-level technical review of the firmware + web clients, with priori
 - ~~Move `/api/wifi` to **POST + JSON body**; never pass passwords in URL query strings.~~ ✅ Implemented (`/api/wifi` now requires `POST` JSON).
 - ~~Add request authentication for mutable endpoints (`/api/wifi`, control commands, OTA), at minimum:~~ 🔄 Partially implemented.
   - ~~per-device admin password or token stored in NVS,~~ ✅ Implemented for `/api/wifi` and OTA Basic Auth.
-  - CSRF-resistant flow for browser UI. ⏳ Pending.
-- ~~Protect OTA route with credentials and rate-limiting/backoff.~~ 🔄 Credentials implemented; rate-limiting/backoff pending.
+  - ~~CSRF-resistant flow for browser UI.~~ ✅ Implemented (`X-Yaeger-CSRF` header validated for mutable REST writes).
+- ~~Protect OTA route with credentials~~ and rate-limiting/backoff. 🔄 Credentials done; OTA backoff/rate-limiting still pending.
 - ~~Add secure defaults in AP mode:~~ 🔄 Partially implemented.
   - ~~WPA2/WPA3 AP passphrase (not open AP),~~ ✅ Implemented (password-protected AP).
   - ~~setup-mode timeout window.~~ ✅ Implemented (AP setup timeout + restart).
@@ -37,22 +37,22 @@ This is a high-level technical review of the firmware + web clients, with priori
 - [x] Replace `/api/wifi` GET query credential flow with authenticated `POST` + JSON body.
 - [x] Protect OTA with admin credentials.
 - [x] Enable AP passphrase and setup timeout window.
-- [ ] Add auth gate for WebSocket mutable control commands.
-- [ ] Add CSRF-resistant browser flow for authenticated actions.
-- [ ] Add rate limiting / exponential backoff for OTA and mutable control endpoints.
+- [x] Add auth gate for WebSocket mutable control commands.
+- [x] Add CSRF-resistant browser flow for authenticated actions.
+- [ ] Add rate limiting / exponential backoff for OTA endpoint (REST/WS mutable endpoint throttling implemented).
 
 ### Findings
 
 - ~~Wi‑Fi credentials are accepted over **HTTP GET query params** at `/api/wifi` (`ssid` / `pass`).~~
 - ~~API endpoints and OTA endpoint appear unauthenticated by default.~~
-- Device exposes AP fallback mode and local admin surface; this remains high-risk until WebSocket auth + CSRF protections are added.
+- Device exposes AP fallback mode and local admin surface; risk is now reduced with auth + CSRF controls, with OTA-specific backoff/rate limiting still pending.
 
 ### Recommendations (2026 best-practice)
 
 1. ~~Move `/api/wifi` to **POST + JSON body**; never pass passwords in URL query strings.~~
 2. ~~Add request authentication for mutable endpoints (`/api/wifi`, control commands, OTA), at minimum:~~
    - ~~per-device admin password or token stored in NVS,~~
-   - CSRF-resistant flow for browser UI.
+   - ~~CSRF-resistant flow for browser UI.~~
 3. ~~Protect OTA route with credentials~~ and add rate-limiting/backoff.
 4. Add secure defaults in AP mode:
    - ~~WPA2/WPA3 AP passphrase (not open AP),~~

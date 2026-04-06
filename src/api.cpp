@@ -8,6 +8,11 @@
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
 
+namespace {
+unsigned long lastWifiMutationMs = 0;
+constexpr unsigned long WIFI_MUTATION_MIN_INTERVAL_MS = 3000;
+}
+
 void setupApi(AsyncWebServer *server) {
   log("setting up api");
 
@@ -26,6 +31,19 @@ void setupApi(AsyncWebServer *server) {
         }
 
         if (!isAuthorizedRequest(request)) {
+          return;
+        }
+
+        if (!hasValidCsrfHeader(request)) {
+          request->send(403, "application/json",
+                        "{\"error\":\"missing/invalid csrf header\"}");
+          return;
+        }
+
+        unsigned long now = millis();
+        if (now - lastWifiMutationMs < WIFI_MUTATION_MIN_INTERVAL_MS) {
+          request->send(429, "application/json",
+                        "{\"error\":\"too many wifi updates\"}");
           return;
         }
 
@@ -53,17 +71,19 @@ void setupApi(AsyncWebServer *server) {
         prefs.putString(wifiPassKey, pass);
         prefs.end();
 
+        lastWifiMutationMs = now;
         logf("saved wifi ssid to prefs: %s", ssid);
         request->send(200, "application/json", "{\"ok\":true}");
       });
 
   server->on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<256> doc;
+    StaticJsonDocument<320> doc;
     doc["firmwareVersion"] = YAEGER_FW_VERSION;
     doc["networkMode"] = getWifiModeString();
     doc["ssid"] = getActiveSSID();
     doc["ip"] = getActiveIP();
     doc["hostname"] = getConfiguredHostname();
+    doc["csrfToken"] = getCsrfToken();
 
     String body;
     serializeJson(doc, body);
