@@ -76,6 +76,16 @@ Courtesy of [@dlisec](https://github.com/dlisec)
 
 A build script has been provided by [@matthew73210](https://github.com/matthew73210), so to get up and running on the
 ESP, just run `./build_and_flash.sh`. Make sure to read the comments in the script. But also in the platformio.ini and choose the right board
+Yaeger OTA in this project is provided by the web-based ElegantOTA handler (`/update`) and not the PlatformIO `espota`
+upload protocol.
+
+For VS Code + PlatformIO uploads via ElegantOTA, use one of these environments:
+
+* `esp32-s3-elegantota`
+* `esp32-s3-mini-elegantota`
+
+These use a custom PlatformIO upload script that sends the built firmware to `http://yaeger.local/update` through the
+same ElegantOTA mechanism used by the device web UI.
 
 ## Latest features
 
