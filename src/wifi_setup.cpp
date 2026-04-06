@@ -1,6 +1,7 @@
 #include "WiFiType.h"
 #include "esp32-hal.h"
 #include "logging.h"
+#include "security.h"
 #include <Arduino.h>
 #include <ESPmDNS.h>
 #include <Preferences.h>
@@ -29,12 +30,17 @@ WiFiParams params;
 const char *yaegerHostname = "yaeger.local";
 unsigned long lastReconnectAttemptMs = 0;
 constexpr unsigned long WIFI_RECONNECT_INTERVAL_MS = 5000;
+constexpr unsigned long AP_SETUP_TIMEOUT_MS = 15UL * 60UL * 1000UL;
+unsigned long apModeStartMs = 0;
 
 void setupAP() {
   WiFi.mode(WIFI_AP);
   delay(100);
-  WiFi.softAP("Yaeger");
+  String apPassphrase = getApPassphrase();
+  WiFi.softAP("Yaeger", apPassphrase.c_str());
   WiFi.setTxPower(WIFI_POWER_8_5dBm);
+  apModeStartMs = millis();
+  log("AP setup mode enabled with WPA2 passphrase");
 }
 
 void connectToWifi() {
@@ -149,6 +155,12 @@ String getConfiguredHostname() { return String(yaegerHostname); }
 
 void maintainWifiConnection() {
   wifi_mode_t mode = WiFi.getMode();
+  if (mode == WIFI_MODE_AP && apModeStartMs > 0 && millis() - apModeStartMs > AP_SETUP_TIMEOUT_MS) {
+    log("AP setup window expired, restarting device");
+    ESP.restart();
+    return;
+  }
+
   if (mode != WIFI_MODE_STA && mode != WIFI_MODE_APSTA) {
     return;
   }

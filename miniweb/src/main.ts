@@ -4,6 +4,7 @@ import { roastApp } from "./roast";
 import { profile, ProfileControl } from "./profiling.ts";
 import { PIDController } from "./pid.ts";
 import { connectionStatus, lastMessage, lastUpdate } from "./websocket";
+import { getBasicAuthHeaderValue } from "./auth";
 
 declare const __APP_VERSION__: string;
 declare const __BUILD_TIMESTAMP__: string;
@@ -14,6 +15,7 @@ interface DeviceInfo {
   ssid: string;
   ip: string;
   hostname: string;
+  csrfToken?: string;
 }
 
 const { button, div, input, p, span, h1, h2 } = van.tags;
@@ -30,6 +32,7 @@ const passField = van.state("");
 // Versioning and network details
 const deviceInfo = van.state<DeviceInfo | null>(null);
 const deviceInfoError = van.state<string | null>(null);
+const csrfToken = van.state("");
 
 const appVersion = __APP_VERSION__;
 const buildTimestamp = new Date(__BUILD_TIMESTAMP__).toLocaleString();
@@ -43,6 +46,7 @@ const refreshDeviceInfo = async () => {
     }
 
     deviceInfo.val = (await response.json()) as DeviceInfo;
+    csrfToken.val = deviceInfo.val.csrfToken || "";
   } catch (error: unknown) {
     deviceInfo.val = null;
     if (error instanceof Error) {
@@ -60,9 +64,15 @@ const updateWifiSettings = async () => {
   const pass = passField.val;
 
   try {
-    const response = await fetch(
-      `http://${location.host}/api/wifi?ssid=${encodeURIComponent(ssid)}&pass=${encodeURIComponent(pass)}`,
-    );
+    const response = await fetch(`http://${location.host}/api/wifi`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: getBasicAuthHeaderValue(),
+        "X-Yaeger-CSRF": csrfToken.val,
+      },
+      body: JSON.stringify({ ssid, pass }),
+    });
     if (response.ok) {
       alert(
         "Wifi settings updated!\nPlease restart for the new settings to take effect",
