@@ -17,6 +17,7 @@
 #include "heater.h"
 #include "logging.h"
 #include "sensors.h"
+#include "security.h"
 #include "wifi_setup.h"
 
 #define PIN 48
@@ -82,7 +83,8 @@ void setup(void) {
   server.serveStatic("/settings", LittleFS, "/").setDefaultFile("index.html");
   server.serveStatic("/editor", LittleFS, "/").setDefaultFile("index.html");
 
-  ElegantOTA.begin(&server); // Start ElegantOTA
+  String adminSecret = getApiAdminSecret();
+  ElegantOTA.begin(&server, getApiAdminUsername(), adminSecret.c_str()); // Start ElegantOTA
   // ElegantOTA callbacks
   ElegantOTA.onStart(onOTAStart);
   ElegantOTA.onProgress(onOTAProgress);
