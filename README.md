@@ -58,6 +58,8 @@ You can also control Yaeger from its own web interface without an app. Just poin
 your home wifi, or `192.168.4.1` if Yaeger creates its own access point.
 ![yaeger webui](./assets/yaeger-webui.png)
 
+The web UI now includes a **Version & Network Info** section that shows the Web UI version/build timestamp and device firmware/network details (mode, SSID, IP, hostname) so you can quickly check when the currently loaded build was last updated.
+
 #### Using Yaeger on the go
 
 If Yaeger can't connect to your preferred Wifi, it will create its own access point. Perfect for when out and about :grin:
