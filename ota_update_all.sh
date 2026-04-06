@@ -130,6 +130,20 @@ run_pio_with_auto_deps() {
 
 echo "Using OTA PlatformIO environment: $PIO_ENV"
 
+
+if [[ -z "${YAEGER_OTA_USERNAME:-}" ]]; then
+  export YAEGER_OTA_USERNAME="admin"
+fi
+
+if [[ -z "${YAEGER_OTA_PASSWORD:-}" ]]; then
+  if [[ -t 0 ]]; then
+    read -r -s -p "Enter OTA admin password: " YAEGER_OTA_PASSWORD
+    echo
+    export YAEGER_OTA_PASSWORD
+  else
+    echo "Warning: YAEGER_OTA_PASSWORD is not set; OTA upload may fail with HTTP 401."
+  fi
+fi
 ensure_ota_venv
 
 echo "Building miniweb assets..."
