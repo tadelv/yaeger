@@ -89,6 +89,16 @@ For VS Code + PlatformIO uploads via ElegantOTA, use one of these environments:
 These use a custom PlatformIO upload script that sends the built firmware to `http://yaeger.local/update` through the
 same ElegantOTA mechanism used by the device web UI.
 
+For a **single-command OTA update of the whole project** (frontend files + firmware), run:
+
+```bash
+./ota_update_all.sh s3
+# or
+./ota_update_all.sh s3-mini
+```
+
+This builds `miniweb`, uploads LittleFS (`uploadfs`), then uploads firmware (`upload`) over ElegantOTA in one fell swoop.
+
 ## Latest features
 
 ### PID
