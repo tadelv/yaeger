@@ -47,7 +47,7 @@ void setupApi(AsyncWebServer *server) {
           return;
         }
 
-        DynamicJsonDocument doc(256);
+        JsonDocument doc;
         DeserializationError err = deserializeJson(doc, data, len);
         if (err) {
           request->send(400, "application/json",
@@ -77,7 +77,7 @@ void setupApi(AsyncWebServer *server) {
       });
 
   server->on("/api/info", HTTP_GET, [](AsyncWebServerRequest *request) {
-    StaticJsonDocument<320> doc;
+    JsonDocument doc;
     doc["firmwareVersion"] = YAEGER_FW_VERSION;
     doc["networkMode"] = getWifiModeString();
     doc["ssid"] = getActiveSSID();

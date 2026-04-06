@@ -78,8 +78,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     logf("msg: %s\n", msg.c_str());
 #endif
 
-    const size_t capacity = JSON_OBJECT_SIZE(4) + 160;
-    DynamicJsonDocument doc(capacity);
+    JsonDocument doc;
 
     DeserializationError err = deserializeJson(doc, msg);
     if (err) {
@@ -149,7 +148,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
         (strncmp(command, "setPreferences", 14) == 0 ||
          strncmp(command, "getPreferences", 14) == 0)) {
       JsonObject root = doc.to<JsonObject>();
-      JsonObject dataObj = root.createNestedObject("data");
+      JsonObject dataObj = root["data"].to<JsonObject>();
       root["id"] = ln_id;
       dataObj["type"] = "preferences";
       dataObj["pidKp"] = preferences.getDouble("pidKp", 1.0);
@@ -160,7 +159,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
     if (command != NULL && strncmp(command, "getData", 7) == 0) {
       JsonObject root = doc.to<JsonObject>();
-      JsonObject dataObj = root.createNestedObject("data");
+      JsonObject dataObj = root["data"].to<JsonObject>();
       root["id"] = ln_id;
       float etbt[3];
       getETBTReadings(etbt);

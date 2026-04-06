@@ -83,7 +83,7 @@ bool hasValidCsrfHeader(AsyncWebServerRequest *request) {
     return false;
   }
 
-  AsyncWebHeader *csrfHeader = request->getHeader("X-Yaeger-CSRF");
+  const AsyncWebHeader *csrfHeader = request->getHeader("X-Yaeger-CSRF");
   return csrfHeader->value() == csrfToken;
 }
 
