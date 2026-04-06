@@ -77,6 +77,17 @@ Courtesy of [@dlisec](https://github.com/dlisec)
 A build script has been provided by [@matthew73210](https://github.com/matthew73210), so to get up and running on the
 ESP, just run `./build_and_flash.sh`. Make sure to read the comments in the script. But also in the platformio.ini and choose the right board
 
+#### OTA upload from VS Code (PlatformIO)
+
+If you already flashed Yaeger once over USB and it is connected to your network, select one of the OTA environments in
+PlatformIO before clicking upload:
+
+* `esp32-s3-ota`
+* `esp32-s3-mini-ota`
+
+These environments use `upload_protocol = espota` and `upload_port = yaeger.local`, which avoids serial auto-detection
+issues (for example selecting `Bluetooth-Incoming-Port` on macOS).
+
 ## Latest features
 
 ### PID
