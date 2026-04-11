@@ -21,7 +21,7 @@ interface DeviceInfo {
 
 type AppTab = "home" | "roast" | "autotune" | "logs" | "settings";
 
-const { button, div, input, p, span, h1, h2 } = van.tags;
+const { button, div, input, p, span, h1, h2, label } = van.tags;
 
 // State variables
 const pidPFactor = van.state(1.0);
@@ -100,24 +100,27 @@ const PIDConfig = () =>
     h2("PID Factors"),
     div(
       { class: "form-grid" },
-      p("P:"),
+      label({ for: "pid-p" }, "P"),
       input({
+        id: "pid-p",
         type: "number",
         value: pidPFactor.val,
         oninput: (e: Event) => {
           pidPFactor.val = parseFloat((e.target as HTMLInputElement).value) || 0;
         },
       }),
-      p("I:"),
+      label({ for: "pid-i" }, "I"),
       input({
+        id: "pid-i",
         type: "number",
         value: pidIFactor.val,
         oninput: (e: Event) => {
           pidIFactor.val = parseFloat((e.target as HTMLInputElement).value) || 0;
         },
       }),
-      p("D:"),
+      label({ for: "pid-d" }, "D"),
       input({
+        id: "pid-d",
         type: "number",
         value: pidDFactor.val,
         oninput: (e: Event) => {
@@ -204,16 +207,20 @@ const SettingsPanel = () =>
       h2("Wifi Settings"),
       div(
         { class: "form-grid" },
-        p("Wifi SSID"),
+        label({ for: "wifi-ssid" }, "Wi‑Fi SSID"),
         input({
+          id: "wifi-ssid",
           type: "text",
+          autocomplete: "off",
           oninput: (e: Event) => {
             ssidField.val = (e.target as HTMLInputElement).value;
           },
         }),
-        p("Wifi Password"),
+        label({ for: "wifi-password" }, "Wi‑Fi Password"),
         input({
+          id: "wifi-password",
           type: "password",
+          autocomplete: "new-password",
           oninput: (e: Event) => {
             passField.val = (e.target as HTMLInputElement).value;
           },
