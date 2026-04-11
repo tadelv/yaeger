@@ -62,9 +62,9 @@ The web UI now includes a **Version & Network Info** section that shows the Web 
 
 ### Frontend status
 
-- `miniweb` (TypeScript + Vite) is the **primary and supported** web UI.
-- `webserver` (legacy Svelte/Rollup) is now considered **deprecated/frozen** and should not receive new feature work.
-- Project scripts and firmware asset packaging target `miniweb` by default.
+- `miniweb` (TypeScript + Vite) is the **only supported** web UI in this repository.
+- The old `webserver` Svelte/Rollup frontend and related legacy files have been removed.
+- Project scripts and firmware asset packaging target `miniweb`.
 
 #### Using Yaeger on the go
 
