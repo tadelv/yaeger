@@ -4,6 +4,8 @@ export type YaegerMessage = {
   ET: number;
   BT: number;
   Amb: number;
+  sampleAgeMs?: number;
+  sensorOk?: boolean;
   FanVal: number;
   BurnerVal: number;
   id: number;

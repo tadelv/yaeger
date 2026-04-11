@@ -255,11 +255,13 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       JsonObject dataObj = root["data"].to<JsonObject>();
       root["id"] = ln_id;
       float etbt[3];
-      getETBTReadings(etbt);
+      bool gotReading = getETBTReadings(etbt);
       dataObj["type"] = "status";
-      dataObj["ET"] = etbt[0];
-      dataObj["BT"] = etbt[1];
-      dataObj["Amb"] = etbt[2];
+      dataObj["ET"] = gotReading ? etbt[0] : NAN;
+      dataObj["BT"] = gotReading ? etbt[1] : NAN;
+      dataObj["Amb"] = gotReading ? etbt[2] : NAN;
+      dataObj["sampleAgeMs"] = millis() - getLastSensorUpdateMs();
+      dataObj["sensorOk"] = gotReading;
       dataObj["BurnerVal"] = getHeaterPower();
       dataObj["FanVal"] = getFanSpeed();
     }
@@ -267,7 +269,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     String response;
     response.reserve(measureJson(doc) + 1);
     serializeJson(doc, response);
+#ifdef DEBUG
     log(response.c_str());
+#endif
     client->text(response);
   } break;
   default:

@@ -38,4 +38,6 @@
 #define DISPLAY_CL 42
 #endif
 
-#define DEBUG
+#ifndef ENABLE_LCD
+#define ENABLE_LCD 0
+#endif
