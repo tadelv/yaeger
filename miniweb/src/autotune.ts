@@ -10,6 +10,7 @@ type PidMethod = "ziegler-nichols" | "tyreus-luyben" | "pessen-integral" | "no-o
 const target = van.state<PidTarget>("BT");
 const method = van.state<PidMethod>("ziegler-nichols");
 const setpoint = van.state(20);
+const fanSpeed = van.state(50);
 const kp = van.state(1.0);
 const ki = van.state(0.1);
 const kd = van.state(0.01);
@@ -34,6 +35,9 @@ function syncFromMessage() {
   if (typeof msg.setpoint === "number") {
     setpoint.val = msg.setpoint;
   }
+  if (typeof msg.FanVal === "number") {
+    fanSpeed.val = msg.FanVal;
+  }
   if (typeof msg.pidAutotune === "boolean") {
     autotuneActive.val = msg.pidAutotune;
   }
@@ -53,6 +57,11 @@ function applyTargetPid() {
 }
 
 function startAutotune() {
+  sendCommand({
+    id: 1,
+    command: "setFan",
+    value: fanSpeed.val,
+  });
   sendCommand({
     id: 1,
     command: "setPidControl",
@@ -117,6 +126,29 @@ export const autotuneApp = () =>
           setpoint.val = parseFloat((e.target as HTMLInputElement).value) || 0;
         },
       }),
+    ),
+    p(
+      "Fan (%)",
+      input({
+        type: "number",
+        min: "0",
+        max: "100",
+        value: fanSpeed,
+        oninput: (e: Event) => {
+          fanSpeed.val = parseFloat((e.target as HTMLInputElement).value) || 0;
+        },
+      }),
+    ),
+    button(
+      {
+        onclick: () =>
+          sendCommand({
+            id: 1,
+            command: "setFan",
+            value: fanSpeed.val,
+          }),
+      },
+      "Apply fan speed",
     ),
     p(
       "Kp",
