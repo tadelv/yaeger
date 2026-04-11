@@ -30,6 +30,8 @@ const setpoint = van.state(20);
 const pidPFactor = van.state(1.0);
 const pidIFactor = van.state(0.1);
 const pidDFactor = van.state(0.01);
+const btRoR = van.state<number | null>(null);
+const etRoR = van.state<number | null>(null);
 
 // Chart.js setup
 const chartElement = canvas({ id: "liveChart" });
@@ -115,6 +117,7 @@ van.derive(() => {
 
       // Update chart with new data
       updateChart(chart, newState.roast);
+      updateDisplayedRoR();
 
       // Check profile following
       if (
@@ -242,6 +245,29 @@ function sendPidControlConfig() {
   });
 }
 
+function updateDisplayedRoR() {
+  const measurements = state.val.roast?.measurements ?? [];
+  if (measurements.length < 2) {
+    btRoR.val = null;
+    etRoR.val = null;
+    return;
+  }
+
+  const latest = measurements[measurements.length - 1];
+  const previous = measurements[measurements.length - 2];
+  const elapsedSeconds =
+    (latest.timestamp.getTime() - previous.timestamp.getTime()) / 1000;
+
+  if (elapsedSeconds <= 0) {
+    btRoR.val = null;
+    etRoR.val = null;
+    return;
+  }
+
+  btRoR.val = ((latest.message.BT - previous.message.BT) / elapsedSeconds) * 60;
+  etRoR.val = ((latest.message.ET - previous.message.ET) / elapsedSeconds) * 60;
+}
+
 var DownloadButton = () => {
   const shouldShowButton = van.derive(() => {
     const c =
@@ -327,6 +353,7 @@ const UploadRoastInput = () => {
           roast: jsonData,
         };
         updateChart(chart, state.val.roast!);
+        updateDisplayedRoR();
       } catch (error) {
         console.log("upload failed:", error);
       }
@@ -573,6 +600,14 @@ const createApp = () => div(
         console.log("BT render:", currentMessage.val?.BT);
         return currentMessage.val?.BT ?? "N/A";
       },
+      " ",
+      "BT RoR: ",
+      () => btRoR.val?.toFixed(2) ?? "N/A",
+      " °C/min",
+      " ",
+      "ET RoR: ",
+      () => etRoR.val?.toFixed(2) ?? "N/A",
+      " °C/min",
     ),
     " ",
     p(
@@ -584,6 +619,20 @@ const createApp = () => div(
     ),
   ),
   UploadRoastInput,
+  p(),
+  div(
+    "PID current values: ",
+    "Temp ",
+    () => currentMessage.val?.pidCurrentTemp?.toFixed(2) ?? "N/A",
+    " | Error ",
+    () => currentMessage.val?.pidError?.toFixed(2) ?? "N/A",
+    " | Integral ",
+    () => currentMessage.val?.pidIntegral?.toFixed(2) ?? "N/A",
+    " | Derivative ",
+    () => currentMessage.val?.pidDerivative?.toFixed(2) ?? "N/A",
+    " | Output ",
+    () => currentMessage.val?.pidOutput?.toFixed(2) ?? "N/A",
+  ),
   p(),
   PIDConfig,
   p(),

@@ -26,6 +26,10 @@ unsigned long lastPidUpdateMs = 0;
 double pidIntegral = 0.0;
 double pidPreviousError = 0.0;
 bool pidHasPreviousError = false;
+double pidCurrentTemp = NAN;
+double pidError = 0.0;
+double pidDerivative = 0.0;
+double pidOutput = 0.0;
 
 double pidSetpoint = 20.0;
 bool pidEnabled = true;
@@ -314,6 +318,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       dataObj["setpoint"] = pidSetpoint;
       dataObj["pidEnabled"] = pidEnabled;
       dataObj["pidTarget"] = pidTargetToString(pidTarget);
+      dataObj["pidCurrentTemp"] = pidCurrentTemp;
+      dataObj["pidError"] = pidError;
+      dataObj["pidIntegral"] = pidIntegral;
+      dataObj["pidDerivative"] = pidDerivative;
+      dataObj["pidOutput"] = pidOutput;
     }
 
     if (command != NULL && strncmp(command, "getData", 7) == 0) {
@@ -333,6 +342,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       dataObj["setpoint"] = pidSetpoint;
       dataObj["pidEnabled"] = pidEnabled;
       dataObj["pidTarget"] = pidTargetToString(pidTarget);
+      dataObj["pidCurrentTemp"] = pidCurrentTemp;
+      dataObj["pidError"] = pidError;
+      dataObj["pidIntegral"] = pidIntegral;
+      dataObj["pidDerivative"] = pidDerivative;
+      dataObj["pidOutput"] = pidOutput;
     }
 
     String response;
@@ -417,4 +431,8 @@ void updatePidControl() {
   long heaterPower = lround(std::clamp(output, 0.0, 100.0));
   setHeaterPower(heaterPower);
   pidPreviousError = error;
+  pidCurrentTemp = currentTemp;
+  pidError = error;
+  pidDerivative = derivative;
+  pidOutput = output;
 }

@@ -8,6 +8,13 @@ export type YaegerMessage = {
   sensorOk?: boolean;
   FanVal: number;
   BurnerVal: number;
+  btRoR?: number;
+  etRoR?: number;
+  pidCurrentTemp?: number;
+  pidError?: number;
+  pidIntegral?: number;
+  pidDerivative?: number;
+  pidOutput?: number;
   id: number;
 }
 
