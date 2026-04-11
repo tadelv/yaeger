@@ -267,7 +267,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
     String response;
     response.reserve(measureJson(doc) + 1);
     serializeJson(doc, response);
+#ifdef DEBUG
     log(response.c_str());
+#endif
     client->text(response);
   } break;
   default:
