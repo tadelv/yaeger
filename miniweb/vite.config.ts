@@ -1,3 +1,4 @@
+import preact from "@preact/preset-vite";
 import { defineConfig } from "vite";
 import { VitePWA } from "vite-plugin-pwa";
 import packageJson from "./package.json";
@@ -48,7 +49,7 @@ export default defineConfig(async () => ({
     __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
   },
   plugins: [
-    // react(),
+    preact(),
     // viteTsconfigPaths(),
     // svgrPlugin(),
     // viteCompression(),

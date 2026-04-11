@@ -1,0 +1,169 @@
+import { render } from "preact";
+import { useEffect, useState } from "preact/hooks";
+import "./style.css";
+import { AutotuneApp } from "./autotune";
+import { LogsApp } from "./logs";
+import { ProfileControl } from "./profiling";
+import { RoastApp } from "./roast";
+import { getBasicAuthHeaderValue } from "./auth";
+import { useSocketState } from "./websocket";
+
+declare const __APP_VERSION__: string;
+declare const __BUILD_TIMESTAMP__: string;
+
+interface DeviceInfo {
+  firmwareVersion: string;
+  networkMode: string;
+  ssid: string;
+  ip: string;
+  hostname: string;
+  csrfToken?: string;
+}
+
+type AppTab = "home" | "roast" | "autotune" | "logs" | "settings";
+
+function App() {
+  const { connectionStatus, lastMessage, lastUpdate } = useSocketState();
+  const [pidPFactor, setPidPFactor] = useState(1.0);
+  const [pidIFactor, setPidIFactor] = useState(0.1);
+  const [pidDFactor, setPidDFactor] = useState(0.01);
+  const [ssidField, setSsidField] = useState("");
+  const [passField, setPassField] = useState("");
+  const [activeTab, setActiveTab] = useState<AppTab>("home");
+  const [deviceInfo, setDeviceInfo] = useState<DeviceInfo | null>(null);
+  const [deviceInfoError, setDeviceInfoError] = useState<string | null>(null);
+  const [csrfToken, setCsrfToken] = useState("");
+  const [, setTick] = useState(0);
+
+  const appVersion = __APP_VERSION__;
+  const buildTimestamp = new Date(__BUILD_TIMESTAMP__).toLocaleString();
+
+  const refreshDeviceInfo = async () => {
+    try {
+      setDeviceInfoError(null);
+      const response = await fetch(`http://${location.host}/api/info`);
+      if (!response.ok) throw new Error(`API returned ${response.status}`);
+      const data = (await response.json()) as DeviceInfo;
+      setDeviceInfo(data);
+      setCsrfToken(data.csrfToken || "");
+    } catch (error) {
+      setDeviceInfo(null);
+      setDeviceInfoError(error instanceof Error ? error.message : "Unknown error");
+    }
+  };
+
+  useEffect(() => {
+    void refreshDeviceInfo();
+  }, []);
+
+  const updateWifiSettings = async () => {
+    try {
+      const response = await fetch(`http://${location.host}/api/wifi`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: getBasicAuthHeaderValue(),
+          "X-Yaeger-CSRF": csrfToken,
+        },
+        body: JSON.stringify({ ssid: ssidField, pass: passField }),
+      });
+      if (response.ok) {
+        alert("Wifi settings updated!\nPlease restart for the new settings to take effect");
+        await refreshDeviceInfo();
+      } else {
+        alert(`Something happened: ${response.status}`);
+      }
+    } catch (error) {
+      alert(error instanceof Error ? `Error: ${error.message}` : "An unknown error occurred");
+    }
+  };
+
+  return (
+    <div class="app-layout">
+      <div class="tabs-nav">
+        <h2 class="tabs-title">Yaeger</h2>
+        {(["home", "roast", "autotune", "logs", "settings"] as AppTab[]).map((tab) => (
+          <button class={`tab-btn ${activeTab === tab ? "active" : ""}`} onClick={() => setActiveTab(tab)}>
+            {tab.charAt(0).toUpperCase() + tab.slice(1)}
+          </button>
+        ))}
+      </div>
+      <div class="tab-content">
+        {activeTab === "home" && (
+          <div>
+            <h1>Yaeger Roaster Control</h1>
+            <p class="muted">Modern command center for your roast workflow.</p>
+            <div class="connection-status">
+              Connection Status: <span>{connectionStatus}</span>
+            </div>
+            <div class="section">
+              <h2>Current Readings</h2>
+              <p>ET: {lastMessage?.ET ?? "N/A"}°C</p>
+              <p>BT: {lastMessage?.BT ?? "N/A"}°C</p>
+              <p>Sim BT (core): {lastMessage?.simBT ?? "N/A"}°C</p>
+              <p>Sensor sample age: {lastMessage?.sampleAgeMs ?? "N/A"} ms</p>
+              <p>Sensor status: {lastMessage?.sensorOk ? "OK" : "BUSY/STALE"}</p>
+              <p>Last update: {lastUpdate?.toString() ?? "N/A"}</p>
+            </div>
+          </div>
+        )}
+
+        {activeTab === "roast" && <RoastApp />}
+        {activeTab === "autotune" && <AutotuneApp />}
+        {activeTab === "logs" && <LogsApp />}
+
+        {activeTab === "settings" && (
+          <div>
+            <div class="section">
+              <h2>Version & Network Info</h2>
+              <p>Web UI version: {appVersion}</p>
+              <p>Web UI build: {buildTimestamp}</p>
+              <p>Viewed via: {location.origin}</p>
+              {deviceInfo ? (
+                <div>
+                  <p>Firmware version: {deviceInfo.firmwareVersion}</p>
+                  <p>Network mode: {deviceInfo.networkMode}</p>
+                  <p>SSID: {deviceInfo.ssid || "N/A"}</p>
+                  <p>IP address: {deviceInfo.ip || "N/A"}</p>
+                  <p>Hostname: {deviceInfo.hostname || "N/A"}</p>
+                </div>
+              ) : (
+                <p>Device info unavailable</p>
+              )}
+              {deviceInfoError ? <p style="color:#b91c1c;">Could not load network info: {deviceInfoError}</p> : null}
+              <button onClick={() => void refreshDeviceInfo()}>Refresh Info</button>
+            </div>
+            <div class="section">
+              <h2>Profile Selection</h2>
+              <ProfileControl onStateChange={() => setTick((v) => v + 1)} />
+            </div>
+            <div class="section">
+              <h2>PID Factors</h2>
+              <div class="form-grid">
+                <label for="pid-p">P</label>
+                <input id="pid-p" type="number" value={pidPFactor} onInput={(e) => setPidPFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+                <label for="pid-i">I</label>
+                <input id="pid-i" type="number" value={pidIFactor} onInput={(e) => setPidIFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+                <label for="pid-d">D</label>
+                <input id="pid-d" type="number" value={pidDFactor} onInput={(e) => setPidDFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+              </div>
+            </div>
+            <div class="section">
+              <h2>Wifi Settings</h2>
+              <div class="form-grid">
+                <label for="wifi-ssid">Wi‑Fi SSID</label>
+                <input id="wifi-ssid" type="text" autoComplete="off" onInput={(e) => setSsidField((e.target as HTMLInputElement).value)} />
+                <label for="wifi-password">Wi‑Fi Password</label>
+                <input id="wifi-password" type="password" autoComplete="new-password" onInput={(e) => setPassField((e.target as HTMLInputElement).value)} />
+              </div>
+              <p />
+              <button onClick={() => void updateWifiSettings()}>Update Wifi</button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+render(<App />, document.getElementById("app")!);
