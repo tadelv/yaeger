@@ -234,14 +234,17 @@ function sendCommand(data: any) {
 }
 
 function sendPidControlConfig() {
-  const shouldEnablePid =
-    pidEnabled.val && state.val.currentState.status == RoasterStatus.roasting;
+  const isRoasting = state.val.currentState.status == RoasterStatus.roasting;
+  const shouldEnablePid = pidEnabled.val && isRoasting;
+  const shouldAutotune = pidAutotune.val && isRoasting;
   sendCommand({
     id: 1,
     command: "setPidControl",
     setpoint: setpoint.val,
     pidEnabled: shouldEnablePid,
     pidTarget: tempTarget,
+    pidTuneMethod: tempMethod,
+    pidAutotune: shouldAutotune,
   });
 }
 
@@ -387,7 +390,9 @@ let tempI = pidIFactor.val;
 let tempD = pidDFactor.val;
 
 let tempTarget = "BT";
+let tempMethod = "ziegler-nichols";
 const pidEnabled = van.state(false);
+const pidAutotune = van.state(false);
 
 const PIDConfig = () =>
   div(
@@ -429,6 +434,22 @@ const PIDConfig = () =>
       },
       option({ value: "BT" }, "BT"),
       option({ value: "ET" }, "ET"),
+      option({ value: "simBT" }, "Sim BT"),
+    ),
+    p(),
+    "Method:",
+    select(
+      {
+        value: tempMethod,
+        onchange: (e: Event) => {
+          tempMethod = (e.target as HTMLSelectElement).value;
+          sendPidControlConfig();
+        },
+      },
+      option({ value: "ziegler-nichols" }, "Ziegler-Nichols"),
+      option({ value: "tyreus-luyben" }, "Tyreus-Luyben"),
+      option({ value: "pessen-integral" }, "Pessen Integral"),
+      option({ value: "no-overshoot" }, "No overshoot"),
     ),
     p(),
     button(
@@ -440,6 +461,7 @@ const PIDConfig = () =>
           sendCommand({
             id: 1,
             command: "setPreferences",
+            pidTarget: tempTarget,
             pidKp: pidPFactor.val,
             pidKi: pidIFactor.val,
             pidKd: pidDFactor.val,
@@ -463,6 +485,16 @@ const PIDConfig = () =>
         },
       }),
       "PID Enabled",
+    ),
+    p(),
+    button(
+      {
+        onclick: () => {
+          pidAutotune.val = !pidAutotune.val;
+          sendPidControlConfig();
+        },
+      },
+      () => (pidAutotune.val ? "Stop autotune" : "Start autotune"),
     ),
   );
 
