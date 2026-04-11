@@ -21,6 +21,7 @@ Adafruit_MAX31855 tcBeans(MAX2CLK, MAX2CS, MAX2DO);
 
 const uint8_t kMovingAverageWindowSize = 10;
 const unsigned long kSamplingWindowDurationMs = 400;
+const uint8_t kFaultDebounceThreshold = 3;
 
 MovingAverageFilter exhaustFilter(kMovingAverageWindowSize);
 MovingAverageFilter beansFilter(kMovingAverageWindowSize);
@@ -28,6 +29,8 @@ MovingAverageFilter beansFilter(kMovingAverageWindowSize);
 /*SimpleKalmanFilter beansFilter(80, 80, 3);*/
 unsigned long lastReadTime = 0;
 unsigned long lastSensorUpdateMs = 0;
+uint8_t exhaustFaultCount = 0;
+uint8_t beansFaultCount = 0;
 
 SemaphoreHandle_t mtx;
 StaticSemaphore_t mtx_buffer;
@@ -72,16 +75,30 @@ void takeReadings() {
 void takeETReadings(float dt) {
   float exhaustTemp = tcExhaust.readCelsius();
   if (isnan(exhaustTemp)) {
+    exhaustFaultCount++;
+    if (exhaustFaultCount < kFaultDebounceThreshold) {
+      return;
+    }
+
     uint8_t e = tcExhaust.readError();
-    logf("Thermocouple fault(s) detected! %d", e);
-    if (e & MAX31855_FAULT_OPEN)
-      log("FAULT: Thermocouple is open - no connections.");
-    if (e & MAX31855_FAULT_SHORT_GND)
-      log("FAULT: Thermocouple is short-circuited to GND.");
-    if (e & MAX31855_FAULT_SHORT_VCC)
-      log("FAULT: Thermocouple is short-circuited to VCC.");
+    logf("Exhaust thermocouple fault(s) detected! %d\n", e);
+    if (e & MAX31855_FAULT_OPEN) {
+      log("FAULT: Exhaust thermocouple open - no connections.");
+    }
+    if (e & MAX31855_FAULT_SHORT_GND) {
+      log("FAULT: Exhaust thermocouple short-circuited to GND.");
+    }
+    if (e & MAX31855_FAULT_SHORT_VCC) {
+      log("FAULT: Exhaust thermocouple short-circuited to VCC.");
+    }
+
+    if (e == 0) {
+      // Sometimes NaN occurs transiently; attempt sensor re-sync.
+      tcExhaust.begin();
+    }
     return;
   }
+  exhaustFaultCount = 0;
 #ifdef DEBUG
   logf("Exhaust Temp: %.2f\n", exhaustTemp);
 #endif
@@ -91,16 +108,29 @@ void takeETReadings(float dt) {
 void takeBTReadings(float dt) {
   float beanTemp = tcBeans.readCelsius();
   if (isnan(beanTemp)) {
+    beansFaultCount++;
+    if (beansFaultCount < kFaultDebounceThreshold) {
+      return;
+    }
+
     uint8_t e = tcBeans.readError();
-    logf("Thermocouple fault(s) detected! %d", e);
-    if (e & MAX31855_FAULT_OPEN)
-      log("FAULT: Thermocouple is open - no connections.");
-    if (e & MAX31855_FAULT_SHORT_GND)
-      log("FAULT: Thermocouple is short-circuited to GND.");
-    if (e & MAX31855_FAULT_SHORT_VCC)
-      log("FAULT: Thermocouple is short-circuited to VCC.");
+    logf("Bean thermocouple fault(s) detected! %d\n", e);
+    if (e & MAX31855_FAULT_OPEN) {
+      log("FAULT: Bean thermocouple open - no connections.");
+    }
+    if (e & MAX31855_FAULT_SHORT_GND) {
+      log("FAULT: Bean thermocouple short-circuited to GND.");
+    }
+    if (e & MAX31855_FAULT_SHORT_VCC) {
+      log("FAULT: Bean thermocouple short-circuited to VCC.");
+    }
+
+    if (e == 0) {
+      tcBeans.begin();
+    }
     return;
   }
+  beansFaultCount = 0;
 #ifdef DEBUG
   logf("Bean Temp: %.2f\n", beanTemp);
 #endif

@@ -39,7 +39,9 @@ void setFanSpeed(int speed) {
 
   logf("Fan speed set to %d%%\n", speed);
   if (xQueueOverwrite(speedQueue, &speed) == pdPASS) {
+#ifdef DEBUG
     logf("Requested fan speed set to %d%%\n", speed);
+#endif
   }
 }
 
@@ -61,7 +63,9 @@ void rampFanSpeedTask(void *pvParams) {
         }
 
         analogWrite(FAN_PIN, currentFanSpeed * 255 / 100);
+#ifdef DEBUG
         logf("Fan speed updated to %d%%\n", currentFanSpeed);
+#endif
 
         // Break if the target speed is reached
         if (currentFanSpeed == desiredSpeed) {

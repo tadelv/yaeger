@@ -37,5 +37,3 @@
 #define DISPLAY_DA 41
 #define DISPLAY_CL 42
 #endif
-
-#define DEBUG
