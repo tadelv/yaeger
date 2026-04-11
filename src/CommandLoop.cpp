@@ -354,7 +354,8 @@ void setupMainLoop(AsyncWebSocket *ws) {
   pidSetpoint = preferences.getDouble("pidSetpoint", 20.0);
   const String configuredTarget = preferences.getString("pidTarget", "BT");
   pidTarget = configuredTarget == "ET" ? PidTargetSensor::ET : PidTargetSensor::BT;
-  pidEnabled = preferences.getBool("pidEnabled", true);
+  pidEnabled = false;
+  preferences.putBool("pidEnabled", false);
   ws->onEvent(onWsEvent);
 }
 

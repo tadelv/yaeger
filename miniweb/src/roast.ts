@@ -231,11 +231,13 @@ function sendCommand(data: any) {
 }
 
 function sendPidControlConfig() {
+  const shouldEnablePid =
+    pidEnabled.val && state.val.currentState.status == RoasterStatus.roasting;
   sendCommand({
     id: 1,
     command: "setPidControl",
     setpoint: setpoint.val,
-    pidEnabled: pidEnabled.val,
+    pidEnabled: shouldEnablePid,
     pidTarget: tempTarget,
   });
 }
@@ -358,7 +360,7 @@ let tempI = pidIFactor.val;
 let tempD = pidDFactor.val;
 
 let tempTarget = "BT";
-const pidEnabled = van.state(true);
+const pidEnabled = van.state(false);
 
 const PIDConfig = () =>
   div(
@@ -605,6 +607,7 @@ function toggleRoastStart() {
         },
         profile: profile.val,
       };
+      sendPidControlConfig();
       break;
     case RoasterStatus.roasting:
       state.val = {
@@ -618,6 +621,7 @@ function toggleRoastStart() {
           profile: state.val.profile,
         },
       };
+      sendPidControlConfig();
       break;
   }
 }
