@@ -149,6 +149,9 @@ export function RoastApp() {
     return elapsed > 0 ? ((latest.message.ET - prev.message.ET) / elapsed) * 60 : null;
   }, [state.roast]);
 
+  const formatMetric = (value: number | null | undefined, digits = 2) =>
+    typeof value === "number" ? value.toFixed(digits) : "N/A";
+
   const toggleRoastStart = () => {
     if (state.currentState.status === RoasterStatus.idle) {
       setState((prev) => ({
@@ -193,8 +196,8 @@ export function RoastApp() {
   };
 
   return (
-    <div>
-      <div>
+    <div class="roast-dashboard">
+      <div class="roast-toolbar">
         <button onClick={toggleRoastStart}>
           {state.currentState.status === RoasterStatus.idle ? "Start" : "Stop"}
         </button>
@@ -235,10 +238,50 @@ export function RoastApp() {
           }}
           disabled={state.currentState.status === RoasterStatus.roasting}
         />
-        <span> Roast time: {roastTime}</span>
+        <span class="roast-time-pill">Roast time: {roastTime}</span>
       </div>
 
-      <canvas id="liveChart" ref={chartCanvasRef} />
+      <section class="telemetry-panel">
+        <div class="telemetry-header">
+          <h2>Live telemetry</h2>
+          <span class="last-update">Last update: {lastUpdate?.toString() ?? "N/A"}</span>
+        </div>
+        <div class="telemetry-grid">
+          <div class="metric-card">
+            <span>ET</span>
+            <strong>{formatMetric(lastMessage?.ET, 3)} °C</strong>
+          </div>
+          <div class="metric-card">
+            <span>BT</span>
+            <strong>{formatMetric(lastMessage?.BT, 3)} °C</strong>
+          </div>
+          <div class="metric-card">
+            <span>Sim BT</span>
+            <strong>{formatMetric(lastMessage?.simBT, 1)} °C</strong>
+          </div>
+          <div class="metric-card">
+            <span>BT RoR</span>
+            <strong>{formatMetric(btRoR, 2)} °C/min</strong>
+          </div>
+          <div class="metric-card">
+            <span>ET RoR</span>
+            <strong>{formatMetric(etRoR, 2)} °C/min</strong>
+          </div>
+        </div>
+
+        <div class="pid-summary">
+          <h3>PID current values</h3>
+          <div class="pid-grid">
+            <span>Temp {formatMetric(lastMessage?.pidCurrentTemp, 2)}</span>
+            <span>Error {formatMetric(lastMessage?.pidError, 2)}</span>
+            <span>Integral {formatMetric(lastMessage?.pidIntegral, 2)}</span>
+            <span>Derivative {formatMetric(lastMessage?.pidDerivative, 2)}</span>
+            <span>Output {formatMetric(lastMessage?.pidOutput, 2)}</span>
+          </div>
+        </div>
+      </section>
+
+      <canvas id="liveChart" ref={chartCanvasRef} class="live-chart" />
 
       <div class="control_cluster">
         <div>
@@ -291,7 +334,7 @@ export function RoastApp() {
         </div>
       </div>
 
-      <div>
+      <div class="event-buttons">
         {[
           ["charge", "Charge"],
           ["dry-end", "Dry End"],
@@ -307,20 +350,7 @@ export function RoastApp() {
         ))}
       </div>
 
-      <p>
-        ET: {lastMessage?.ET ?? "N/A"} BT: {lastMessage?.BT ?? "N/A"} Sim BT: {lastMessage?.simBT?.toFixed(1) ?? "N/A"} BT
-        RoR: {btRoR?.toFixed(2) ?? "N/A"} °C/min ET RoR: {etRoR?.toFixed(2) ?? "N/A"} °C/min
-      </p>
-      <p>Last update: {lastUpdate?.toString() ?? "N/A"}</p>
-
-      <div>
-        PID current values: Temp {lastMessage?.pidCurrentTemp?.toFixed(2) ?? "N/A"} | Error {lastMessage?.pidError?.toFixed(2) ?? "N/A"} |
-        Integral {lastMessage?.pidIntegral?.toFixed(2) ?? "N/A"} | Derivative {lastMessage?.pidDerivative?.toFixed(2) ?? "N/A"} | Output
-        {" "}
-        {lastMessage?.pidOutput?.toFixed(2) ?? "N/A"}
-      </div>
-
-      <div>
+      <div class="section">
         <h3>PID Factors</h3>
         <p>
           P <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />

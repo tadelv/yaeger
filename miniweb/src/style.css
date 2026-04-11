@@ -186,6 +186,116 @@ textarea:focus {
   color: hsl(var(--secondary-foreground));
 }
 
+.roast-dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.roast-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.85rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  background: linear-gradient(150deg, hsl(var(--background)), hsl(var(--secondary)));
+}
+
+.roast-time-pill {
+  margin-left: auto;
+  font-weight: 600;
+  color: #0f172a;
+  background: #e0f2fe;
+  border-radius: 999px;
+  padding: 0.35rem 0.75rem;
+}
+
+.telemetry-panel {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  padding: 1rem;
+  background: linear-gradient(140deg, #f8fbff 0%, #eef2ff 100%);
+}
+
+.telemetry-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  align-items: baseline;
+  margin-bottom: 0.75rem;
+}
+
+.telemetry-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.last-update {
+  color: #475569;
+  font-size: 0.85rem;
+}
+
+.telemetry-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(145px, 1fr));
+  gap: 0.75rem;
+}
+
+.metric-card {
+  border: 1px solid #bfdbfe;
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+}
+
+.metric-card span {
+  color: #475569;
+  font-size: 0.8rem;
+}
+
+.metric-card strong {
+  margin-top: 0.2rem;
+  font-size: 1.05rem;
+  letter-spacing: 0.01em;
+}
+
+.pid-summary {
+  margin-top: 0.9rem;
+  padding-top: 0.75rem;
+  border-top: 1px dashed #93c5fd;
+}
+
+.pid-summary h3 {
+  margin: 0 0 0.55rem;
+  font-size: 0.95rem;
+}
+
+.pid-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.4rem 0.75rem;
+  color: #1e293b;
+  font-size: 0.88rem;
+}
+
+.live-chart {
+  width: 100%;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  background: hsl(var(--background));
+  padding: 0.3rem;
+}
+
+.event-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .section p {
   margin: 0.35rem 0;
 }
@@ -222,6 +332,15 @@ textarea:focus {
     grid-template-columns: 1fr;
     gap: 0.45rem;
   }
+
+  .roast-time-pill {
+    margin-left: 0;
+  }
+
+  .telemetry-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
 }
 
 @media (prefers-color-scheme: dark) {
@@ -239,6 +358,33 @@ textarea:focus {
 
   body {
     background: radial-gradient(circle at top left, #111827 0%, hsl(var(--background)) 42%);
+  }
+
+  .roast-time-pill {
+    color: #e2e8f0;
+    background: #1e3a8a;
+  }
+
+  .telemetry-panel {
+    background: linear-gradient(140deg, #0b1221 0%, #111827 100%);
+  }
+
+  .last-update,
+  .metric-card span {
+    color: #94a3b8;
+  }
+
+  .metric-card {
+    border-color: #334155;
+    background: rgba(15, 23, 42, 0.8);
+  }
+
+  .pid-summary {
+    border-top-color: #334155;
+  }
+
+  .pid-grid {
+    color: #cbd5e1;
   }
 }
 
