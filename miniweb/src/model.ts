@@ -16,6 +16,7 @@ export type YaegerMessage = {
   pidIntegral?: number;
   pidDerivative?: number;
   pidOutput?: number;
+  setpoint?: number;
   pidTarget?: "BT" | "ET" | "simBT";
   pidTuneMethod?: "ziegler-nichols" | "tyreus-luyben" | "pessen-integral" | "no-overshoot";
   pidAutotune?: boolean;

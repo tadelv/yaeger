@@ -1,6 +1,7 @@
 import "./style.css";
 import van from "vanjs-core";
 import { roastApp } from "./roast";
+import { autotuneApp } from "./autotune";
 import { logsApp } from "./logs";
 import { ProfileControl } from "./profiling.ts";
 import { connectionStatus, lastMessage, lastUpdate } from "./websocket";
@@ -18,7 +19,7 @@ interface DeviceInfo {
   csrfToken?: string;
 }
 
-type AppTab = "home" | "roast" | "logs" | "settings";
+type AppTab = "home" | "roast" | "autotune" | "logs" | "settings";
 
 const { button, div, input, p, span, h1, h2 } = van.tags;
 
@@ -229,6 +230,7 @@ const TabsNav = () =>
     h2({ class: "tabs-title" }, "Yaeger"),
     button({ class: () => `tab-btn ${activeTab.val === "home" ? "active" : ""}`, onclick: () => (activeTab.val = "home") }, "Home"),
     button({ class: () => `tab-btn ${activeTab.val === "roast" ? "active" : ""}`, onclick: () => (activeTab.val = "roast") }, "Roast"),
+    button({ class: () => `tab-btn ${activeTab.val === "autotune" ? "active" : ""}`, onclick: () => (activeTab.val = "autotune") }, "Autotune"),
     button({ class: () => `tab-btn ${activeTab.val === "logs" ? "active" : ""}`, onclick: () => (activeTab.val = "logs") }, "Logs"),
     button({ class: () => `tab-btn ${activeTab.val === "settings" ? "active" : ""}`, onclick: () => (activeTab.val = "settings") }, "Settings"),
   );
@@ -242,6 +244,8 @@ const appLayout = div(
       switch (activeTab.val) {
         case "roast":
           return roastApp();
+        case "autotune":
+          return autotuneApp();
         case "logs":
           return logsApp();
         case "settings":
