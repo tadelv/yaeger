@@ -60,6 +60,12 @@ your home wifi, or `192.168.4.1` if Yaeger creates its own access point.
 
 The web UI now includes a **Version & Network Info** section that shows the Web UI version/build timestamp and device firmware/network details (mode, SSID, IP, hostname) so you can quickly check when the currently loaded build was last updated.
 
+### Frontend status
+
+- `miniweb` (TypeScript + Vite) is the **primary and supported** web UI.
+- `webserver` (legacy Svelte/Rollup) is now considered **deprecated/frozen** and should not receive new feature work.
+- Project scripts and firmware asset packaging target `miniweb` by default.
+
 #### Using Yaeger on the go
 
 If Yaeger can't connect to your preferred Wifi, it will create its own access point. Perfect for when out and about :grin:
@@ -98,6 +104,14 @@ For a **single-command OTA update of the whole project** (frontend files + firmw
 ```
 
 This builds `miniweb`, then runs OTA in two explicit steps: (1) upload LittleFS (`buildfs` + `uploadfs`) and (2) upload firmware (`upload`). The script creates and uses a local Python virtual environment (`.ota-venv`), installs required OTA dependencies (`platformio`, `littlefs-python`, `fatfs-ng`, `pyyaml`), and auto-retries if PlatformIO reports missing Python modules.
+
+For local frontend builds, use npm from `miniweb`:
+
+```bash
+cd miniweb
+npm ci
+npm run build
+```
 
 ## Latest features
 

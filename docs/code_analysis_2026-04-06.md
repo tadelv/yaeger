@@ -114,6 +114,18 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ## 4) **Frontend modernization path (high priority, medium effort)**
 
+### Implementation status (April 11, 2026 update)
+
+- ~~Make `miniweb` the single primary frontend and define deprecation timeline for `webserver`.~~ ✅ Implemented (project docs + build path now explicitly designate `miniweb` as primary and `webserver` as deprecated/frozen).
+- ~~If legacy UI must remain, plan migration to modern Svelte/Vite stack.~~ ✅ Implemented as policy decision (legacy kept as frozen fallback with no new feature investment).
+- ~~Standardize package manager/lockfile strategy (npm vs yarn) to reduce CI drift.~~ ✅ Implemented for active frontend path (`build_and_flash.sh` now uses `npm ci` for deterministic `miniweb` installs).
+
+### Updated TODO list
+
+- [x] Declare `miniweb` as canonical UI and deprecate legacy `webserver`.
+- [x] Freeze legacy UI scope to maintenance-only fallback.
+- [x] Standardize active frontend build path on deterministic npm installs.
+
 ### Findings
 
 - Repository contains **two web UIs** (`webserver` legacy Svelte 3 + Rollup, and `miniweb` TypeScript + Vite).
@@ -121,9 +133,9 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ### Recommendations
 
-1. Make `miniweb` the single primary frontend and define deprecation timeline for `webserver`.
-2. If legacy UI must remain, plan migration to modern Svelte/Vite stack.
-3. Standardize package manager/lockfile strategy (npm vs yarn) to reduce CI drift.
+1. ~~Make `miniweb` the single primary frontend and define deprecation timeline for `webserver`.~~
+2. ~~If legacy UI must remain, plan migration to modern Svelte/Vite stack.~~
+3. ~~Standardize package manager/lockfile strategy (npm vs yarn) to reduce CI drift.~~
 
 ## 5) **Dependency and supply-chain updates (high priority)**
 
