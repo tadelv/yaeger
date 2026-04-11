@@ -1,58 +1,91 @@
 import van from "vanjs-core";
 import { YaegerMessage } from "./model.ts";
 
-// State variables
 export const connectionStatus = van.state("Disconnected");
 export const lastMessage = van.state<YaegerMessage | null>(null);
 export const lastUpdate = van.state<Date | null>(null);
 
-// Initialize WebSocket
-export const socket = new WebSocket("ws://" + location.host + "/ws");
+const WS_PATH = "/ws";
+const DATA_REQUEST_INTERVAL_MS = 1000;
+const RECONNECT_DELAY_MS = 2000;
 
-// WebSocket message handling
-socket.onmessage = (event) => {
-  console.log("WebSocket message received:", event.data);
+let socket: WebSocket | null = null;
+let requestTimerId: number | null = null;
+let reconnectTimerId: number | null = null;
+
+function stopPolling() {
+  if (requestTimerId != null) {
+    window.clearInterval(requestTimerId);
+    requestTimerId = null;
+  }
+}
+
+function scheduleReconnect() {
+  if (reconnectTimerId != null) {
+    return;
+  }
+
+  reconnectTimerId = window.setTimeout(() => {
+    reconnectTimerId = null;
+    connectWebSocket();
+  }, RECONNECT_DELAY_MS);
+}
+
+function sendGetData() {
+  if (socket?.readyState !== WebSocket.OPEN) {
+    return;
+  }
+
+  socket.send(
+    JSON.stringify({
+      id: 1,
+      command: "getData",
+    }),
+  );
+}
+
+function handleMessage(event: MessageEvent) {
   try {
-    const data = JSON.parse(event.data);
-    const message: YaegerMessage = data.data;
-    if (message != undefined) {
+    const parsed = JSON.parse(event.data);
+    const message: YaegerMessage | undefined = parsed.data;
+
+    if (message) {
       lastMessage.val = message;
       lastUpdate.val = new Date();
     }
   } catch (error) {
     console.error("Error parsing WebSocket message:", error);
   }
-};
+}
 
-socket.onopen = () => {
-  console.log("WebSocket connection established");
-  connectionStatus.val = "Connected";
-  startPeriodicWebSocketMessages(1000);
-};
+function connectWebSocket() {
+  stopPolling();
 
-function startPeriodicWebSocketMessages(interval: number) {
-  if (socket.readyState === WebSocket.OPEN) {
-    const timerId = setInterval(() => {
-      const cmd = JSON.stringify({
-        id: 1,
-        command: "getData",
-      });
-      socket.send(cmd);
-    }, interval);
+  const wsProtocol = location.protocol === "https:" ? "wss" : "ws";
+  socket = new WebSocket(`${wsProtocol}://${location.host}${WS_PATH}`);
 
-    // Clear timer on WebSocket close
-    socket.onclose = () => {
-      console.log("WebSocket connection closed");
-      connectionStatus.val = "Disconnected";
-      clearInterval(timerId);
-      console.log("Timer stopped due to WebSocket closure.");
-    };
-    socket.onerror = (error) => {
-      console.error("WebSocket error:", error);
-      clearInterval(timerId);
-      connectionStatus.val = "Error";
-    };
-  } else {
-    console.warn("WebSocket is not open. Timer will not start.");
-  }
-} 
+  socket.onopen = () => {
+    connectionStatus.val = "Connected";
+    sendGetData();
+    requestTimerId = window.setInterval(sendGetData, DATA_REQUEST_INTERVAL_MS);
+  };
+
+  socket.onmessage = handleMessage;
+
+  socket.onclose = () => {
+    connectionStatus.val = "Disconnected";
+    stopPolling();
+    scheduleReconnect();
+  };
+
+  socket.onerror = (error) => {
+    console.error("WebSocket error:", error);
+    connectionStatus.val = "Error";
+    stopPolling();
+    socket?.close();
+  };
+}
+
+connectWebSocket();
+
+export { socket };

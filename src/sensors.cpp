@@ -20,7 +20,7 @@ Adafruit_MAX31855 tcExhaust(MAX1CLK, MAX1CS, MAX1DO);
 Adafruit_MAX31855 tcBeans(MAX2CLK, MAX2CS, MAX2DO);
 
 const uint8_t kMovingAverageWindowSize = 10;
-const uint8_t kSamplingWindowDuration = 400;
+const unsigned long kSamplingWindowDurationMs = 400;
 
 MovingAverageFilter exhaustFilter(kMovingAverageWindowSize);
 MovingAverageFilter beansFilter(kMovingAverageWindowSize);
@@ -50,8 +50,8 @@ void startSensors() {
 }
 
 void takeReadings() {
-  float dt = (millis() - lastReadTime);
-  if (dt < kSamplingWindowDuration) {
+  unsigned long dt = millis() - lastReadTime;
+  if (dt < kSamplingWindowDurationMs) {
     return;
   }
   if (xSemaphoreTakeRecursive(mtx, portMAX_DELAY) == pdTRUE) {
