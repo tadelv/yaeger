@@ -31,6 +31,8 @@ AsyncWebSocket ws("/ws");
 AsyncWebServer server(80);
 constexpr unsigned long FAST_TICK_INTERVAL_MS = 10;
 unsigned long lastFastTickMs = 0;
+constexpr unsigned long DISPLAY_REFRESH_INTERVAL_MS = 1000;
+unsigned long lastDisplayRefreshMs = 0;
 
 void setupSimulation(AsyncWebSocket *ws);
 void updateSimulation();
@@ -121,6 +123,10 @@ void loop(void) {
     ws.cleanupClients();
     updateConnectionSafety(&ws);
     takeReadings();
+  }
+  if (now - lastDisplayRefreshMs >= DISPLAY_REFRESH_INTERVAL_MS) {
+    lastDisplayRefreshMs = now;
+    updateDisplaySensorStatus();
   }
   updateHeater();
   yield();

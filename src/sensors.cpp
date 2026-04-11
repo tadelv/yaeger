@@ -31,6 +31,8 @@ unsigned long lastReadTime = 0;
 unsigned long lastSensorUpdateMs = 0;
 uint8_t exhaustFaultCount = 0;
 uint8_t beansFaultCount = 0;
+SensorErrorCode exhaustSensorError = SENSOR_OK;
+SensorErrorCode beanSensorError = SENSOR_OK;
 
 SemaphoreHandle_t mtx;
 StaticSemaphore_t mtx_buffer;
@@ -101,6 +103,14 @@ void takeETReadings(float dt) {
     }
 
     uint8_t e = tcExhaust.readError();
+    exhaustSensorError = SENSOR_ERR_UNKNOWN;
+    if ((e & MAX31855_FAULT_OPEN) != 0) {
+      exhaustSensorError = SENSOR_ERR_OPEN;
+    } else if ((e & MAX31855_FAULT_SHORT_GND) != 0) {
+      exhaustSensorError = SENSOR_ERR_SHORT_GND;
+    } else if ((e & MAX31855_FAULT_SHORT_VCC) != 0) {
+      exhaustSensorError = SENSOR_ERR_SHORT_VCC;
+    }
     logf("Exhaust thermocouple fault(s) detected! %d\n", e);
     if (e & MAX31855_FAULT_OPEN) {
       log("FAULT: Exhaust thermocouple open - no connections.");
@@ -125,6 +135,7 @@ void takeETReadings(float dt) {
     return;
   }
   exhaustFaultCount = 0;
+  exhaustSensorError = SENSOR_OK;
 #ifdef DEBUG
   logf("Exhaust Temp: %.2f\n", exhaustTemp);
 #endif
@@ -140,6 +151,14 @@ void takeBTReadings(float dt) {
     }
 
     uint8_t e = tcBeans.readError();
+    beanSensorError = SENSOR_ERR_UNKNOWN;
+    if ((e & MAX31855_FAULT_OPEN) != 0) {
+      beanSensorError = SENSOR_ERR_OPEN;
+    } else if ((e & MAX31855_FAULT_SHORT_GND) != 0) {
+      beanSensorError = SENSOR_ERR_SHORT_GND;
+    } else if ((e & MAX31855_FAULT_SHORT_VCC) != 0) {
+      beanSensorError = SENSOR_ERR_SHORT_VCC;
+    }
     logf("Bean thermocouple fault(s) detected! %d\n", e);
     if (e & MAX31855_FAULT_OPEN) {
       log("FAULT: Bean thermocouple open - no connections.");
@@ -163,6 +182,7 @@ void takeBTReadings(float dt) {
     return;
   }
   beansFaultCount = 0;
+  beanSensorError = SENSOR_OK;
 #ifdef DEBUG
   logf("Bean Temp: %.2f\n", beanTemp);
 #endif
@@ -181,3 +201,6 @@ bool getETBTReadings(float *readingsBuf) {
 unsigned long getLastSensorUpdateMs() {
   return lastSensorUpdateMs;
 }
+
+SensorErrorCode getExhaustSensorError() { return exhaustSensorError; }
+SensorErrorCode getBeanSensorError() { return beanSensorError; }
