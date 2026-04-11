@@ -45,6 +45,10 @@ unsigned long pidAutotuneLastCrossingMs = 0;
 double pidAutotuneHalfCycleSecondsSum = 0.0;
 int pidAutotuneHalfCycleCount = 0;
 int pidAutotuneCrossings = 0;
+unsigned long pidAutotuneStartMs = 0;
+double pidAutotuneKu = NAN;
+double pidAutotunePu = NAN;
+double pidAutotuneHeaterCommand = 0.0;
 constexpr double PID_AUTOTUNE_RELAY_OUTPUT_HIGH = 60.0;
 constexpr double PID_AUTOTUNE_RELAY_OUTPUT_LOW = 20.0;
 constexpr int PID_AUTOTUNE_MIN_CROSSINGS = 8;
@@ -263,6 +267,10 @@ void startPidAutotune() {
   pidAutotuneHalfCycleSecondsSum = 0.0;
   pidAutotuneHalfCycleCount = 0;
   pidAutotuneCrossings = 0;
+  pidAutotuneStartMs = millis();
+  pidAutotuneKu = NAN;
+  pidAutotunePu = NAN;
+  pidAutotuneHeaterCommand = 0.0;
   pidEnabled = false;
   preferences.putBool("pidEnabled", false);
   logf("PID autotune started (target=%s, method=%s, setpoint=%.2f)\n", pidTargetToString(pidTarget),
@@ -272,6 +280,7 @@ void startPidAutotune() {
 void stopPidAutotune(const char *reason) {
   pidAutotuneActive = false;
   setHeaterPower(0);
+  pidAutotuneHeaterCommand = 0.0;
   logf("PID autotune stopped (%s)\n", reason == NULL ? "unknown" : reason);
 }
 
@@ -518,6 +527,22 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidIntegral"] = pidIntegral;
       dataObj["pidDerivative"] = pidDerivative;
       dataObj["pidOutput"] = pidOutput;
+      dataObj["pidAutotuneCrossings"] = pidAutotuneCrossings;
+      dataObj["pidAutotuneTargetCrossings"] = PID_AUTOTUNE_MIN_CROSSINGS;
+      dataObj["pidAutotunePeakHigh"] = pidAutotunePeakHigh;
+      dataObj["pidAutotunePeakLow"] = pidAutotunePeakLow;
+      dataObj["pidAutotuneKu"] = pidAutotuneKu;
+      dataObj["pidAutotunePu"] = pidAutotunePu;
+      dataObj["pidAutotuneElapsedSec"] = pidAutotuneStartMs > 0 ? (millis() - pidAutotuneStartMs) / 1000.0 : 0.0;
+      double avgHalfCycle = pidAutotuneHalfCycleCount > 0 ? pidAutotuneHalfCycleSecondsSum / pidAutotuneHalfCycleCount : NAN;
+      dataObj["pidAutotuneEtaSec"] =
+          (pidAutotuneActive && !isnan(avgHalfCycle))
+              ? std::max(0.0, (PID_AUTOTUNE_MIN_CROSSINGS - pidAutotuneCrossings) * avgHalfCycle)
+              : NAN;
+      dataObj["pidAutotuneHeaterCommand"] = pidAutotuneHeaterCommand;
+      dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
+      dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
+      dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
     }
 
     if (command != NULL && strncmp(command, "getData", 7) == 0) {
@@ -545,6 +570,22 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidIntegral"] = pidIntegral;
       dataObj["pidDerivative"] = pidDerivative;
       dataObj["pidOutput"] = pidOutput;
+      dataObj["pidAutotuneCrossings"] = pidAutotuneCrossings;
+      dataObj["pidAutotuneTargetCrossings"] = PID_AUTOTUNE_MIN_CROSSINGS;
+      dataObj["pidAutotunePeakHigh"] = pidAutotunePeakHigh;
+      dataObj["pidAutotunePeakLow"] = pidAutotunePeakLow;
+      dataObj["pidAutotuneKu"] = pidAutotuneKu;
+      dataObj["pidAutotunePu"] = pidAutotunePu;
+      dataObj["pidAutotuneElapsedSec"] = pidAutotuneStartMs > 0 ? (millis() - pidAutotuneStartMs) / 1000.0 : 0.0;
+      double avgHalfCycle = pidAutotuneHalfCycleCount > 0 ? pidAutotuneHalfCycleSecondsSum / pidAutotuneHalfCycleCount : NAN;
+      dataObj["pidAutotuneEtaSec"] =
+          (pidAutotuneActive && !isnan(avgHalfCycle))
+              ? std::max(0.0, (PID_AUTOTUNE_MIN_CROSSINGS - pidAutotuneCrossings) * avgHalfCycle)
+              : NAN;
+      dataObj["pidAutotuneHeaterCommand"] = pidAutotuneHeaterCommand;
+      dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
+      dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
+      dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
     }
 
     String response;
@@ -631,6 +672,7 @@ void updatePidControl() {
         pidAutotunePeakHigh = currentTemp;
       }
       setHeaterPower(lround(PID_AUTOTUNE_RELAY_OUTPUT_HIGH));
+      pidAutotuneHeaterCommand = PID_AUTOTUNE_RELAY_OUTPUT_HIGH;
       if (currentTemp >= pidSetpoint) {
         pidAutotuneRelayHigh = false;
         if (pidAutotuneLastCrossingMs != 0) {
@@ -645,6 +687,7 @@ void updatePidControl() {
         pidAutotunePeakLow = currentTemp;
       }
       setHeaterPower(lround(PID_AUTOTUNE_RELAY_OUTPUT_LOW));
+      pidAutotuneHeaterCommand = PID_AUTOTUNE_RELAY_OUTPUT_LOW;
       if (currentTemp <= pidSetpoint) {
         pidAutotuneRelayHigh = true;
         if (pidAutotuneLastCrossingMs != 0) {
@@ -662,6 +705,8 @@ void updatePidControl() {
       const double relayAmplitude = (PID_AUTOTUNE_RELAY_OUTPUT_HIGH - PID_AUTOTUNE_RELAY_OUTPUT_LOW) / 2.0;
       const double ku = (4.0 * relayAmplitude) / (M_PI * oscillationAmplitude);
       const double puSeconds = 2.0 * (pidAutotuneHalfCycleSecondsSum / pidAutotuneHalfCycleCount);
+      pidAutotuneKu = ku;
+      pidAutotunePu = puSeconds;
       applyAutotunedPidGains(ku, puSeconds);
       logf("PID autotune converged (Ku=%.4f, Pu=%.4f, peakHigh=%.2f, peakLow=%.2f)\n", ku, puSeconds,
            pidAutotunePeakHigh, pidAutotunePeakLow);

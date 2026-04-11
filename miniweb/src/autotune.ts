@@ -17,6 +17,8 @@ const kd = van.state(0.01);
 const autotuneActive = van.state(false);
 const history = van.state<Array<{ ts: number; ET: number; BT: number; simBT: number }>>([]);
 const HISTORY_LIMIT = 300;
+const autotuneLog = van.state<string[]>([]);
+let lastCrossingsSeen = -1;
 
 function sendCommand(data: any) {
   const authToken = getAdminSecret();
@@ -30,6 +32,19 @@ function syncFromMessage() {
   }
   if (typeof msg.pidAutotune === "boolean") {
     autotuneActive.val = msg.pidAutotune;
+  }
+  if (typeof msg.pidAutotuneCrossings === "number" && msg.pidAutotuneCrossings !== lastCrossingsSeen) {
+    lastCrossingsSeen = msg.pidAutotuneCrossings;
+    autotuneLog.val = [
+      ...autotuneLog.val.slice(-24),
+      `Crossing ${msg.pidAutotuneCrossings}/${msg.pidAutotuneTargetCrossings ?? "?"} • Heater ${msg.pidAutotuneHeaterCommand ?? "?"}%`,
+    ];
+  }
+  if (!msg.pidAutotune && typeof msg.pidAutotuneKu === "number" && typeof msg.pidAutotunePu === "number") {
+    const doneMessage = `Autotune complete • Ku ${msg.pidAutotuneKu.toFixed(3)} • Pu ${msg.pidAutotunePu.toFixed(2)}s`;
+    if (autotuneLog.val[autotuneLog.val.length - 1] !== doneMessage) {
+      autotuneLog.val = [...autotuneLog.val.slice(-24), doneMessage];
+    }
   }
   if (
     typeof msg.ET === "number" &&
@@ -72,6 +87,7 @@ function startAutotune() {
     pidAutotune: true,
   });
   autotuneActive.val = true;
+  autotuneLog.val = ["Autotune requested… waiting for crossings"];
 }
 
 function stopAutotune() {
@@ -160,6 +176,37 @@ export const autotuneApp = () =>
     { class: "section" },
     h2("PID Autotune"),
     p("Use this page to tune PID without starting a roast session."),
+    p(
+      "Autotune: ",
+      () => (lastMessage.val?.pidAutotune ? "Running" : "Idle"),
+      " | Crossings ",
+      () => `${lastMessage.val?.pidAutotuneCrossings ?? 0}/${lastMessage.val?.pidAutotuneTargetCrossings ?? "?"}`,
+      " | Heater PWM ",
+      () => `${lastMessage.val?.pidAutotuneHeaterCommand?.toFixed(0) ?? "N/A"}%`,
+      " | Elapsed ",
+      () => `${lastMessage.val?.pidAutotuneElapsedSec?.toFixed(1) ?? "N/A"}s`,
+      " | ETA ",
+      () => `${lastMessage.val?.pidAutotuneEtaSec?.toFixed(1) ?? "N/A"}s`,
+    ),
+    p(
+      "Peaks: High ",
+      () => lastMessage.val?.pidAutotunePeakHigh?.toFixed(2) ?? "N/A",
+      "°C | Low ",
+      () => lastMessage.val?.pidAutotunePeakLow?.toFixed(2) ?? "N/A",
+      "°C | Ku ",
+      () => lastMessage.val?.pidAutotuneKu?.toFixed(3) ?? "N/A",
+      " | Pu ",
+      () => lastMessage.val?.pidAutotunePu?.toFixed(3) ?? "N/A",
+      "s",
+    ),
+    p(
+      "Active PID for target: Kp ",
+      () => lastMessage.val?.pidKpActive?.toFixed(3) ?? "N/A",
+      " | Ki ",
+      () => lastMessage.val?.pidKiActive?.toFixed(3) ?? "N/A",
+      " | Kd ",
+      () => lastMessage.val?.pidKdActive?.toFixed(3) ?? "N/A",
+    ),
     p(
       "Measured: ET ",
       () => lastMessage.val?.ET?.toFixed(1) ?? "N/A",
@@ -270,4 +317,8 @@ export const autotuneApp = () =>
     " ",
     button({ onclick: stopAutotune, disabled: () => !autotuneActive.val }, "Stop autotune"),
     p("Autotune status: ", () => (autotuneActive.val ? "Running" : "Idle")),
+    div(
+      p("Autotune log:"),
+      () => autotuneLog.val.map((line) => div("• ", line)),
+    ),
   );

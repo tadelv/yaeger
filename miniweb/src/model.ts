@@ -20,6 +20,18 @@ export type YaegerMessage = {
   pidTarget?: "BT" | "ET" | "simBT";
   pidTuneMethod?: "ziegler-nichols" | "tyreus-luyben" | "pessen-integral" | "no-overshoot";
   pidAutotune?: boolean;
+  pidAutotuneCrossings?: number;
+  pidAutotuneTargetCrossings?: number;
+  pidAutotunePeakHigh?: number;
+  pidAutotunePeakLow?: number;
+  pidAutotuneKu?: number;
+  pidAutotunePu?: number;
+  pidAutotuneElapsedSec?: number;
+  pidAutotuneEtaSec?: number;
+  pidAutotuneHeaterCommand?: number;
+  pidKpActive?: number;
+  pidKiActive?: number;
+  pidKdActive?: number;
   id: number;
 }
 
