@@ -117,15 +117,15 @@ export function ProfileControl({ onStateChange }: ProfileControlProps) {
   };
 
   return (
-    <div>
-      <p>Profile: {profileStore.profile ? profileStore.profileName : "waiting"}</p>
+    <div class="profile-control">
+      <div class="profile-chip">Profile: {profileStore.profile ? profileStore.profileName : "waiting"}</div>
       <input
         id="profileInput"
         type="file"
         accept="application/json"
         onChange={onProfileUpload}
       />
-      <p>
+      <div class="inline-actions">
         <button
           onClick={() => {
             profileStore.profile = undefined;
@@ -135,8 +135,8 @@ export function ProfileControl({ onStateChange }: ProfileControlProps) {
         >
           Clear
         </button>
-      </p>
-      <label>
+      </div>
+      <label class="switch-label">
         <input
           type="checkbox"
           checked={profileStore.followProfileEnabled}

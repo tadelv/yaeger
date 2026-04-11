@@ -283,9 +283,14 @@ export function RoastApp() {
 
       <canvas id="liveChart" ref={chartCanvasRef} class="live-chart" />
 
-      <div class="control_cluster">
-        <div>
-          Setpoint (°C): {setpoint}
+      <section class="control-panel">
+        <h3>Roast controls</h3>
+        <div class="slider-grid">
+          <div class="slider-card">
+            <div class="slider-header">
+              <span>Setpoint</span>
+              <strong>{setpoint} °C</strong>
+            </div>
           <input
             type="range"
             min="0"
@@ -298,10 +303,13 @@ export function RoastApp() {
               sendPidControlConfig(state.currentState.status);
             }}
           />
-        </div>
+          </div>
 
-        <div>
-          FAN 1: {fan}%
+          <div class="slider-card">
+            <div class="slider-header">
+              <span>FAN 1</span>
+              <strong>{fan}%</strong>
+            </div>
           <input
             type="range"
             min="0"
@@ -314,10 +322,13 @@ export function RoastApp() {
               updateFanPower(value);
             }}
           />
-        </div>
+          </div>
 
-        <div>
-          HEATER: {heater}%
+          <div class="slider-card">
+            <div class="slider-header">
+              <span>HEATER</span>
+              <strong>{heater}%</strong>
+            </div>
           <input
             type="range"
             min="0"
@@ -331,10 +342,13 @@ export function RoastApp() {
               updateHeaterPower(value);
             }}
           />
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div class="event-buttons">
+      <section class="section">
+        <h3>Roast events</h3>
+        <div class="event-buttons">
         {[
           ["charge", "Charge"],
           ["dry-end", "Dry End"],
@@ -348,48 +362,52 @@ export function RoastApp() {
             {text}
           </button>
         ))}
-      </div>
+        </div>
+      </section>
 
       <div class="section">
         <h3>PID Factors</h3>
-        <p>
-          P <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />
-          I <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
-          D <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
-        </p>
-        <p>
-          Target
+        <div class="form-grid">
+          <label>P</label>
+          <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />
+          <label>I</label>
+          <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
+          <label>D</label>
+          <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
+          <label>Target</label>
           <select value={pidTarget} onChange={(e) => setPidTarget((e.target as HTMLSelectElement).value as PidTarget)}>
             <option value="BT">BT</option>
             <option value="ET">ET</option>
             <option value="simBT">Sim BT</option>
           </select>
-        </p>
-        <button
-          onClick={() => {
-            sendCommand({
-              id: 1,
-              command: "setPreferences",
-              pidTarget,
-              pidKp: kp,
-              pidKi: ki,
-              pidKd: kd,
-            });
-          }}
-        >
-          Apply pid
-        </button>
-        <label>
-          <input
-            type="checkbox"
-            checked={pidEnabled}
-            onChange={(e) => {
-              setPidEnabled(e.currentTarget.checked);
-              sendPidControlConfig(state.currentState.status, e.currentTarget.checked);
+        </div>
+        <div class="inline-actions">
+          <button
+            onClick={() => {
+              sendCommand({
+                id: 1,
+                command: "setPreferences",
+                pidTarget,
+                pidKp: kp,
+                pidKi: ki,
+                pidKd: kd,
+              });
             }}
-          />
-          PID Enabled
-        </label>
+          >
+            Apply pid
+          </button>
+          <label class="switch-label">
+            <input
+              type="checkbox"
+              checked={pidEnabled}
+              onChange={(e) => {
+                setPidEnabled(e.currentTarget.checked);
+                sendPidControlConfig(state.currentState.status, e.currentTarget.checked);
+              }}
+            />
+            PID Enabled
+          </label>
+        </div>
       </div>
 
       <div class="section">

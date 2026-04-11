@@ -93,17 +93,34 @@ function App() {
           <div>
             <h1>Yaeger Roaster Control</h1>
             <p class="muted">Modern command center for your roast workflow.</p>
-            <div class="connection-status">
+            <div class="status-strip">
               Connection Status: <span>{connectionStatus}</span>
             </div>
-            <div class="section">
-              <h2>Current Readings</h2>
-              <p>ET: {lastMessage?.ET ?? "N/A"}°C</p>
-              <p>BT: {lastMessage?.BT ?? "N/A"}°C</p>
-              <p>Sim BT (core): {lastMessage?.simBT ?? "N/A"}°C</p>
-              <p>Sensor sample age: {lastMessage?.sampleAgeMs ?? "N/A"} ms</p>
-              <p>Sensor status: {lastMessage?.sensorOk ? "OK" : "BUSY/STALE"}</p>
-              <p>Last update: {lastUpdate?.toString() ?? "N/A"}</p>
+            <div class="telemetry-grid">
+              <div class="metric-card">
+                <span>ET</span>
+                <strong>{lastMessage?.ET ?? "N/A"}°C</strong>
+              </div>
+              <div class="metric-card">
+                <span>BT</span>
+                <strong>{lastMessage?.BT ?? "N/A"}°C</strong>
+              </div>
+              <div class="metric-card">
+                <span>Sim BT (core)</span>
+                <strong>{lastMessage?.simBT ?? "N/A"}°C</strong>
+              </div>
+              <div class="metric-card">
+                <span>Sample age</span>
+                <strong>{lastMessage?.sampleAgeMs ?? "N/A"} ms</strong>
+              </div>
+              <div class="metric-card">
+                <span>Sensor status</span>
+                <strong>{lastMessage?.sensorOk ? "OK" : "BUSY/STALE"}</strong>
+              </div>
+              <div class="metric-card">
+                <span>Last update</span>
+                <strong>{lastUpdate?.toString() ?? "N/A"}</strong>
+              </div>
             </div>
           </div>
         )}
@@ -116,11 +133,13 @@ function App() {
           <div>
             <div class="section">
               <h2>Version & Network Info</h2>
-              <p>Web UI version: {appVersion}</p>
-              <p>Web UI build: {buildTimestamp}</p>
-              <p>Viewed via: {location.origin}</p>
+              <div class="info-list">
+                <p>Web UI version: {appVersion}</p>
+                <p>Web UI build: {buildTimestamp}</p>
+                <p>Viewed via: {location.origin}</p>
+              </div>
               {deviceInfo ? (
-                <div>
+                <div class="info-list">
                   <p>Firmware version: {deviceInfo.firmwareVersion}</p>
                   <p>Network mode: {deviceInfo.networkMode}</p>
                   <p>SSID: {deviceInfo.ssid || "N/A"}</p>

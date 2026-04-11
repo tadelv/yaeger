@@ -153,6 +153,7 @@ button:focus-visible {
 }
 
 input:not([type="range"]),
+select,
 textarea {
   height: 2.5rem;
   width: 100%;
@@ -170,6 +171,7 @@ textarea {
 }
 
 input:not([type="range"]):focus,
+select:focus,
 textarea:focus {
   outline: none;
   border-color: hsl(var(--ring));
@@ -294,6 +296,97 @@ textarea:focus {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+}
+
+.control-panel {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  padding: 1rem;
+  background: hsl(var(--background));
+}
+
+.control-panel h3 {
+  margin: 0 0 0.8rem;
+}
+
+.slider-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 0.85rem;
+}
+
+.slider-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+  background: hsl(var(--secondary));
+}
+
+.slider-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 0.35rem;
+}
+
+.inline-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+  margin-top: 0.8rem;
+}
+
+.switch-label {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  font-weight: 500;
+}
+
+.profile-control {
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+}
+
+.profile-chip {
+  width: fit-content;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  background: hsl(var(--background));
+}
+
+.status-strip {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid hsl(var(--border));
+  border-radius: 999px;
+  padding: 0.3rem 0.7rem;
+  margin-bottom: 0.75rem;
+  background: hsl(var(--secondary));
+  font-weight: 600;
+}
+
+.pid-inline-inputs {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.5rem;
+}
+
+.log-console {
+  width: 100%;
+  min-height: 180px;
+  border-radius: var(--radius);
+  padding: 0.75rem;
+  border: 1px solid hsl(var(--border));
+  background: #020617;
+  color: #cbd5e1;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.info-list p {
+  margin: 0.25rem 0;
 }
 
 .section p {
