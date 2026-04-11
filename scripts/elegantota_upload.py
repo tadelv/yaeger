@@ -144,7 +144,9 @@ def _normalise_base_url(custom_upload_url: str) -> tuple[str, str | None]:
     return base_url, _build_auth_header(username, password)
 
 def _detect_ota_mode(env, filename: str) -> str:  # noqa: ANN001 (PlatformIO callback data)
-    target_names = set(env.Get("COMMAND_LINE_TARGETS") or [])
+    get_value = getattr(env, "get", None)
+    raw_targets = get_value("COMMAND_LINE_TARGETS") if callable(get_value) else None
+    target_names = set(raw_targets or [])
     if "uploadfs" in target_names or "buildfs" in target_names:
         return "fs"
 
