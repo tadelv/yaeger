@@ -2,7 +2,7 @@ import van from "vanjs-core";
 import { getAdminSecret } from "./auth";
 import { lastMessage, socket } from "./websocket";
 
-const { button, div, h2, input, option, p, select } = van.tags;
+const { button, div, h2, input, option, p, pre, select } = van.tags;
 
 type PidTarget = "BT" | "ET" | "simBT";
 type PidMethod = "ziegler-nichols" | "tyreus-luyben" | "pessen-integral" | "no-overshoot";
@@ -11,6 +11,8 @@ const target = van.state<PidTarget>("BT");
 const method = van.state<PidMethod>("ziegler-nichols");
 const setpoint = van.state(20);
 const fanSpeed = van.state(50);
+const minHeaterPwm = van.state(0);
+const maxHeaterPwm = van.state(60);
 const kp = van.state(1.0);
 const ki = van.state(0.1);
 const kd = van.state(0.01);
@@ -45,6 +47,17 @@ function syncFromMessage() {
     if (autotuneLog.val[autotuneLog.val.length - 1] !== doneMessage) {
       autotuneLog.val = [...autotuneLog.val.slice(-24), doneMessage];
     }
+  }
+  if (!msg.pidAutotune && typeof msg.pidKpActive === "number" && typeof msg.pidKiActive === "number" && typeof msg.pidKdActive === "number") {
+    kp.val = msg.pidKpActive;
+    ki.val = msg.pidKiActive;
+    kd.val = msg.pidKdActive;
+  }
+  if (typeof msg.pidAutotuneMin === "number") {
+    minHeaterPwm.val = msg.pidAutotuneMin;
+  }
+  if (typeof msg.pidAutotuneMax === "number") {
+    maxHeaterPwm.val = msg.pidAutotuneMax;
   }
   if (
     typeof msg.ET === "number" &&
@@ -84,6 +97,8 @@ function startAutotune() {
     pidTarget: target.val,
     pidTuneMethod: method.val,
     setpoint: setpoint.val,
+    pidAutotuneMin: minHeaterPwm.val,
+    pidAutotuneMax: maxHeaterPwm.val,
     pidAutotune: true,
   });
   autotuneActive.val = true;
@@ -187,6 +202,8 @@ export const autotuneApp = () =>
       () => `${lastMessage.val?.pidAutotuneElapsedSec?.toFixed(1) ?? "N/A"}s`,
       " | ETA ",
       () => `${lastMessage.val?.pidAutotuneEtaSec?.toFixed(1) ?? "N/A"}s`,
+      " | Min/Max PWM ",
+      () => `${lastMessage.val?.pidAutotuneMin?.toFixed(0) ?? "N/A"}-${lastMessage.val?.pidAutotuneMax?.toFixed(0) ?? "N/A"}%`,
     ),
     p(
       "Peaks: High ",
@@ -259,6 +276,30 @@ export const autotuneApp = () =>
       }),
     ),
     p(
+      "Heater Min PWM (%)",
+      input({
+        type: "number",
+        min: "0",
+        max: "100",
+        value: minHeaterPwm,
+        oninput: (e: Event) => {
+          minHeaterPwm.val = parseFloat((e.target as HTMLInputElement).value) || 0;
+        },
+      }),
+    ),
+    p(
+      "Heater Max PWM (%)",
+      input({
+        type: "number",
+        min: "0",
+        max: "100",
+        value: maxHeaterPwm,
+        oninput: (e: Event) => {
+          maxHeaterPwm.val = parseFloat((e.target as HTMLInputElement).value) || 0;
+        },
+      }),
+    ),
+    p(
       "Fan (%)",
       input({
         type: "number",
@@ -317,8 +358,6 @@ export const autotuneApp = () =>
     " ",
     button({ onclick: stopAutotune, disabled: () => !autotuneActive.val }, "Stop autotune"),
     p("Autotune status: ", () => (autotuneActive.val ? "Running" : "Idle")),
-    div(
-      p("Autotune log:"),
-      () => autotuneLog.val.map((line) => div("• ", line)),
-    ),
+    p("Autotune log:"),
+    pre(() => autotuneLog.val.map((line) => `• ${line}`).join("\n")),
   );

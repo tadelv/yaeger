@@ -29,6 +29,8 @@ export type YaegerMessage = {
   pidAutotuneElapsedSec?: number;
   pidAutotuneEtaSec?: number;
   pidAutotuneHeaterCommand?: number;
+  pidAutotuneMin?: number;
+  pidAutotuneMax?: number;
   pidKpActive?: number;
   pidKiActive?: number;
   pidKdActive?: number;

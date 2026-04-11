@@ -49,8 +49,8 @@ unsigned long pidAutotuneStartMs = 0;
 double pidAutotuneKu = NAN;
 double pidAutotunePu = NAN;
 double pidAutotuneHeaterCommand = 0.0;
-constexpr double PID_AUTOTUNE_RELAY_OUTPUT_HIGH = 60.0;
-constexpr double PID_AUTOTUNE_RELAY_OUTPUT_LOW = 0.0;
+double pidAutotuneRelayOutputHigh = 60.0;
+double pidAutotuneRelayOutputLow = 0.0;
 constexpr int PID_AUTOTUNE_MIN_CROSSINGS = 8;
 
 bool isMutatingCommand(const char *command) {
@@ -247,6 +247,14 @@ bool validateCommandSchema(AsyncWebSocketClient *client, JsonDocument &doc, cons
       client->text("{\"error\":\"invalid schema: pidTuneMethod must be string\"}");
       return false;
     }
+    if (!doc["pidAutotuneMin"].isNull() && !doc["pidAutotuneMin"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: pidAutotuneMin must be numeric\"}");
+      return false;
+    }
+    if (!doc["pidAutotuneMax"].isNull() && !doc["pidAutotuneMax"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: pidAutotuneMax must be numeric\"}");
+      return false;
+    }
   }
 
   return true;
@@ -275,6 +283,7 @@ void startPidAutotune() {
   preferences.putBool("pidEnabled", false);
   logf("PID autotune started (target=%s, method=%s, setpoint=%.2f)\n", pidTargetToString(pidTarget),
        pidMethodToString(pidTuneMethod), pidSetpoint);
+  logf("PID autotune relay bounds min=%.1f max=%.1f\n", pidAutotuneRelayOutputLow, pidAutotuneRelayOutputHigh);
 }
 
 void stopPidAutotune(const char *reason) {
@@ -470,6 +479,19 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
           stopPidAutotune("requested by client");
         }
       }
+      if (!doc["pidAutotuneMin"].isNull()) {
+        pidAutotuneRelayOutputLow = std::clamp(doc["pidAutotuneMin"].as<double>(), 0.0, 100.0);
+        preferences.putDouble("pidAutoMin", pidAutotuneRelayOutputLow);
+      }
+      if (!doc["pidAutotuneMax"].isNull()) {
+        pidAutotuneRelayOutputHigh = std::clamp(doc["pidAutotuneMax"].as<double>(), 0.0, 100.0);
+        preferences.putDouble("pidAutoMax", pidAutotuneRelayOutputHigh);
+      }
+      if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
+        double temp = pidAutotuneRelayOutputLow;
+        pidAutotuneRelayOutputLow = pidAutotuneRelayOutputHigh;
+        pidAutotuneRelayOutputHigh = temp;
+      }
     }
 
     if (getHeaterPower() > 0 && getFanSpeed() <= 30) {
@@ -540,6 +562,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
               ? std::max(0.0, (PID_AUTOTUNE_MIN_CROSSINGS - pidAutotuneCrossings) * avgHalfCycle)
               : NAN;
       dataObj["pidAutotuneHeaterCommand"] = pidAutotuneHeaterCommand;
+      dataObj["pidAutotuneMin"] = pidAutotuneRelayOutputLow;
+      dataObj["pidAutotuneMax"] = pidAutotuneRelayOutputHigh;
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
@@ -583,6 +607,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
               ? std::max(0.0, (PID_AUTOTUNE_MIN_CROSSINGS - pidAutotuneCrossings) * avgHalfCycle)
               : NAN;
       dataObj["pidAutotuneHeaterCommand"] = pidAutotuneHeaterCommand;
+      dataObj["pidAutotuneMin"] = pidAutotuneRelayOutputLow;
+      dataObj["pidAutotuneMax"] = pidAutotuneRelayOutputHigh;
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
@@ -622,6 +648,13 @@ void setupMainLoop(AsyncWebSocket *ws) {
   pidEnabled = false;
   preferences.putBool("pidEnabled", false);
   pidAutotuneActive = false;
+  pidAutotuneRelayOutputLow = std::clamp(preferences.getDouble("pidAutoMin", 0.0), 0.0, 100.0);
+  pidAutotuneRelayOutputHigh = std::clamp(preferences.getDouble("pidAutoMax", 60.0), 0.0, 100.0);
+  if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
+    double temp = pidAutotuneRelayOutputLow;
+    pidAutotuneRelayOutputLow = pidAutotuneRelayOutputHigh;
+    pidAutotuneRelayOutputHigh = temp;
+  }
   ws->onEvent(onWsEvent);
 }
 
@@ -671,8 +704,8 @@ void updatePidControl() {
       if (isnan(pidAutotunePeakHigh) || currentTemp > pidAutotunePeakHigh) {
         pidAutotunePeakHigh = currentTemp;
       }
-      setHeaterPower(lround(PID_AUTOTUNE_RELAY_OUTPUT_HIGH));
-      pidAutotuneHeaterCommand = PID_AUTOTUNE_RELAY_OUTPUT_HIGH;
+      setHeaterPower(lround(pidAutotuneRelayOutputHigh));
+      pidAutotuneHeaterCommand = pidAutotuneRelayOutputHigh;
       if (currentTemp >= pidSetpoint) {
         pidAutotuneRelayHigh = false;
         if (pidAutotuneLastCrossingMs != 0) {
@@ -686,8 +719,8 @@ void updatePidControl() {
       if (isnan(pidAutotunePeakLow) || currentTemp < pidAutotunePeakLow) {
         pidAutotunePeakLow = currentTemp;
       }
-      setHeaterPower(lround(PID_AUTOTUNE_RELAY_OUTPUT_LOW));
-      pidAutotuneHeaterCommand = PID_AUTOTUNE_RELAY_OUTPUT_LOW;
+      setHeaterPower(lround(pidAutotuneRelayOutputLow));
+      pidAutotuneHeaterCommand = pidAutotuneRelayOutputLow;
       if (currentTemp <= pidSetpoint) {
         pidAutotuneRelayHigh = true;
         if (pidAutotuneLastCrossingMs != 0) {
@@ -702,7 +735,7 @@ void updatePidControl() {
     if (pidAutotuneCrossings >= PID_AUTOTUNE_MIN_CROSSINGS && pidAutotuneHalfCycleCount > 0 &&
         !isnan(pidAutotunePeakHigh) && !isnan(pidAutotunePeakLow) && pidAutotunePeakHigh > pidAutotunePeakLow) {
       const double oscillationAmplitude = (pidAutotunePeakHigh - pidAutotunePeakLow) / 2.0;
-      const double relayAmplitude = (PID_AUTOTUNE_RELAY_OUTPUT_HIGH - PID_AUTOTUNE_RELAY_OUTPUT_LOW) / 2.0;
+      const double relayAmplitude = (pidAutotuneRelayOutputHigh - pidAutotuneRelayOutputLow) / 2.0;
       const double ku = (4.0 * relayAmplitude) / (M_PI * oscillationAmplitude);
       const double puSeconds = 2.0 * (pidAutotuneHalfCycleSecondsSum / pidAutotuneHalfCycleCount);
       pidAutotuneKu = ku;
