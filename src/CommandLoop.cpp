@@ -338,6 +338,9 @@ void applyAutotunedPidGains(double ku, double puSeconds) {
   setPidGain("pidKp", pidTarget, kp);
   setPidGain("pidKi", pidTarget, ki);
   setPidGain("pidKd", pidTarget, kd);
+  preferences.putDouble("pidKp", kp);
+  preferences.putDouble("pidKi", ki);
+  preferences.putDouble("pidKd", kd);
 }
 } // namespace
 
@@ -513,14 +516,17 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       if (!doc["pidKp"].isNull()) {
         double pidKp = doc["pidKp"].as<double>();
         setPidGain("pidKp", preferenceTarget, pidKp);
+        preferences.putDouble("pidKp", pidKp);
       }
       if (!doc["pidKi"].isNull()) {
         double pidKi = doc["pidKi"].as<double>();
         setPidGain("pidKi", preferenceTarget, pidKi);
+        preferences.putDouble("pidKi", pidKi);
       }
       if (!doc["pidKd"].isNull()) {
         double pidKd = doc["pidKd"].as<double>();
         setPidGain("pidKd", preferenceTarget, pidKd);
+        preferences.putDouble("pidKd", pidKd);
       }
       if (!doc["cooldownFanSpeed"].isNull()) {
         long cooldownFanSpeed = doc["cooldownFanSpeed"].as<long>();
