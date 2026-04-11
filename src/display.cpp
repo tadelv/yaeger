@@ -1,6 +1,7 @@
 
 #include "config.h"
 #include "sensors.h"
+#if ENABLE_LCD
 #include <LiquidCrystal_I2C.h>
 #include <WiFi.h>
 
@@ -47,3 +48,4 @@ void updateDisplaySensorStatus() {
     lcd.print("   ");
   }
 }
+#endif

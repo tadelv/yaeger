@@ -3,6 +3,7 @@
 #include "freertos/portmacro.h"
 #include "freertos/semphr.h"
 #include "logging.h"
+#include "sensors.h"
 #include <Adafruit_MAX31855.h>
 #include <NexgenFilter.h>
 #include <SPI.h>

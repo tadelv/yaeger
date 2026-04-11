@@ -37,3 +37,7 @@
 #define DISPLAY_DA 41
 #define DISPLAY_CL 42
 #endif
+
+#ifndef ENABLE_LCD
+#define ENABLE_LCD 0
+#endif
