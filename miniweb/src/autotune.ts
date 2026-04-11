@@ -26,18 +26,6 @@ function syncFromMessage() {
   if (!msg) {
     return;
   }
-  if (msg.pidTarget) {
-    target.val = msg.pidTarget;
-  }
-  if (msg.pidTuneMethod) {
-    method.val = msg.pidTuneMethod;
-  }
-  if (typeof msg.setpoint === "number") {
-    setpoint.val = msg.setpoint;
-  }
-  if (typeof msg.FanVal === "number") {
-    fanSpeed.val = msg.FanVal;
-  }
   if (typeof msg.pidAutotune === "boolean") {
     autotuneActive.val = msg.pidAutotune;
   }
