@@ -1,7 +1,9 @@
 #include "FreeRTOS.h"
 #include "config.h"
+#include "fan.h"
 #include "freertos/portmacro.h"
 #include "freertos/semphr.h"
+#include "heater.h"
 #include "logging.h"
 #include "sensors.h"
 #include <Adafruit_MAX31855.h>
@@ -39,6 +41,22 @@ SemaphoreHandle_t mtx;
 StaticSemaphore_t mtx_buffer;
 
 float readings[3] = {0, 0, 0};
+float simulatedInternalBeanTemp = NAN;
+
+// 1D Kalman estimator for a "core bean" state:
+// x_k = x_(k-1) + dt * (k_env*(ET-x) + k_heat*u_heat - k_fan*u_fan) + w_k
+// z_k = BT + alpha * (ET-BT) + v_k
+//
+// The z_k formulation uses ET-BT differential as a proxy for inward heat flux,
+// while control inputs model heater and fan influence on thermal dynamics.
+constexpr float kCoreEnvCoupling = 0.010f;     // 1/s
+constexpr float kCoreHeaterGain = 0.030f;      // °C/s at 100% heater
+constexpr float kCoreFanCoolingGain = 0.025f;  // °C/s at 100% fan
+constexpr float kCoreDeltaWeight = 0.25f;      // blend ET-BT differential
+constexpr float kKalmanProcessNoiseBase = 0.06f;
+constexpr float kKalmanProcessNoiseControlGain = 0.50f;
+constexpr float kKalmanMeasurementNoise = 0.35f;
+float simulatedBeanVariance = 1.0f;
 
 void takeETReadings(float dt);
 void takeBTReadings(float dt);
@@ -90,6 +108,40 @@ void takeReadings() {
     logf("internal: %.2f\n", internal);
 #endif
     readings[2] = internal;
+
+    bool sensorDataValid = exhaustSensorError == SENSOR_OK && beanSensorError == SENSOR_OK;
+    if (sensorDataValid) {
+      const float dtSeconds = dt / 1000.0f;
+      const float et = readings[0];
+      const float bt = readings[1];
+      const float heaterNorm = getHeaterPower() / 100.0f;
+      const float fanNorm = getFanSpeed() / 100.0f;
+
+      if (isnan(simulatedInternalBeanTemp)) {
+        simulatedInternalBeanTemp = bt;
+        simulatedBeanVariance = 1.0f;
+      }
+
+      const float controlInfluence = kCoreHeaterGain * heaterNorm - kCoreFanCoolingGain * fanNorm;
+      const float predicted =
+          simulatedInternalBeanTemp +
+          dtSeconds * (kCoreEnvCoupling * (et - simulatedInternalBeanTemp) + controlInfluence);
+      const float processNoise = kKalmanProcessNoiseBase +
+                                 kKalmanProcessNoiseControlGain * (fabsf(controlInfluence));
+      float predictedVariance = simulatedBeanVariance + processNoise;
+      if (predictedVariance < 1e-4f) {
+        predictedVariance = 1e-4f;
+      }
+
+      const float pseudoMeasurement = bt + kCoreDeltaWeight * (et - bt);
+      const float innovation = pseudoMeasurement - predicted;
+      const float innovationCovariance = predictedVariance + kKalmanMeasurementNoise;
+      const float kalmanGain = predictedVariance / innovationCovariance;
+
+      simulatedInternalBeanTemp = predicted + kalmanGain * innovation;
+      simulatedBeanVariance = (1.0f - kalmanGain) * predictedVariance;
+    }
+
     lastSensorUpdateMs = lastReadTime;
     xSemaphoreGiveRecursive(mtx);
   }
@@ -197,6 +249,15 @@ bool getETBTReadings(float *readingsBuf) {
     return true;
   }
   return false;
+}
+
+float getSimulatedInternalBeanTemp() {
+  if (xSemaphoreTakeRecursive(mtx, pdMS_TO_TICKS(5)) == pdTRUE) {
+    float simulated = simulatedInternalBeanTemp;
+    xSemaphoreGiveRecursive(mtx);
+    return simulated;
+  }
+  return NAN;
 }
 
 unsigned long getLastSensorUpdateMs() {
