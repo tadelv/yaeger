@@ -41,3 +41,7 @@
 #ifndef ENABLE_LCD
 #define ENABLE_LCD 0
 #endif
+
+#ifndef ENABLE_WEBSERIAL_LOGGING
+#define ENABLE_WEBSERIAL_LOGGING 0
+#endif

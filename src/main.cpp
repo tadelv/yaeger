@@ -1,15 +1,11 @@
 
 #include <Adafruit_NeoPixel.h>
-#include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA
 #include <LittleFS.h>
 
 #include "AsyncWebSocket.h"
 #include "CommandLoop.h"
-#include "HardwareSerial.h"
-#include "IPAddress.h"
-#include "WiFiType.h"
 #include "api.h"
 #include "config.h"
 #include "display.h"
@@ -22,8 +18,6 @@
 
 #define PIN 48
 Adafruit_NeoPixel pixels(1, PIN);
-// for ota
-const char *host = "esp32 Roaster";
 // Create AsyncWebServer object on port 80
 /*WebServer server(80);*/
 // Create a WebSocket object
@@ -33,9 +27,6 @@ constexpr unsigned long FAST_TICK_INTERVAL_MS = 10;
 unsigned long lastFastTickMs = 0;
 constexpr unsigned long DISPLAY_REFRESH_INTERVAL_MS = 1000;
 unsigned long lastDisplayRefreshMs = 0;
-
-void setupSimulation(AsyncWebSocket *ws);
-void updateSimulation();
 
 unsigned long ota_progress_millis = 0;
 void onOTAStart() {
