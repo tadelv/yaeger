@@ -39,6 +39,25 @@ float readings[3] = {0, 0, 0};
 
 void takeETReadings(float dt);
 void takeBTReadings(float dt);
+void primeThermocoupleBusPins();
+void reinitializeThermocouples();
+
+void primeThermocoupleBusPins() {
+  pinMode(MAX1CS, OUTPUT);
+  pinMode(MAX2CS, OUTPUT);
+  digitalWrite(MAX1CS, HIGH);
+  digitalWrite(MAX2CS, HIGH);
+
+  // Shared MAX31855 MISO line can float on some clone boards; pull-up helps avoid
+  // false all-low reads that decode as SHORT_GND faults.
+  pinMode(MAX1DO, INPUT_PULLUP);
+}
+
+void reinitializeThermocouples() {
+  primeThermocoupleBusPins();
+  tcExhaust.begin();
+  tcBeans.begin();
+}
 
 void startSensors() {
   log("Initializing sensors");
@@ -47,6 +66,7 @@ void startSensors() {
     log("could not create mutex");
   }
   delay(500); // Give the sensors time to settle
+  primeThermocoupleBusPins();
   bool allGood = true;
   allGood &= tcExhaust.begin();
   allGood &= tcBeans.begin();
@@ -96,6 +116,12 @@ void takeETReadings(float dt) {
       // Sometimes NaN occurs transiently; attempt sensor re-sync.
       tcExhaust.begin();
     }
+    if ((e & MAX31855_FAULT_SHORT_GND) != 0 && beansFaultCount >= kFaultDebounceThreshold) {
+      log("Both probes reporting SHORT_GND; reinitializing thermocouple bus");
+      reinitializeThermocouples();
+      exhaustFaultCount = 0;
+      beansFaultCount = 0;
+    }
     return;
   }
   exhaustFaultCount = 0;
@@ -127,6 +153,12 @@ void takeBTReadings(float dt) {
 
     if (e == 0) {
       tcBeans.begin();
+    }
+    if ((e & MAX31855_FAULT_SHORT_GND) != 0 && exhaustFaultCount >= kFaultDebounceThreshold) {
+      log("Both probes reporting SHORT_GND; reinitializing thermocouple bus");
+      reinitializeThermocouples();
+      exhaustFaultCount = 0;
+      beansFaultCount = 0;
     }
     return;
   }
