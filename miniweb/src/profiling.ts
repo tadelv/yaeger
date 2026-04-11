@@ -4,7 +4,7 @@ const { label, button, div, input, select, option, canvas, p, span } = van.tags;
 import { Profile, RoastState } from "./model";
 
 export const profile = van.state<Profile | undefined>();
-export const followProfileEnabled = van.state(true);
+export const followProfileEnabled = van.state(false);
 const profileName = van.state("");
 
 export function followProfile(

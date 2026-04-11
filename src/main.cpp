@@ -123,6 +123,7 @@ void loop(void) {
     ws.cleanupClients();
     updateConnectionSafety(&ws);
     takeReadings();
+    updatePidControl();
   }
   if (now - lastDisplayRefreshMs >= DISPLAY_REFRESH_INTERVAL_MS) {
     lastDisplayRefreshMs = now;
