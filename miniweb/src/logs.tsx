@@ -72,6 +72,7 @@ export function LogsApp() {
       <p>Live device logs (auto-refresh every 2s).</p>
       {logError ? <p style="color:#b91c1c;">Log error: {logError}</p> : null}
       <div class="section">
+        <div class="inline-actions">
         <button onClick={() => void refreshLogs()}>Refresh Logs</button>
         <button
           onClick={() => {
@@ -87,6 +88,7 @@ export function LogsApp() {
           Download Logs
         </button>
         <button onClick={() => void clearLogs()}>Clear Device Logs</button>
+        </div>
       </div>
       <div class="section">
         <p>Upload a log file into device log history for troubleshooting context.</p>
@@ -99,7 +101,7 @@ export function LogsApp() {
           }}
         />
       </div>
-      <textarea readOnly style="width:100%;min-height:320px;font-family:monospace;" value={logText} />
+      <textarea readOnly class="log-console" style="min-height:320px;" value={logText} />
     </div>
   );
 }

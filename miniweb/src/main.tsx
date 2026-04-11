@@ -36,6 +36,7 @@ function App() {
   const [, setTick] = useState(0);
 
   const appVersion = __APP_VERSION__;
+  const appVersionLabel = `V${appVersion}`;
   const buildTimestamp = new Date(__BUILD_TIMESTAMP__).toLocaleString();
 
   const refreshDeviceInfo = async () => {
@@ -87,23 +88,54 @@ function App() {
             {tab.charAt(0).toUpperCase() + tab.slice(1)}
           </button>
         ))}
+        <div class="external-links">
+          <a class="ext-link" href="https://github.com/tadelv/yaeger" target="_blank" rel="noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.3-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 .1.7 2.6 3.3 1.8.1-.7.4-1.2.7-1.5-2.7-.3-5.5-1.4-5.5-6a4.7 4.7 0 0 1 1.2-3.2c-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.3 11.3 0 0 1 6 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.9.1 3.2a4.7 4.7 0 0 1 1.2 3.2c0 4.7-2.8 5.7-5.5 6 .4.3.8 1 .8 2v3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z" />
+            </svg>
+            Yaeger GitHub
+          </a>
+          <a class="ext-link" href="https://matthew73210.github.io/Gaggiuino-web-profiler/" target="_blank" rel="noreferrer">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 5v4.6l3.3 3.3-1.4 1.4L11 12V7Z" />
+            </svg>
+            Gaggiuino Profiler
+          </a>
+        </div>
       </div>
       <div class="tab-content">
         {activeTab === "home" && (
           <div>
             <h1>Yaeger Roaster Control</h1>
             <p class="muted">Modern command center for your roast workflow.</p>
-            <div class="connection-status">
+            <div class="status-strip">
               Connection Status: <span>{connectionStatus}</span>
             </div>
-            <div class="section">
-              <h2>Current Readings</h2>
-              <p>ET: {lastMessage?.ET ?? "N/A"}°C</p>
-              <p>BT: {lastMessage?.BT ?? "N/A"}°C</p>
-              <p>Sim BT (core): {lastMessage?.simBT ?? "N/A"}°C</p>
-              <p>Sensor sample age: {lastMessage?.sampleAgeMs ?? "N/A"} ms</p>
-              <p>Sensor status: {lastMessage?.sensorOk ? "OK" : "BUSY/STALE"}</p>
-              <p>Last update: {lastUpdate?.toString() ?? "N/A"}</p>
+            <div class="telemetry-grid">
+              <div class="metric-card">
+                <span>ET</span>
+                <strong>{lastMessage?.ET ?? "N/A"}°C</strong>
+              </div>
+              <div class="metric-card">
+                <span>BT</span>
+                <strong>{lastMessage?.BT ?? "N/A"}°C</strong>
+              </div>
+              <div class="metric-card">
+                <span>Sim BT (core)</span>
+                <strong>{lastMessage?.simBT ?? "N/A"}°C</strong>
+              </div>
+              <div class="metric-card">
+                <span>Sample age</span>
+                <strong>{lastMessage?.sampleAgeMs ?? "N/A"} ms</strong>
+              </div>
+              <div class="metric-card">
+                <span>Sensor status</span>
+                <strong>{lastMessage?.sensorOk ? "OK" : "BUSY/STALE"}</strong>
+              </div>
+              <div class="metric-card">
+                <span>Last update</span>
+                <strong>{lastUpdate?.toString() ?? "N/A"}</strong>
+              </div>
             </div>
           </div>
         )}
@@ -116,12 +148,14 @@ function App() {
           <div>
             <div class="section">
               <h2>Version & Network Info</h2>
-              <p>Web UI version: {appVersion}</p>
-              <p>Web UI build: {buildTimestamp}</p>
-              <p>Viewed via: {location.origin}</p>
+              <div class="info-list">
+                <p>Web UI version: {appVersionLabel}</p>
+                <p>Web UI build: {buildTimestamp}</p>
+                <p>Viewed via: {location.origin}</p>
+              </div>
               {deviceInfo ? (
-                <div>
-                  <p>Firmware version: {deviceInfo.firmwareVersion}</p>
+                <div class="info-list">
+                  <p>Firmware version: V{deviceInfo.firmwareVersion}</p>
                   <p>Network mode: {deviceInfo.networkMode}</p>
                   <p>SSID: {deviceInfo.ssid || "N/A"}</p>
                   <p>IP address: {deviceInfo.ip || "N/A"}</p>

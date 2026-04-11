@@ -96,34 +96,38 @@ export function AutotuneApp() {
   return (
     <div class="section">
       <h2>PID Autotune</h2>
-      <p>
-        Autotune: {lastMessage?.pidAutotune ? "Running" : "Idle"} | Crossings {lastMessage?.pidAutotuneCrossings ?? 0}/
+      <div class="status-strip">
+        Autotune: {lastMessage?.pidAutotune ? "Running" : "Idle"} • Crossings {lastMessage?.pidAutotuneCrossings ?? 0}/
         {lastMessage?.pidAutotuneTargetCrossings ?? "?"}
-      </p>
-      <canvas ref={canvasRef} width={700} height={220} />
-      <p>
-        Target
+      </div>
+      <canvas ref={canvasRef} width={700} height={220} class="live-chart" />
+      <div class="form-grid">
+        <label>Target</label>
         <select value={target} onChange={(e) => setTarget((e.target as HTMLSelectElement).value as PidTarget)}>
           <option value="BT">BT</option><option value="ET">ET</option><option value="simBT">Sim BT</option>
         </select>
-      </p>
-      <p>
-        Method
+        <label>Method</label>
         <select value={method} onChange={(e) => setMethod((e.target as HTMLSelectElement).value as PidMethod)}>
           <option value="ziegler-nichols">Ziegler–Nichols</option><option value="tyreus-luyben">Tyreus–Luyben</option>
           <option value="pessen-integral">Pessen Integral</option><option value="no-overshoot">No overshoot</option>
         </select>
-      </p>
-      <p>Setpoint <input type="number" value={setpoint} onInput={(e) => setSetpoint(Number((e.target as HTMLInputElement).value) || 0)} /></p>
-      <p>Fan <input type="number" value={fanSpeed} onInput={(e) => setFanSpeed(Number((e.target as HTMLInputElement).value) || 0)} /></p>
-      <p>Min PWM <input type="number" value={minHeaterPwm} onInput={(e) => setMinHeaterPwm(Number((e.target as HTMLInputElement).value) || 0)} /></p>
-      <p>Max PWM <input type="number" value={maxHeaterPwm} onInput={(e) => setMaxHeaterPwm(Number((e.target as HTMLInputElement).value) || 0)} /></p>
-      <p>
-        Kp <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />
-        Ki <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
-        Kd <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
-      </p>
-      <button
+        <label>Setpoint</label>
+        <input type="number" value={setpoint} onInput={(e) => setSetpoint(Number((e.target as HTMLInputElement).value) || 0)} />
+        <label>Fan</label>
+        <input type="number" value={fanSpeed} onInput={(e) => setFanSpeed(Number((e.target as HTMLInputElement).value) || 0)} />
+        <label>Min PWM</label>
+        <input type="number" value={minHeaterPwm} onInput={(e) => setMinHeaterPwm(Number((e.target as HTMLInputElement).value) || 0)} />
+        <label>Max PWM</label>
+        <input type="number" value={maxHeaterPwm} onInput={(e) => setMaxHeaterPwm(Number((e.target as HTMLInputElement).value) || 0)} />
+        <label>Kp / Ki / Kd</label>
+        <div class="pid-inline-inputs">
+          <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />
+          <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
+          <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
+        </div>
+      </div>
+      <div class="inline-actions">
+        <button
         onClick={() => {
           sendCommand({
             id: 1,
@@ -144,7 +148,8 @@ export function AutotuneApp() {
       </button>
       <button onClick={() => sendCommand({ id: 1, command: "setPidControl", pidAutotune: false })}>Stop</button>
       <button onClick={() => sendCommand({ id: 1, command: "setPreferences", pidTarget: target, pidKp: kp, pidKi: ki, pidKd: kd })}>Apply PID</button>
-      <pre>{autotuneLog.slice(-25).join("\n")}</pre>
+      </div>
+      <pre class="log-console">{autotuneLog.slice(-25).join("\n")}</pre>
     </div>
   );
 }

@@ -149,6 +149,9 @@ export function RoastApp() {
     return elapsed > 0 ? ((latest.message.ET - prev.message.ET) / elapsed) * 60 : null;
   }, [state.roast]);
 
+  const formatMetric = (value: number | null | undefined, digits = 2) =>
+    typeof value === "number" ? value.toFixed(digits) : "N/A";
+
   const toggleRoastStart = () => {
     if (state.currentState.status === RoasterStatus.idle) {
       setState((prev) => ({
@@ -193,8 +196,8 @@ export function RoastApp() {
   };
 
   return (
-    <div>
-      <div>
+    <div class="roast-dashboard">
+      <div class="roast-toolbar">
         <button onClick={toggleRoastStart}>
           {state.currentState.status === RoasterStatus.idle ? "Start" : "Stop"}
         </button>
@@ -235,14 +238,59 @@ export function RoastApp() {
           }}
           disabled={state.currentState.status === RoasterStatus.roasting}
         />
-        <span> Roast time: {roastTime}</span>
+        <span class="roast-time-pill">Roast time: {roastTime}</span>
       </div>
 
-      <canvas id="liveChart" ref={chartCanvasRef} />
+      <section class="telemetry-panel">
+        <div class="telemetry-header">
+          <h2>Live telemetry</h2>
+          <span class="last-update">Last update: {lastUpdate?.toString() ?? "N/A"}</span>
+        </div>
+        <div class="telemetry-grid">
+          <div class="metric-card">
+            <span>ET</span>
+            <strong>{formatMetric(lastMessage?.ET, 3)} °C</strong>
+          </div>
+          <div class="metric-card">
+            <span>BT</span>
+            <strong>{formatMetric(lastMessage?.BT, 3)} °C</strong>
+          </div>
+          <div class="metric-card">
+            <span>Sim BT</span>
+            <strong>{formatMetric(lastMessage?.simBT, 1)} °C</strong>
+          </div>
+          <div class="metric-card">
+            <span>BT RoR</span>
+            <strong>{formatMetric(btRoR, 2)} °C/min</strong>
+          </div>
+          <div class="metric-card">
+            <span>ET RoR</span>
+            <strong>{formatMetric(etRoR, 2)} °C/min</strong>
+          </div>
+        </div>
 
-      <div class="control_cluster">
-        <div>
-          Setpoint (°C): {setpoint}
+        <div class="pid-summary">
+          <h3>PID current values</h3>
+          <div class="pid-grid">
+            <span>Temp {formatMetric(lastMessage?.pidCurrentTemp, 2)}</span>
+            <span>Error {formatMetric(lastMessage?.pidError, 2)}</span>
+            <span>Integral {formatMetric(lastMessage?.pidIntegral, 2)}</span>
+            <span>Derivative {formatMetric(lastMessage?.pidDerivative, 2)}</span>
+            <span>Output {formatMetric(lastMessage?.pidOutput, 2)}</span>
+          </div>
+        </div>
+      </section>
+
+      <canvas id="liveChart" ref={chartCanvasRef} class="live-chart" />
+
+      <section class="control-panel">
+        <h3>Roast controls</h3>
+        <div class="slider-grid">
+          <div class="slider-card">
+            <div class="slider-header">
+              <span>Setpoint</span>
+              <strong>{setpoint} °C</strong>
+            </div>
           <input
             type="range"
             min="0"
@@ -255,10 +303,13 @@ export function RoastApp() {
               sendPidControlConfig(state.currentState.status);
             }}
           />
-        </div>
+          </div>
 
-        <div>
-          FAN 1: {fan}%
+          <div class="slider-card">
+            <div class="slider-header">
+              <span>FAN 1</span>
+              <strong>{fan}%</strong>
+            </div>
           <input
             type="range"
             min="0"
@@ -271,10 +322,13 @@ export function RoastApp() {
               updateFanPower(value);
             }}
           />
-        </div>
+          </div>
 
-        <div>
-          HEATER: {heater}%
+          <div class="slider-card">
+            <div class="slider-header">
+              <span>HEATER</span>
+              <strong>{heater}%</strong>
+            </div>
           <input
             type="range"
             min="0"
@@ -288,10 +342,13 @@ export function RoastApp() {
               updateHeaterPower(value);
             }}
           />
+          </div>
         </div>
-      </div>
+      </section>
 
-      <div>
+      <section class="section">
+        <h3>Roast events</h3>
+        <div class="event-buttons">
         {[
           ["charge", "Charge"],
           ["dry-end", "Dry End"],
@@ -305,61 +362,52 @@ export function RoastApp() {
             {text}
           </button>
         ))}
-      </div>
+        </div>
+      </section>
 
-      <p>
-        ET: {lastMessage?.ET ?? "N/A"} BT: {lastMessage?.BT ?? "N/A"} Sim BT: {lastMessage?.simBT?.toFixed(1) ?? "N/A"} BT
-        RoR: {btRoR?.toFixed(2) ?? "N/A"} °C/min ET RoR: {etRoR?.toFixed(2) ?? "N/A"} °C/min
-      </p>
-      <p>Last update: {lastUpdate?.toString() ?? "N/A"}</p>
-
-      <div>
-        PID current values: Temp {lastMessage?.pidCurrentTemp?.toFixed(2) ?? "N/A"} | Error {lastMessage?.pidError?.toFixed(2) ?? "N/A"} |
-        Integral {lastMessage?.pidIntegral?.toFixed(2) ?? "N/A"} | Derivative {lastMessage?.pidDerivative?.toFixed(2) ?? "N/A"} | Output
-        {" "}
-        {lastMessage?.pidOutput?.toFixed(2) ?? "N/A"}
-      </div>
-
-      <div>
+      <div class="section">
         <h3>PID Factors</h3>
-        <p>
-          P <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />
-          I <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
-          D <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
-        </p>
-        <p>
-          Target
+        <div class="form-grid">
+          <label>P</label>
+          <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />
+          <label>I</label>
+          <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
+          <label>D</label>
+          <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
+          <label>Target</label>
           <select value={pidTarget} onChange={(e) => setPidTarget((e.target as HTMLSelectElement).value as PidTarget)}>
             <option value="BT">BT</option>
             <option value="ET">ET</option>
             <option value="simBT">Sim BT</option>
           </select>
-        </p>
-        <button
-          onClick={() => {
-            sendCommand({
-              id: 1,
-              command: "setPreferences",
-              pidTarget,
-              pidKp: kp,
-              pidKi: ki,
-              pidKd: kd,
-            });
-          }}
-        >
-          Apply pid
-        </button>
-        <label>
-          <input
-            type="checkbox"
-            checked={pidEnabled}
-            onChange={(e) => {
-              setPidEnabled(e.currentTarget.checked);
-              sendPidControlConfig(state.currentState.status, e.currentTarget.checked);
+        </div>
+        <div class="inline-actions">
+          <button
+            onClick={() => {
+              sendCommand({
+                id: 1,
+                command: "setPreferences",
+                pidTarget,
+                pidKp: kp,
+                pidKi: ki,
+                pidKd: kd,
+              });
             }}
-          />
-          PID Enabled
-        </label>
+          >
+            Apply pid
+          </button>
+          <label class="switch-label">
+            <input
+              type="checkbox"
+              checked={pidEnabled}
+              onChange={(e) => {
+                setPidEnabled(e.currentTarget.checked);
+                sendPidControlConfig(state.currentState.status, e.currentTarget.checked);
+              }}
+            />
+            PID Enabled
+          </label>
+        </div>
       </div>
 
       <div class="section">
