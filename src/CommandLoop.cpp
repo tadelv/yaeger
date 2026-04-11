@@ -6,6 +6,7 @@
 #include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <Preferences.h>
+#include <algorithm>
 #include <cmath>
 #include <cstring>
 
@@ -19,6 +20,17 @@ constexpr long ACTUATOR_MAX_VALUE = 100;
 unsigned long lastWebClientDisconnectMs = 0;
 unsigned long lastMutatingCommandMs = 0;
 bool webClientGraceActive = false;
+constexpr unsigned long PID_UPDATE_INTERVAL_MS = 400;
+unsigned long lastPidUpdateMs = 0;
+
+double pidIntegral = 0.0;
+double pidPreviousError = 0.0;
+bool pidHasPreviousError = false;
+
+double pidSetpoint = 20.0;
+bool pidEnabled = true;
+enum class PidTargetSensor { BT, ET };
+PidTargetSensor pidTarget = PidTargetSensor::BT;
 
 bool isMutatingCommand(const char *command) {
   if (command == NULL) {
@@ -27,7 +39,8 @@ bool isMutatingCommand(const char *command) {
 
   return strncmp(command, "setBurner", 9) == 0 ||
          strncmp(command, "setFan", 6) == 0 ||
-         strncmp(command, "setPreferences", 14) == 0;
+         strncmp(command, "setPreferences", 14) == 0 ||
+         strncmp(command, "setPidControl", 13) == 0;
 }
 
 bool enforceMutatingCommandAuth(AsyncWebSocketClient *client,
@@ -107,7 +120,32 @@ bool validateCommandSchema(AsyncWebSocketClient *client, JsonDocument &doc,
     }
   }
 
+  if (strncmp(command, "setPidControl", 13) == 0) {
+    if (!doc["setpoint"].isNull() && !doc["setpoint"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: setpoint must be numeric\"}");
+      return false;
+    }
+    if (!doc["pidEnabled"].isNull() && !doc["pidEnabled"].is<bool>()) {
+      client->text("{\"error\":\"invalid schema: pidEnabled must be boolean\"}");
+      return false;
+    }
+    if (!doc["pidTarget"].isNull() && !doc["pidTarget"].is<const char *>()) {
+      client->text("{\"error\":\"invalid schema: pidTarget must be string\"}");
+      return false;
+    }
+  }
+
   return true;
+}
+
+void resetPidState() {
+  pidIntegral = 0.0;
+  pidPreviousError = 0.0;
+  pidHasPreviousError = false;
+}
+
+const char *pidTargetToString(PidTargetSensor target) {
+  return target == PidTargetSensor::ET ? "ET" : "BT";
 }
 } // namespace
 
@@ -208,6 +246,31 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       setFanSpeed(clampedVal);
     }
 
+    if (command != NULL && strncmp(command, "setPidControl", 13) == 0) {
+      if (!doc["setpoint"].isNull()) {
+        pidSetpoint = doc["setpoint"].as<double>();
+        preferences.putDouble("pidSetpoint", pidSetpoint);
+      }
+      if (!doc["pidEnabled"].isNull()) {
+        bool nextPidEnabled = doc["pidEnabled"].as<bool>();
+        if (pidEnabled != nextPidEnabled) {
+          resetPidState();
+        }
+        pidEnabled = nextPidEnabled;
+        preferences.putBool("pidEnabled", pidEnabled);
+      }
+      if (!doc["pidTarget"].isNull()) {
+        const char *target = doc["pidTarget"].as<const char *>();
+        if (target != NULL && strncmp(target, "ET", 2) == 0) {
+          pidTarget = PidTargetSensor::ET;
+        } else {
+          pidTarget = PidTargetSensor::BT;
+        }
+        preferences.putString("pidTarget", pidTargetToString(pidTarget));
+        resetPidState();
+      }
+    }
+
     // Safeguard to prevent heater fuse blowout
     if (getHeaterPower() > 0 && getFanSpeed() <= 30) {
       setFanSpeed(30);
@@ -248,6 +311,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       dataObj["pidKi"] = preferences.getDouble("pidKi", 0.1);
       dataObj["pidKd"] = preferences.getDouble("pidKd", 0.01);
       dataObj["cooldownFanSpeed"] = preferences.getLong("coolFanSpeed", 65);
+      dataObj["setpoint"] = pidSetpoint;
+      dataObj["pidEnabled"] = pidEnabled;
+      dataObj["pidTarget"] = pidTargetToString(pidTarget);
     }
 
     if (command != NULL && strncmp(command, "getData", 7) == 0) {
@@ -264,6 +330,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       dataObj["sensorOk"] = gotReading;
       dataObj["BurnerVal"] = getHeaterPower();
       dataObj["FanVal"] = getFanSpeed();
+      dataObj["setpoint"] = pidSetpoint;
+      dataObj["pidEnabled"] = pidEnabled;
+      dataObj["pidTarget"] = pidTargetToString(pidTarget);
     }
 
     String response;
@@ -282,6 +351,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
 
 void setupMainLoop(AsyncWebSocket *ws) {
   preferences.begin("preferences");
+  pidSetpoint = preferences.getDouble("pidSetpoint", 20.0);
+  const String configuredTarget = preferences.getString("pidTarget", "BT");
+  pidTarget = configuredTarget == "ET" ? PidTargetSensor::ET : PidTargetSensor::BT;
+  pidEnabled = preferences.getBool("pidEnabled", true);
   ws->onEvent(onWsEvent);
 }
 
@@ -303,4 +376,44 @@ void updateConnectionSafety(AsyncWebSocket *ws) {
   setFanSpeed(preferences.getLong("coolFanSpeed", 65));
   webClientGraceActive = false;
   log("No websocket clients after grace period, entering cooldown safety mode");
+}
+
+void updatePidControl() {
+  unsigned long now = millis();
+  if (now - lastPidUpdateMs < PID_UPDATE_INTERVAL_MS) {
+    return;
+  }
+  lastPidUpdateMs = now;
+
+  if (!pidEnabled) {
+    return;
+  }
+
+  float etbt[3];
+  if (!getETBTReadings(etbt)) {
+    return;
+  }
+
+  double currentTemp = pidTarget == PidTargetSensor::ET ? etbt[0] : etbt[1];
+  double error = pidSetpoint - currentTemp;
+
+  double kp = preferences.getDouble("pidKp", 1.0);
+  double ki = preferences.getDouble("pidKi", 0.1);
+  double kd = preferences.getDouble("pidKd", 0.01);
+  double dtSeconds = PID_UPDATE_INTERVAL_MS / 1000.0;
+
+  pidIntegral += error * dtSeconds;
+  pidIntegral = std::clamp(pidIntegral, -100.0, 100.0);
+
+  double derivative = 0.0;
+  if (pidHasPreviousError) {
+    derivative = (error - pidPreviousError) / dtSeconds;
+  } else {
+    pidHasPreviousError = true;
+  }
+
+  double output = kp * error + ki * pidIntegral + kd * derivative;
+  long heaterPower = lround(std::clamp(output, 0.0, 100.0));
+  setHeaterPower(heaterPower);
+  pidPreviousError = error;
 }

@@ -10,7 +10,6 @@ import {
   Profile,
 } from "./model.ts";
 import { getFormattedTimeDifference } from "./util.ts";
-import { PIDController } from "./pid.ts";
 import {
   followProfile,
   followProfileEnabled,
@@ -31,7 +30,6 @@ const setpoint = van.state(20);
 const pidPFactor = van.state(1.0);
 const pidIFactor = van.state(0.1);
 const pidDFactor = van.state(0.01);
-var pid = new PIDController(1.0, 0.1, 0.01);
 
 // Chart.js setup
 const chartElement = canvas({ id: "liveChart" });
@@ -130,13 +128,13 @@ van.derive(() => {
         if (profileUpdate != undefined) {
           console.log("Updating setpoint from profile:", profileUpdate.setPoint);
           setpoint.val = profileUpdate.setPoint;
+          sendPidControlConfig();
           if (profileUpdate.fanValue != undefined) {
             slider1Value.val = profileUpdate.fanValue!
             updateFanPower(profileUpdate.fanValue!)
           }
         }
       }
-      controlHeater();
     }
 
     // Update state atomically
@@ -230,6 +228,16 @@ function sendCommand(data: any) {
   const msg = JSON.stringify({ ...data, authToken });
   console.log("sending command: ", msg);
   socket?.send(msg);
+}
+
+function sendPidControlConfig() {
+  sendCommand({
+    id: 1,
+    command: "setPidControl",
+    setpoint: setpoint.val,
+    pidEnabled: pidEnabled.val,
+    pidTarget: tempTarget,
+  });
 }
 
 var DownloadButton = () => {
@@ -340,6 +348,7 @@ const SetpointControl = () =>
       value: setpoint,
       oninput: (e: Event) => {
         setpoint.val = parseInt((e.target as HTMLInputElement).value, 10);
+        sendPidControlConfig();
       },
     }),
   );
@@ -386,6 +395,7 @@ const PIDConfig = () =>
         value: tempTarget,
         onchange: (e: Event) => {
           tempTarget = (e.target as HTMLSelectElement).value;
+          sendPidControlConfig();
         },
       },
       option({ value: "BT" }, "BT"),
@@ -398,18 +408,18 @@ const PIDConfig = () =>
           pidPFactor.val = tempP;
           pidIFactor.val = tempI;
           pidDFactor.val = tempD;
-
-          pid = new PIDController(
-            pidPFactor.val,
-            pidIFactor.val,
-            pidDFactor.val,
-          );
+          sendCommand({
+            id: 1,
+            command: "setPreferences",
+            pidKp: pidPFactor.val,
+            pidKi: pidIFactor.val,
+            pidKd: pidDFactor.val,
+          });
           console.log("New PID values set:", {
             P: pidPFactor.val,
             I: pidIFactor.val,
             D: pidDFactor.val,
           });
-          console.log("PID:", JSON.stringify(pid));
         },
       },
       "Apply pid",
@@ -418,30 +428,14 @@ const PIDConfig = () =>
       input({
         type: "checkbox",
         checked: pidEnabled.val,
-        oninput: (e) => (pidEnabled.val = e.target.checked),
+        oninput: (e) => {
+          pidEnabled.val = e.target.checked;
+          sendPidControlConfig();
+        },
       }),
       "PID Enabled",
     ),
   );
-
-function controlHeater() {
-  let currentTemp: number;
-  if (tempTarget == "BT") {
-    currentTemp = state.val.currentState.lastMessage?.BT ?? 0;
-  } else {
-    currentTemp = state.val.currentState.lastMessage?.ET ?? 0;
-  }
-  const output = pid.compute(setpoint.val, currentTemp);
-
-  // Clamp output to 0–100% range
-  const heaterPower = Math.min(100, Math.max(0, Math.round(output)));
-
-  if (pidEnabled.val == false) {
-    return;
-  }
-  updateHeaterPower(heaterPower);
-  slider2Value.val = heaterPower; // Reflect change in the UI
-}
 
 // UI creation
 const createApp = () => div(
