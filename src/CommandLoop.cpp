@@ -50,7 +50,7 @@ double pidAutotuneKu = NAN;
 double pidAutotunePu = NAN;
 double pidAutotuneHeaterCommand = 0.0;
 constexpr double PID_AUTOTUNE_RELAY_OUTPUT_HIGH = 60.0;
-constexpr double PID_AUTOTUNE_RELAY_OUTPUT_LOW = 20.0;
+constexpr double PID_AUTOTUNE_RELAY_OUTPUT_LOW = 0.0;
 constexpr int PID_AUTOTUNE_MIN_CROSSINGS = 8;
 
 bool isMutatingCommand(const char *command) {
