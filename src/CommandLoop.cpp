@@ -334,6 +334,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
       dataObj["type"] = "status";
       dataObj["ET"] = gotReading ? etbt[0] : NAN;
       dataObj["BT"] = gotReading ? etbt[1] : NAN;
+      dataObj["simBT"] = getSimulatedInternalBeanTemp();
       dataObj["Amb"] = gotReading ? etbt[2] : NAN;
       dataObj["sampleAgeMs"] = millis() - getLastSensorUpdateMs();
       dataObj["sensorOk"] = gotReading;

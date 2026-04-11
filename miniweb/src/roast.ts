@@ -601,6 +601,9 @@ const createApp = () => div(
         return currentMessage.val?.BT ?? "N/A";
       },
       " ",
+      "Sim BT: ",
+      () => currentMessage.val?.simBT?.toFixed(1) ?? "N/A",
+      " ",
       "BT RoR: ",
       () => btRoR.val?.toFixed(2) ?? "N/A",
       " °C/min",

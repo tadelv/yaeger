@@ -11,6 +11,7 @@ enum SensorErrorCode : uint8_t {
 void startSensors();
 void takeReadings();
 bool getETBTReadings(float *readings);
+float getSimulatedInternalBeanTemp();
 unsigned long getLastSensorUpdateMs();
 SensorErrorCode getExhaustSensorError();
 SensorErrorCode getBeanSensorError();

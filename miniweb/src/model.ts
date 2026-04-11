@@ -3,6 +3,7 @@
 export type YaegerMessage = {
   ET: number;
   BT: number;
+  simBT?: number;
   Amb: number;
   sampleAgeMs?: number;
   sensorOk?: boolean;
