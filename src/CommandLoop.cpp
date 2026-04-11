@@ -505,6 +505,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
           client->text("{\"error\":\"invalid pidTarget\"}");
           return;
         }
+        // Keep the active PID target aligned with explicit preference writes so updates
+        // are immediately visible/used across the UI and control loop.
+        pidTarget = preferenceTarget;
+        preferences.putString("pidTarget", pidTargetToString(pidTarget));
       }
       if (!doc["pidKp"].isNull()) {
         double pidKp = doc["pidKp"].as<double>();
