@@ -89,6 +89,18 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ## 3) **Network resiliency and boot behavior (high priority)**
 
+### Implementation status (April 11, 2026 update)
+
+- ~~Convert Wi‑Fi connect to non-blocking state machine (or bounded async retry steps).~~ ✅ Implemented (connect attempts now run without blocking startup loop and time out to AP fallback).
+- ~~Keep loop tick deterministic by moving periodic tasks to elapsed-time scheduling.~~ ✅ Implemented (`millis()`-driven 10ms fast tick for cleanup/safety/sensor polling).
+- ~~Add watchdog-friendly design: avoid long blocking sections in startup/connect paths.~~ ✅ Implemented (removed blocking connect loop and replaced fixed loop delay with cooperative `yield()`).
+
+### Updated TODO list
+
+- [x] Replace blocking Wi‑Fi connect loop with non-blocking attempt tracking + timeout.
+- [x] Move periodic runtime tasks to elapsed-time scheduling for deterministic ticks.
+- [x] Remove fixed loop sleep and use cooperative yielding for watchdog friendliness.
+
 ### Findings
 
 - Wi‑Fi connect routine blocks in a loop up to ~10s with `delay(1000)` retries.
@@ -96,9 +108,9 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ### Recommendations
 
-1. Convert Wi‑Fi connect to non-blocking state machine (or bounded async retry steps).
-2. Keep loop tick deterministic by moving periodic tasks to elapsed-time scheduling.
-3. Add watchdog-friendly design: avoid long blocking sections in startup/connect paths.
+1. ~~Convert Wi‑Fi connect to non-blocking state machine (or bounded async retry steps).~~
+2. ~~Keep loop tick deterministic by moving periodic tasks to elapsed-time scheduling.~~
+3. ~~Add watchdog-friendly design: avoid long blocking sections in startup/connect paths.~~
 
 ## 4) **Frontend modernization path (high priority, medium effort)**
 
