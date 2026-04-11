@@ -143,6 +143,17 @@ def _normalise_base_url(custom_upload_url: str) -> tuple[str, str | None]:
 
     return base_url, _build_auth_header(username, password)
 
+def _detect_ota_mode(env, filename: str) -> str:  # noqa: ANN001 (PlatformIO callback data)
+    target_names = set(env.Get("COMMAND_LINE_TARGETS") or [])
+    if "uploadfs" in target_names or "buildfs" in target_names:
+        return "fs"
+
+    lowered = filename.lower()
+    if "littlefs" in lowered or "spiffs" in lowered or "fatfs" in lowered:
+        return "fs"
+
+    return "fr"
+
 
 def on_upload(source, target, env):  # noqa: ANN001 (PlatformIO callback signature)
     firmware_path = str(source[0])
@@ -154,7 +165,7 @@ def on_upload(source, target, env):  # noqa: ANN001 (PlatformIO callback signatu
 
     firmware_md5 = hashlib.md5(firmware_data).hexdigest()
     filename = os.path.basename(firmware_path)
-    mode = "fs" if filename in ("spiffs.bin", "littlefs.bin") else "fr"
+    mode = _detect_ota_mode(env, filename)
 
     start_url = f"{base_url}/ota/start?mode={mode}&hash={firmware_md5}"
     upload_url = f"{base_url}/ota/upload"
