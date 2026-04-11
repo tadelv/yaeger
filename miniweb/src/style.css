@@ -12,106 +12,129 @@
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 
-  /* === ShadCN design tokens === */
-  --radius: 0.5rem;
-
+  --radius: 0.65rem;
   --background: 0 0% 100%;
   --foreground: 240 10% 3.9%;
-
   --border: 240 5.9% 90%;
   --input: 240 5.9% 90%;
-  --ring: 240 5.9% 10%;
-
-  --primary: 240 5.9% 10%;
+  --ring: 221 83% 53%;
+  --primary: 222 47% 11%;
   --primary-foreground: 0 0% 98%;
-
-  --secondary: 240 4.8% 95.9%;
+  --secondary: 220 14% 96%;
   --secondary-foreground: 240 5.9% 10%;
-
   --destructive: 0 84.2% 60.2%;
   --destructive-foreground: 0 0% 98%;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
 body {
   margin: 0;
-  /*display: flex;*/
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
-  background: hsl(var(--background));
+  background: radial-gradient(circle at top left, #dbeafe 0%, hsl(var(--background)) 40%);
   color: hsl(var(--foreground));
 }
 
-control_cluster {
-	place-content: align;
-	background-color: #ff0000;
-}
-
 h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+  font-size: 2rem;
+  line-height: 1.15;
+  margin: 0 0 0.5rem;
 }
 
 #app {
-  max-width: 1280px;
-  margin: 0 auto;
-  /*padding: 5rem;*/
-  text-align: center;
+  width: min(1240px, 95vw);
+  margin: 2rem auto;
 }
 
-.logo {
-  height: 6em;
-  padding: 1.5em;
-  will-change: filter;
-  transition: filter 300ms;
-}
-.logo:hover {
-  filter: drop-shadow(0 0 2em #646cffaa);
-}
-.logo.vanilla:hover {
-  filter: drop-shadow(0 0 2em #3178c6aa);
+.app-layout {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 1rem;
+  align-items: start;
 }
 
-.card {
-  padding: 2em;
+.tabs-nav {
+  position: sticky;
+  top: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+  padding: 1rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 1rem;
+  background: linear-gradient(180deg, #0f172a, #111827);
+  box-shadow: 0 12px 34px rgba(2, 6, 23, 0.3);
 }
 
-.read-the-docs {
-  color: #888;
+.tabs-title {
+  color: #f8fafc;
+  margin: 0 0 0.75rem;
+  letter-spacing: 0.02em;
 }
 
-/* ------------------- ShadCN-style Button ------------------- */
+.tab-btn {
+  justify-content: flex-start;
+  width: 100%;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  background: rgba(30, 41, 59, 0.8);
+  color: #e2e8f0;
+}
+
+.tab-btn:hover {
+  background: rgba(51, 65, 85, 0.95);
+}
+
+.tab-btn.active {
+  background: linear-gradient(90deg, #2563eb, #0891b2);
+  color: #fff;
+  border-color: transparent;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
+}
+
+.tab-content {
+  padding: 1.25rem;
+  border-radius: 1rem;
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--background));
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08);
+}
+
+.muted {
+  color: #64748b;
+  margin-top: 0;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.form-grid p {
+  margin: 0;
+  font-weight: 500;
+}
+
 button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
-
   height: 2.5rem;
   padding: 0 1rem;
   font-size: 0.875rem;
-  font-weight: 500;
+  font-weight: 600;
   font-family: inherit;
-
   border-radius: var(--radius);
   border: 1px solid hsl(var(--border));
   background: hsl(var(--primary));
   color: hsl(var(--primary-foreground));
   cursor: pointer;
-
-  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
 }
 button:hover {
-  background: hsl(var(--primary) / 0.9);
+  background: hsl(var(--primary) / 0.92);
+  transform: translateY(-1px);
 }
 button:disabled {
   opacity: 0.5;
@@ -122,30 +145,35 @@ button:focus-visible {
   outline-offset: 2px;
   box-shadow: 0 0 0 2px hsl(var(--ring));
 }
-/* ------------------- ShadCN-style Inputs ------------------- */
-input:not([type="range"]) {
+
+input:not([type="range"]),
+textarea {
   height: 2.5rem;
   width: 100%;
   padding: 0 0.75rem;
   font-size: 0.875rem;
-
   border-radius: var(--radius);
   border: 1px solid hsl(var(--input));
   background: hsl(var(--background));
   color: hsl(var(--foreground));
-
   transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
-input:not([type="range"]):focus {
+
+textarea {
+  height: auto;
+}
+
+input:not([type="range"]):focus,
+textarea:focus {
   outline: none;
   border-color: hsl(var(--ring));
-  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.4);
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.35);
 }
-/* ------------------- Card & Section ------------------- */
+
 .card,
 .section {
-  padding: 1.5rem;
-  margin-top: 1.5rem;
+  padding: 1.25rem;
+  margin-top: 1rem;
   border: 1px solid hsl(var(--border));
   border-radius: var(--radius);
   background: hsl(var(--secondary));
@@ -154,77 +182,85 @@ input:not([type="range"]):focus {
 .section h2 {
   margin-top: 0;
   margin-bottom: 1rem;
-  font-size: 1.125rem;
-  font-weight: 600;
+  font-size: 1.05rem;
 }
-/* ------------------- Dark-mode token overrides ------------------- */
+
+@media (max-width: 880px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs-nav {
+    position: static;
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .tabs-title {
+    width: 100%;
+  }
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
     --background: 240 10% 3.9%;
     --foreground: 0 0% 98%;
-
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
-    --ring: 240 4.9% 83%;
-
+    --ring: 199 89% 48%;
     --primary: 0 0% 98%;
     --primary-foreground: 240 5.9% 10%;
-
     --secondary: 240 3.7% 15.9%;
     --secondary-foreground: 0 0% 98%;
+  }
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 85.7% 97.3%;
+  body {
+    background: radial-gradient(circle at top left, #111827 0%, hsl(var(--background)) 42%);
   }
 }
 
-/* Style the slider */
+/* Range sliders used in roasting controls */
 input[type="range"] {
   -webkit-appearance: none;
   width: 220px;
   height: 6px;
-  /*background: #ddd;*/
   border-radius: 3px;
   position: relative;
   margin: 20px 0;
 }
 
-/* Remove default outline on focus */
 input[type="range"]:focus {
   outline: none;
 }
 
-/* Track styles */
 input[type="range"]::-webkit-slider-runnable-track {
   height: 6px;
   background: #ddd;
   border-radius: 3px;
 }
 
-/* Thumb styles */
 input[type="range"]::-webkit-slider-thumb {
   -webkit-appearance: none;
   height: 20px;
   width: 20px;
   border-radius: 50%;
-  background: #007BFF;
+  background: #007bff;
   border: 2px solid #fff;
   cursor: pointer;
-  margin-top: -7px; /* Center thumb */
+  margin-top: -7px;
 }
 
-/* Disabled slider styles */
 input[type="range"]:disabled {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
 input[type="range"]:disabled::-webkit-slider-runnable-track {
-  background: #bbb; /* Lighter track for disabled state */
+  background: #bbb;
 }
 
 input[type="range"]:disabled::-webkit-slider-thumb {
-  background: #888; /* Gray thumb for disabled state */
+  background: #888;
   border: 2px solid #ccc;
   cursor: not-allowed;
 }

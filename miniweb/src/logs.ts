@@ -131,18 +131,5 @@ export const logsApp = () => {
       style: "width: 100%; min-height: 320px; font-family: monospace;",
       value: () => logText.val,
     }),
-    div(
-      { class: "section" },
-      button({
-        onclick: () => {
-          if (refreshTimerId != null) {
-            window.clearInterval(refreshTimerId);
-            refreshTimerId = null;
-          }
-          document.getElementById("app")!.innerHTML = "";
-          window.location.href = "/";
-        },
-      }, "Back"),
-    ),
   );
 };
