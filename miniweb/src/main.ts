@@ -2,8 +2,7 @@ import "./style.css";
 import van from "vanjs-core";
 import { roastApp } from "./roast";
 import { logsApp } from "./logs";
-import { profile, ProfileControl } from "./profiling.ts";
-import { PIDController } from "./pid.ts";
+import { ProfileControl } from "./profiling.ts";
 import { connectionStatus, lastMessage, lastUpdate } from "./websocket";
 import { getBasicAuthHeaderValue } from "./auth";
 
@@ -19,7 +18,11 @@ interface DeviceInfo {
   csrfToken?: string;
 }
 
+type DashboardTab = "overview" | "control" | "network";
+
 const { button, div, input, p, span, h1, h2 } = van.tags;
+
+const activeTab = van.state<DashboardTab>("overview");
 
 // State variables
 const pidPFactor = van.state(1.0);
@@ -91,73 +94,92 @@ const updateWifiSettings = async () => {
   }
 };
 
+const navTab = (tab: DashboardTab, label: string, subtitle: string) =>
+  button(
+    {
+      class: () =>
+        activeTab.val === tab ? "sidebar-tab is-active" : "sidebar-tab",
+      onclick: () => {
+        activeTab.val = tab;
+      },
+    },
+    div({ class: "sidebar-tab-title" }, label),
+    div({ class: "sidebar-tab-subtitle" }, subtitle),
+  );
+
 // PID Configuration
 const PIDConfig = () =>
   div(
-    "PID Factors",
-    p(),
-    "P:",
-    input({
-      type: "number",
-      value: pidPFactor.val,
-      oninput: (e: Event) => {
-        pidPFactor.val = parseFloat((e.target as HTMLInputElement).value) || 0;
-      },
-    }),
-    "I:",
-    input({
-      type: "number",
-      value: pidIFactor.val,
-      oninput: (e: Event) => {
-        pidIFactor.val = parseFloat((e.target as HTMLInputElement).value) || 0;
-      },
-    }),
-    "D:",
-    input({
-      type: "number",
-      value: pidDFactor.val,
-      oninput: (e: Event) => {
-        pidDFactor.val = parseFloat((e.target as HTMLInputElement).value) || 0;
-      },
-    }),
+    { class: "section" },
+    h2("PID Settings"),
+    div(
+      { class: "settings-grid" },
+      p("P Factor"),
+      input({
+        type: "number",
+        value: pidPFactor.val,
+        oninput: (e: Event) => {
+          pidPFactor.val = parseFloat((e.target as HTMLInputElement).value) || 0;
+        },
+      }),
+      p("I Factor"),
+      input({
+        type: "number",
+        value: pidIFactor.val,
+        oninput: (e: Event) => {
+          pidIFactor.val = parseFloat((e.target as HTMLInputElement).value) || 0;
+        },
+      }),
+      p("D Factor"),
+      input({
+        type: "number",
+        value: pidDFactor.val,
+        oninput: (e: Event) => {
+          pidDFactor.val = parseFloat((e.target as HTMLInputElement).value) || 0;
+        },
+      }),
+    ),
   );
 
 // Connection Status Display
 const ConnectionStatus = () =>
   div(
-    { class: "connection-status" },
-    "Connection Status: ",
-    span(
-      {
-        style: () =>
-          `color: ${
-            connectionStatus.val === "Connected"
-              ? "green"
-              : connectionStatus.val === "Error"
-                ? "red"
-                : "orange"
-          }`,
-      },
-      () => connectionStatus.val,
+    { class: "section" },
+    h2("Connection"),
+    p(
+      "Connection Status: ",
+      span(
+        {
+          style: () =>
+            `color: ${
+              connectionStatus.val === "Connected"
+                ? "#16a34a"
+                : connectionStatus.val === "Error"
+                  ? "#dc2626"
+                  : "#f59e0b"
+            }`,
+        },
+        () => connectionStatus.val,
+      ),
     ),
+    p("Last telemetry update: ", () => lastUpdate.val?.toString() ?? "N/A"),
   );
 
 // Sensor Data Display
 const SensorData = () =>
   div(
-    { class: "sensor-data" },
-    "Current Readings:",
+    { class: "section" },
+    h2("Sensors"),
     p("ET: ", () => lastMessage.val?.ET ?? "N/A", "°C"),
     p("BT: ", () => lastMessage.val?.BT ?? "N/A", "°C"),
     p("Sensor sample age: ", () => lastMessage.val?.sampleAgeMs ?? "N/A", " ms"),
     p("Sensor status: ", () => (lastMessage.val?.sensorOk ? "OK" : "BUSY/STALE")),
-    p("Last update: ", () => lastUpdate.val?.toString() ?? "N/A"),
   );
 
 const VersionAndNetworkInfo = () =>
   div(
     { class: "section" },
-    h2("Version & Network Info"),
+    h2("Version & Network"),
     p("Web UI version: ", appVersion),
     p("Web UI build: ", buildTimestamp),
     p("Viewed via: ", location.origin),
@@ -182,51 +204,46 @@ const VersionAndNetworkInfo = () =>
     button({ onclick: refreshDeviceInfo }, "Refresh Info"),
   );
 
-// Start page UI
-const startPage = div(
+const WifiSettings = () =>
   div(
-    { class: "start-page" },
-    h1("Yaeger Roaster Control"),
-    ConnectionStatus,
-    SensorData,
-    VersionAndNetworkInfo,
-    div({ class: "section" }, h2("Profile Selection"), ProfileControl),
-    div({ class: "section" }, h2("PID Settings"), PIDConfig),
+    { class: "section" },
+    h2("Wifi Settings"),
     div(
-      { class: "section" },
-      h2("Wifi Settings"),
-      p(),
-      "Wifi ssid:",
+      { class: "settings-grid" },
+      p("Wifi SSID"),
       input({
         type: "text",
         oninput: (e: Event) => {
           ssidField.val = (e.target as HTMLInputElement).value;
         },
       }),
-      p(),
-      "Wifi pass (if any)",
+      p("Wifi Password"),
       input({
         type: "password",
         oninput: (e: Event) => {
           passField.val = (e.target as HTMLInputElement).value;
         },
       }),
-      p(),
-      button({ onclick: updateWifiSettings }, "Update Wifi"),
     ),
+    button({ onclick: updateWifiSettings }, "Update Wifi"),
+  );
+
+const QuickActions = () =>
+  div(
+    { class: "section" },
+    h2("Quick Actions"),
+    p("Start a roast session or inspect device logs."),
     div(
-      { class: "section" },
+      { class: "action-row" },
       button(
         {
           onclick: () => {
-            // Navigate to roast page
             document.getElementById("app")!.innerHTML = "";
             van.add(document.getElementById("app")!, roastApp());
           },
         },
         "Start Roasting",
       ),
-      " ",
       button(
         {
           onclick: () => {
@@ -235,9 +252,49 @@ const startPage = div(
             window.history.pushState({}, "", "/logs");
           },
         },
-        "Logs",
+        "Open Logs",
       ),
     ),
+  );
+
+const DashboardPanel = () =>
+  div(
+    { class: "dashboard-panel" },
+    () => {
+      if (activeTab.val === "overview") {
+        return div(ConnectionStatus, SensorData, QuickActions);
+      }
+      if (activeTab.val === "control") {
+        return div(
+          div({ class: "section" }, h2("Profile Selection"), ProfileControl),
+          PIDConfig,
+          QuickActions,
+        );
+      }
+
+      return div(VersionAndNetworkInfo, WifiSettings);
+    },
+  );
+
+// Start page UI
+const startPage = div(
+  { class: "app-shell" },
+  div(
+    { class: "sidebar" },
+    h1("Yaeger"),
+    p({ class: "sidebar-subtitle" }, "Roaster Control"),
+    navTab("overview", "Overview", "Live status and sensors"),
+    navTab("control", "Roast Controls", "Profiles and PID tuning"),
+    navTab("network", "Network", "Device info and wifi"),
+  ),
+  div(
+    { class: "content" },
+    div(
+      { class: "content-header" },
+      h2("Control Center"),
+      p("Modernized dashboard with task-focused tabs."),
+    ),
+    DashboardPanel,
   ),
 );
 
