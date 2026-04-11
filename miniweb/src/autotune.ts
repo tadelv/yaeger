@@ -63,12 +63,8 @@ function applyTargetPid() {
 function startAutotune() {
   sendCommand({
     id: 1,
-    command: "setFan",
-    value: fanSpeed.val,
-  });
-  sendCommand({
-    id: 1,
     command: "setPidControl",
+    FanVal: fanSpeed.val,
     pidEnabled: false,
     pidTarget: target.val,
     pidTuneMethod: method.val,

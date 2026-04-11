@@ -67,6 +67,7 @@ bool enforceMutatingCommandAuth(AsyncWebSocketClient *client, JsonDocument &doc)
 
   unsigned long now = millis();
   if (now - lastMutatingCommandMs < MUTATING_CMD_MIN_INTERVAL_MS) {
+    logf("Mutating command rate-limited (delta=%lu ms)\n", now - lastMutatingCommandMs);
     client->text("{\"error\":\"rate limit exceeded\"}");
     return false;
   }
@@ -264,11 +265,14 @@ void startPidAutotune() {
   pidAutotuneCrossings = 0;
   pidEnabled = false;
   preferences.putBool("pidEnabled", false);
+  logf("PID autotune started (target=%s, method=%s, setpoint=%.2f)\n", pidTargetToString(pidTarget),
+       pidMethodToString(pidTuneMethod), pidSetpoint);
 }
 
-void stopPidAutotune() {
+void stopPidAutotune(const char *reason) {
   pidAutotuneActive = false;
   setHeaterPower(0);
+  logf("PID autotune stopped (%s)\n", reason == NULL ? "unknown" : reason);
 }
 
 double readPidTargetTemp(PidTargetSensor target, const float *etbt) {
@@ -454,7 +458,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
         if (shouldAutotune) {
           startPidAutotune();
         } else {
-          stopPidAutotune();
+          stopPidAutotune("requested by client");
         }
       }
     }
@@ -659,7 +663,9 @@ void updatePidControl() {
       const double ku = (4.0 * relayAmplitude) / (M_PI * oscillationAmplitude);
       const double puSeconds = 2.0 * (pidAutotuneHalfCycleSecondsSum / pidAutotuneHalfCycleCount);
       applyAutotunedPidGains(ku, puSeconds);
-      stopPidAutotune();
+      logf("PID autotune converged (Ku=%.4f, Pu=%.4f, peakHigh=%.2f, peakLow=%.2f)\n", ku, puSeconds,
+           pidAutotunePeakHigh, pidAutotunePeakLow);
+      stopPidAutotune("converged");
       resetPidState();
     }
 
