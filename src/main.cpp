@@ -29,6 +29,8 @@ const char *host = "esp32 Roaster";
 // Create a WebSocket object
 AsyncWebSocket ws("/ws");
 AsyncWebServer server(80);
+constexpr unsigned long FAST_TICK_INTERVAL_MS = 10;
+unsigned long lastFastTickMs = 0;
 
 void setupSimulation(AsyncWebSocket *ws);
 void updateSimulation();
@@ -110,11 +112,15 @@ void setup(void) {
 }
 
 void loop(void) {
+  unsigned long now = millis();
   ElegantOTA.loop();
   maintainWifiConnection();
-  ws.cleanupClients();
-  updateConnectionSafety(&ws);
-  delay(10);
-  takeReadings();
+  if (now - lastFastTickMs >= FAST_TICK_INTERVAL_MS) {
+    lastFastTickMs = now;
+    ws.cleanupClients();
+    updateConnectionSafety(&ws);
+    takeReadings();
+  }
   updateHeater();
+  yield();
 }

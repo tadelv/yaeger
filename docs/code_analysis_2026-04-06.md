@@ -60,6 +60,20 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ## 2) **WebSocket robustness and heap stability (high priority)**
 
+### Implementation status (April 6, 2026 update)
+
+- ~~Validate parse result (`DeserializationError`) and reject malformed frames.~~ ✅ Implemented (malformed JSON and unsupported fragmented/non-text frames are rejected).
+- ~~Enforce command schema validation (required fields, ranges).~~ ✅ Implemented (numeric schema checks for mutating commands and preference payloads).
+- ~~Replace fixed-size `char[200]` with `measureJson` + dynamic/streamed response.~~ ✅ Implemented (`measureJson` + dynamically-sized `String` response buffer).
+- ~~Add clamp logic for actuator values (e.g., fan/heater range validation) server-side regardless of client behavior.~~ ✅ Implemented (server-side clamping + logging for burner/fan/cooldown values).
+
+### Updated TODO list
+
+- [x] Reject malformed JSON payloads and unsupported WebSocket frame shapes.
+- [x] Validate command schema for mutating and preference commands.
+- [x] Remove fixed-size WebSocket response buffer usage.
+- [x] Clamp actuator and cooldown values server-side to safe ranges.
+
 ### Findings
 
 - `deserializeJson` return value is not checked before consuming fields.
@@ -68,12 +82,24 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ### Recommendations
 
-1. Validate parse result (`DeserializationError`) and reject malformed frames.
-2. Enforce command schema validation (required fields, ranges).
-3. Replace fixed-size `char[200]` with `measureJson` + dynamic/streamed response.
-4. Add clamp logic for actuator values (e.g., fan/heater range validation) server-side regardless of client behavior.
+1. ~~Validate parse result (`DeserializationError`) and reject malformed frames.~~
+2. ~~Enforce command schema validation (required fields, ranges).~~
+3. ~~Replace fixed-size `char[200]` with `measureJson` + dynamic/streamed response.~~
+4. ~~Add clamp logic for actuator values (e.g., fan/heater range validation) server-side regardless of client behavior.~~
 
 ## 3) **Network resiliency and boot behavior (high priority)**
+
+### Implementation status (April 11, 2026 update)
+
+- ~~Convert Wi‑Fi connect to non-blocking state machine (or bounded async retry steps).~~ ✅ Implemented (connect attempts now run without blocking startup loop and time out to AP fallback).
+- ~~Keep loop tick deterministic by moving periodic tasks to elapsed-time scheduling.~~ ✅ Implemented (`millis()`-driven 10ms fast tick for cleanup/safety/sensor polling).
+- ~~Add watchdog-friendly design: avoid long blocking sections in startup/connect paths.~~ ✅ Implemented (removed blocking connect loop and replaced fixed loop delay with cooperative `yield()`).
+
+### Updated TODO list
+
+- [x] Replace blocking Wi‑Fi connect loop with non-blocking attempt tracking + timeout.
+- [x] Move periodic runtime tasks to elapsed-time scheduling for deterministic ticks.
+- [x] Remove fixed loop sleep and use cooperative yielding for watchdog friendliness.
 
 ### Findings
 
@@ -82,11 +108,23 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ### Recommendations
 
-1. Convert Wi‑Fi connect to non-blocking state machine (or bounded async retry steps).
-2. Keep loop tick deterministic by moving periodic tasks to elapsed-time scheduling.
-3. Add watchdog-friendly design: avoid long blocking sections in startup/connect paths.
+1. ~~Convert Wi‑Fi connect to non-blocking state machine (or bounded async retry steps).~~
+2. ~~Keep loop tick deterministic by moving periodic tasks to elapsed-time scheduling.~~
+3. ~~Add watchdog-friendly design: avoid long blocking sections in startup/connect paths.~~
 
 ## 4) **Frontend modernization path (high priority, medium effort)**
+
+### Implementation status (April 11, 2026 update)
+
+- ~~Make `miniweb` the single primary frontend and define deprecation timeline for `webserver`.~~ ✅ Implemented (project docs + build path now explicitly designate `miniweb` as primary and `webserver` as deprecated/frozen).
+- ~~If legacy UI must remain, plan migration to modern Svelte/Vite stack.~~ ✅ Implemented as policy decision (legacy kept as frozen fallback with no new feature investment).
+- ~~Standardize package manager/lockfile strategy (npm vs yarn) to reduce CI drift.~~ ✅ Implemented for active frontend path (`build_and_flash.sh` now uses `npm ci` for deterministic `miniweb` installs).
+
+### Updated TODO list
+
+- [x] Declare `miniweb` as canonical UI and deprecate legacy `webserver`.
+- [x] Freeze legacy UI scope to maintenance-only fallback.
+- [x] Standardize active frontend build path on deterministic npm installs.
 
 ### Findings
 
@@ -95,9 +133,9 @@ This is a high-level technical review of the firmware + web clients, with priori
 
 ### Recommendations
 
-1. Make `miniweb` the single primary frontend and define deprecation timeline for `webserver`.
-2. If legacy UI must remain, plan migration to modern Svelte/Vite stack.
-3. Standardize package manager/lockfile strategy (npm vs yarn) to reduce CI drift.
+1. ~~Make `miniweb` the single primary frontend and define deprecation timeline for `webserver`.~~
+2. ~~If legacy UI must remain, plan migration to modern Svelte/Vite stack.~~
+3. ~~Standardize package manager/lockfile strategy (npm vs yarn) to reduce CI drift.~~
 
 ## 5) **Dependency and supply-chain updates (high priority)**
 
@@ -172,4 +210,3 @@ This is a high-level technical review of the firmware + web clients, with priori
 - `npm run build` (`miniweb`, `webserver`)
 - `npm audit --omit=dev --json` (`webserver`)
 - `pio --version` (tool unavailable in environment)
-
