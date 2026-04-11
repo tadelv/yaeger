@@ -72,6 +72,37 @@ h1 {
   letter-spacing: 0.02em;
 }
 
+.external-links {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.ext-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: #cbd5e1;
+  text-decoration: none;
+  font-size: 0.83rem;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  border-radius: 0.6rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.ext-link:hover {
+  color: #fff;
+  border-color: rgba(56, 189, 248, 0.6);
+  background: rgba(15, 23, 42, 0.8);
+}
+
+.ext-link svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+}
+
 .tab-btn {
   justify-content: flex-start;
   width: 100%;
