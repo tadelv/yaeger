@@ -234,8 +234,8 @@ function sendCommand(data: any) {
 }
 
 function sendPidControlConfig() {
-  const shouldEnablePid =
-    pidEnabled.val && state.val.currentState.status == RoasterStatus.roasting;
+  const isRoasting = state.val.currentState.status == RoasterStatus.roasting;
+  const shouldEnablePid = pidEnabled.val && isRoasting;
   sendCommand({
     id: 1,
     command: "setPidControl",
@@ -429,6 +429,7 @@ const PIDConfig = () =>
       },
       option({ value: "BT" }, "BT"),
       option({ value: "ET" }, "ET"),
+      option({ value: "simBT" }, "Sim BT"),
     ),
     p(),
     button(
@@ -440,6 +441,7 @@ const PIDConfig = () =>
           sendCommand({
             id: 1,
             command: "setPreferences",
+            pidTarget: tempTarget,
             pidKp: pidPFactor.val,
             pidKi: pidIFactor.val,
             pidKd: pidDFactor.val,
