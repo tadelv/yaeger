@@ -15,6 +15,8 @@ const kp = van.state(1.0);
 const ki = van.state(0.1);
 const kd = van.state(0.01);
 const autotuneActive = van.state(false);
+const history = van.state<Array<{ ts: number; ET: number; BT: number; simBT: number }>>([]);
+const HISTORY_LIMIT = 300;
 
 function sendCommand(data: any) {
   const authToken = getAdminSecret();
@@ -28,6 +30,20 @@ function syncFromMessage() {
   }
   if (typeof msg.pidAutotune === "boolean") {
     autotuneActive.val = msg.pidAutotune;
+  }
+  if (
+    typeof msg.ET === "number" &&
+    typeof msg.BT === "number" &&
+    typeof msg.simBT === "number"
+  ) {
+    const sample = {
+      ts: Date.now(),
+      ET: msg.ET,
+      BT: msg.BT,
+      simBT: msg.simBT,
+    };
+    const nextHistory = [...history.val, sample];
+    history.val = nextHistory.slice(Math.max(0, nextHistory.length - HISTORY_LIMIT));
   }
 }
 
@@ -71,11 +87,95 @@ function stopAutotune() {
   autotuneActive.val = false;
 }
 
+function currentTargetTemp() {
+  const msg = lastMessage.val;
+  if (!msg) {
+    return null;
+  }
+  if (target.val === "ET") {
+    return msg.ET ?? null;
+  }
+  if (target.val === "simBT") {
+    return msg.simBT ?? null;
+  }
+  return msg.BT ?? null;
+}
+
+const graphCanvas = document.createElement("canvas");
+graphCanvas.width = 700;
+graphCanvas.height = 220;
+
+function drawGraph() {
+  const ctx = graphCanvas.getContext("2d");
+  if (!ctx) {
+    return;
+  }
+  const samples = history.val;
+  const width = graphCanvas.width;
+  const height = graphCanvas.height;
+
+  ctx.clearRect(0, 0, width, height);
+  ctx.fillStyle = "#111827";
+  ctx.fillRect(0, 0, width, height);
+
+  if (samples.length < 2) {
+    ctx.fillStyle = "#9ca3af";
+    ctx.font = "14px sans-serif";
+    ctx.fillText("Waiting for sensor samples…", 16, 24);
+    return;
+  }
+
+  const values = samples.map((s) => (target.val === "ET" ? s.ET : target.val === "simBT" ? s.simBT : s.BT));
+  const minV = Math.min(...values, setpoint.val) - 3;
+  const maxV = Math.max(...values, setpoint.val) + 3;
+  const range = Math.max(1, maxV - minV);
+
+  const xFor = (idx: number) => (idx / (samples.length - 1)) * (width - 20) + 10;
+  const yFor = (v: number) => height - 20 - ((v - minV) / range) * (height - 40);
+
+  ctx.strokeStyle = "#374151";
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(10, yFor(setpoint.val));
+  ctx.lineTo(width - 10, yFor(setpoint.val));
+  ctx.stroke();
+
+  ctx.strokeStyle = "#22d3ee";
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  values.forEach((v, idx) => {
+    const x = xFor(idx);
+    const y = yFor(v);
+    if (idx === 0) ctx.moveTo(x, y);
+    else ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.fillStyle = "#e5e7eb";
+  ctx.font = "12px sans-serif";
+  ctx.fillText(`Target ${target.val} • ${values[values.length - 1].toFixed(1)}°C`, 12, 16);
+  ctx.fillText(`Setpoint ${setpoint.val.toFixed(1)}°C`, width - 150, 16);
+}
+
+van.derive(drawGraph);
+
 export const autotuneApp = () =>
   div(
     { class: "section" },
     h2("PID Autotune"),
     p("Use this page to tune PID without starting a roast session."),
+    p(
+      "Measured: ET ",
+      () => lastMessage.val?.ET?.toFixed(1) ?? "N/A",
+      "°C | BT ",
+      () => lastMessage.val?.BT?.toFixed(1) ?? "N/A",
+      "°C | Sim BT ",
+      () => lastMessage.val?.simBT?.toFixed(1) ?? "N/A",
+      "°C | Selected ",
+      () => currentTargetTemp()?.toFixed(1) ?? "N/A",
+      "°C",
+    ),
+    div(graphCanvas),
     p(
       "Target",
       select(
