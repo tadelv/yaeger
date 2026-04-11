@@ -27,6 +27,7 @@ MovingAverageFilter beansFilter(kMovingAverageWindowSize);
 /*SimpleKalmanFilter exhaustFilter(80, 80, 3);*/
 /*SimpleKalmanFilter beansFilter(80, 80, 3);*/
 unsigned long lastReadTime = 0;
+unsigned long lastSensorUpdateMs = 0;
 
 SemaphoreHandle_t mtx;
 StaticSemaphore_t mtx_buffer;
@@ -63,6 +64,7 @@ void takeReadings() {
     logf("internal: %.2f\n", internal);
 #endif
     readings[2] = internal;
+    lastSensorUpdateMs = lastReadTime;
     xSemaphoreGiveRecursive(mtx);
   }
 }
@@ -105,9 +107,15 @@ void takeBTReadings(float dt) {
   readings[1] = beansFilter.process(beanTemp);
 }
 
-void getETBTReadings(float *readingsBuf) {
-  if (xSemaphoreTakeRecursive(mtx, portMAX_DELAY) == pdTRUE) {
+bool getETBTReadings(float *readingsBuf) {
+  if (xSemaphoreTakeRecursive(mtx, pdMS_TO_TICKS(5)) == pdTRUE) {
     memcpy(readingsBuf, readings, 3 * sizeof(float));
     xSemaphoreGiveRecursive(mtx);
+    return true;
   }
+  return false;
+}
+
+unsigned long getLastSensorUpdateMs() {
+  return lastSensorUpdateMs;
 }

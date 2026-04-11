@@ -1,3 +1,4 @@
 void startSensors();
 void takeReadings();
-void getETBTReadings(float *readings);
+bool getETBTReadings(float *readings);
+unsigned long getLastSensorUpdateMs();

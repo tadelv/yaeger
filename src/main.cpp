@@ -84,6 +84,7 @@ void setup(void) {
   server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
   server.serveStatic("/settings", LittleFS, "/").setDefaultFile("index.html");
   server.serveStatic("/editor", LittleFS, "/").setDefaultFile("index.html");
+  server.serveStatic("/logs", LittleFS, "/").setDefaultFile("index.html");
 
   String adminSecret = getApiAdminSecret();
   ElegantOTA.begin(&server, getApiAdminUsername(), adminSecret.c_str()); // Start ElegantOTA

@@ -3,6 +3,22 @@
 
 namespace {
 constexpr bool kEnableWebSerialLogging = false;
+constexpr size_t kLogBufferMaxChars = 32768;
+String gLogBuffer;
+
+void appendToLogBuffer(const char *message) {
+  if (message == nullptr) {
+    return;
+  }
+
+  gLogBuffer += message;
+  gLogBuffer += "\n";
+
+  if (gLogBuffer.length() > kLogBufferMaxChars) {
+    size_t removeCount = gLogBuffer.length() - kLogBufferMaxChars;
+    gLogBuffer.remove(0, removeCount);
+  }
+}
 }
 
 void recvMsg(uint8_t *data, size_t len){
@@ -26,6 +42,7 @@ void setupLogging(AsyncWebServer *server) {
 
 void log(const char *message) {
 	Serial.println(message);
+  appendToLogBuffer(message);
   if (kEnableWebSerialLogging) {
 	  WebSerial.println(message);
   }
@@ -41,4 +58,11 @@ void logf(const char *format, ...) {
 	  WebSerial.print(buf);
   }
 	Serial.print(buf);
+  appendToLogBuffer(buf);
 }
+
+String getLogBuffer() { return gLogBuffer; }
+
+void clearLogBuffer() { gLogBuffer = ""; }
+
+void appendExternalLog(const String &message) { appendToLogBuffer(message.c_str()); }

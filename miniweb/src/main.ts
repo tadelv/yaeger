@@ -1,6 +1,7 @@
 import "./style.css";
 import van from "vanjs-core";
 import { roastApp } from "./roast";
+import { logsApp } from "./logs";
 import { profile, ProfileControl } from "./profiling.ts";
 import { PIDController } from "./pid.ts";
 import { connectionStatus, lastMessage, lastUpdate } from "./websocket";
@@ -148,6 +149,8 @@ const SensorData = () =>
     "Current Readings:",
     p("ET: ", () => lastMessage.val?.ET ?? "N/A", "°C"),
     p("BT: ", () => lastMessage.val?.BT ?? "N/A", "°C"),
+    p("Sensor sample age: ", () => lastMessage.val?.sampleAgeMs ?? "N/A", " ms"),
+    p("Sensor status: ", () => (lastMessage.val?.sensorOk ? "OK" : "BUSY/STALE")),
     p("Last update: ", () => lastUpdate.val?.toString() ?? "N/A"),
   );
 
@@ -222,6 +225,17 @@ const startPage = div(
           },
         },
         "Start Roasting",
+      ),
+      " ",
+      button(
+        {
+          onclick: () => {
+            document.getElementById("app")!.innerHTML = "";
+            van.add(document.getElementById("app")!, logsApp());
+            window.history.pushState({}, "", "/logs");
+          },
+        },
+        "Logs",
       ),
     ),
   ),

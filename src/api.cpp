@@ -89,4 +89,52 @@ void setupApi(AsyncWebServer *server) {
     serializeJson(doc, body);
     request->send(200, "application/json", body);
   });
+
+  server->on("/api/logs", HTTP_GET, [](AsyncWebServerRequest *request) {
+    request->send(200, "text/plain", getLogBuffer());
+  });
+
+  server->on("/api/logs", HTTP_DELETE, [](AsyncWebServerRequest *request) {
+    if (!isAuthorizedRequest(request)) {
+      return;
+    }
+    if (!hasValidCsrfHeader(request)) {
+      request->send(403, "application/json",
+                    "{\"error\":\"missing/invalid csrf header\"}");
+      return;
+    }
+    clearLogBuffer();
+    request->send(200, "application/json", "{\"ok\":true}");
+  });
+
+  server->on(
+      "/api/logs/upload", HTTP_POST,
+      [](AsyncWebServerRequest *request) {
+        // handled in body parser
+      },
+      NULL,
+      [](AsyncWebServerRequest *request, uint8_t *data, size_t len,
+         size_t index, size_t total) {
+        if (index != 0 || len != total) {
+          request->send(400, "application/json",
+                        "{\"error\":\"chunked body not supported\"}");
+          return;
+        }
+        if (!isAuthorizedRequest(request)) {
+          return;
+        }
+        if (!hasValidCsrfHeader(request)) {
+          request->send(403, "application/json",
+                        "{\"error\":\"missing/invalid csrf header\"}");
+          return;
+        }
+        String uploaded;
+        uploaded.reserve(len + 16);
+        uploaded = "[uploaded] ";
+        for (size_t i = 0; i < len; i++) {
+          uploaded += char(data[i]);
+        }
+        appendExternalLog(uploaded);
+        request->send(200, "application/json", "{\"ok\":true}");
+      });
 }
