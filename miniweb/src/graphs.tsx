@@ -198,15 +198,40 @@ export function RoastGraphs({
   roast,
   mode = "separate",
   heightScale = 1,
+  profile,
 }: {
   roast?: RoastState;
   mode?: RoastGraphMode;
   heightScale?: number;
+  profile?: Profile;
 }) {
   const measurements = roast?.measurements ?? [];
   const start = roast?.startDate;
+  const activeProfile = roast?.profile ?? profile;
+
   if (!start || measurements.length < 2) {
-    return <div class="graph-empty">Live roast graphs will appear after the roast starts.</div>;
+    if (!activeProfile?.steps.length) {
+      return <div class="graph-empty">Live roast graphs will appear after the roast starts.</div>;
+    }
+
+    const totalDuration = activeProfile.steps.reduce((sum, step) => sum + Math.max(step.duration, 0), 0);
+    const previewEndSec = Math.max(1, Math.ceil(totalDuration));
+    const previewSamples = Array.from({ length: previewEndSec + 1 }, (_, i) => i);
+    const previewValues = previewSamples.map((seconds) => getProfileSetpointAtElapsed(activeProfile, seconds));
+    const validValues = previewValues.filter((value): value is number => typeof value === "number");
+    const minY = validValues.length ? Math.max(0, Math.floor(Math.min(...validValues) - 5)) : 0;
+    const maxY = validValues.length ? Math.ceil(Math.max(...validValues) + 5) : 300;
+
+    return (
+      <VisxLineGraph
+        title="Profile Preview"
+        samples={previewSamples}
+        minY={minY}
+        maxY={Math.max(maxY, minY + 10)}
+        height={Math.round(320 * Math.min(1.8, Math.max(0.7, heightScale)))}
+        series={[{ label: "Profile", color: "#facc15", values: previewValues }]}
+      />
+    );
   }
 
   const sampleTimes = measurements.map((m) => (m.timestamp.getTime() - start.getTime()) / 1000);
@@ -217,8 +242,8 @@ export function RoastGraphs({
   const heater = measurements.map((m) => m.message.BurnerVal);
   const btRor = buildRoR(bt, sampleTimes);
   const etRor = buildRoR(et, sampleTimes);
-  const profileSetpoint = roast?.profile
-    ? sampleTimes.map((seconds) => getProfileSetpointAtElapsed(roast.profile as Profile, seconds))
+  const profileSetpoint = activeProfile
+    ? sampleTimes.map((seconds) => getProfileSetpointAtElapsed(activeProfile, seconds))
     : [];
 
   const eventTimes = (roast?.events ?? []).map((event) => ({

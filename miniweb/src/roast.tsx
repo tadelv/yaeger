@@ -463,7 +463,12 @@ export function RoastApp() {
         </div>
       </section>
 
-      <RoastGraphs roast={state.roast} mode={graphMode} heightScale={graphHeightScale} />
+      <RoastGraphs
+        roast={state.roast}
+        mode={graphMode}
+        heightScale={graphHeightScale}
+        profile={profileStore.profile}
+      />
 
       <section class="control-panel">
         <h3>Roast controls</h3>

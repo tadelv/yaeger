@@ -694,6 +694,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       }
       if (!doc["pidProcessDelaySec"].isNull()) {
         pidProcessDelaySeconds = std::max(0.0, doc["pidProcessDelaySec"].as<double>());
+        pidMeasuredProcessDelaySeconds = pidProcessDelaySeconds;
+        preferences.putDouble("pidMeasuredProcessDelaySec", pidMeasuredProcessDelaySeconds);
         preferences.putDouble("pidProcessDelaySec", pidProcessDelaySeconds);
       }
       if (!doc["pidPredictorEnabled"].isNull()) {
@@ -963,6 +965,7 @@ void setupMainLoop(AsyncWebSocket *ws) {
   pidDelayMeasureFan = std::clamp(preferences.getDouble("pidDelayFan", 50.0), 0.0, 100.0);
   pidDelayMeasureHeater = std::clamp(preferences.getDouble("pidDelayHeater", 60.0), 0.0, 100.0);
   pidProcessDelaySeconds = std::max(0.0, preferences.getDouble("pidProcessDelaySec", 0.0));
+  pidMeasuredProcessDelaySeconds = std::max(0.0, preferences.getDouble("pidMeasuredProcessDelaySec", pidProcessDelaySeconds));
   pidPredictorEnabled = preferences.getBool("pidPredictorEnabled", true);
   if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
     double temp = pidAutotuneRelayOutputLow;
@@ -1088,6 +1091,7 @@ void updatePidControl() {
     if (crossedBaseline || sustainedRise) {
       pidMeasuredProcessDelaySeconds = (now - pidDelayHeatStartMs) / 1000.0;
       pidProcessDelaySeconds = pidMeasuredProcessDelaySeconds;
+      preferences.putDouble("pidMeasuredProcessDelaySec", pidMeasuredProcessDelaySeconds);
       preferences.putDouble("pidProcessDelaySec", pidProcessDelaySeconds);
       stopPidDelayMeasurement(crossedBaseline ? "temperature crossed baseline threshold" : "sustained positive slope detected");
     } else if (now - pidDelayHeatStartMs > 120000) {
