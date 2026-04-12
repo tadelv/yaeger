@@ -81,6 +81,9 @@ export function RoastApp() {
 
     setFan(lastMessage.FanVal);
     setHeater(lastMessage.BurnerVal);
+    if (typeof lastMessage.setpoint === "number") {
+      setSetpoint(lastMessage.setpoint);
+    }
 
     setState((prev) => {
       const next: YaegerState = {
@@ -164,6 +167,12 @@ export function RoastApp() {
       .filter((m): m is Measurement => m != null);
 
     if (!measurements.length) return;
+    const recoveredSetpoint = Number(
+      (samples[samples.length - 1] as Record<string, unknown>).setpoint ?? 20,
+    );
+    if (Number.isFinite(recoveredSetpoint)) {
+      setSetpoint(recoveredSetpoint);
+    }
     setState((prev) => ({
       ...prev,
       currentState: {
