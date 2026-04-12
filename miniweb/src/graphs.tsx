@@ -1,12 +1,18 @@
-import createPlotlyComponent from "react-plotly.js/factory";
-import Plotly from "plotly.js-basic-dist-min";
+import { useEffect, useMemo, useRef } from "preact/hooks";
+import uPlot, { Options, Plugin } from "uplot";
+import "uplot/dist/uPlot.min.css";
 import { RoastState } from "./model";
-
-const Plot = createPlotlyComponent(Plotly);
 
 export type RoastGraphMode = "combined" | "separate";
 
 type EventMarker = { label: string; sec: number };
+
+type UPlotChartProps = {
+  title: string;
+  options: Options;
+  data: uPlot.AlignedData;
+  events?: EventMarker[];
+};
 
 function buildRoR(values: number[], timeSeconds: number[], windowSize = 20): Array<number | null> {
   const rate = values.map((temp, i) => {
@@ -24,62 +30,85 @@ function buildRoR(values: number[], timeSeconds: number[], windowSize = 20): Arr
   });
 }
 
-function buildEventShapes(eventTimes: EventMarker[], yRef = "paper") {
-  return eventTimes.map((event) => ({
-    type: "line",
-    x0: event.sec,
-    x1: event.sec,
-    y0: 0,
-    y1: 1,
-    xref: "x",
-    yref,
-    line: { color: "#ef4444", width: 1, dash: "dot" },
-  }));
-}
-
-function buildEventAnnotations(eventTimes: EventMarker[], y = 1.04) {
-  return eventTimes.map((event) => ({
-    x: event.sec,
-    y,
-    xref: "x",
-    yref: "paper",
-    text: event.label,
-    showarrow: false,
-    font: { color: "#fca5a5", size: 10 },
-  }));
-}
-
-function baseLayout(title: string, height: number) {
+function buildEventPlugin(events: EventMarker[]): Plugin {
   return {
-    title: { text: title, font: { size: 14 } },
-    margin: { l: 50, r: 24, t: 40, b: 38 },
-    paper_bgcolor: "#0f172a",
-    plot_bgcolor: "#0f172a",
-    font: { color: "#cbd5e1" },
-    height,
-    legend: { orientation: "h", y: -0.22 },
-    xaxis: {
-      title: "Time (s)",
-      gridcolor: "#334155",
-      zerolinecolor: "#334155",
-      tickfont: { color: "#94a3b8" },
-      titlefont: { color: "#cbd5e1" },
+    hooks: {
+      draw: [(u) => {
+        if (!events.length) return;
+        const { ctx, bbox } = u;
+        ctx.save();
+        ctx.strokeStyle = "#ef4444";
+        ctx.fillStyle = "#fca5a5";
+        ctx.font = "10px sans-serif";
+        events.forEach((event) => {
+          const x = Math.round(u.valToPos(event.sec, "x", true));
+          if (x < bbox.left || x > bbox.left + bbox.width) return;
+          ctx.beginPath();
+          ctx.setLineDash([4, 3]);
+          ctx.moveTo(x, bbox.top);
+          ctx.lineTo(x, bbox.top + bbox.height);
+          ctx.stroke();
+          ctx.setLineDash([]);
+          ctx.fillText(event.label, x + 2, bbox.top + 11);
+        });
+        ctx.restore();
+      }],
     },
   };
 }
 
-function PlotCard({ data, layout }: { data: any[]; layout: any }) {
+function UPlotChart({ title, options, data, events = [] }: UPlotChartProps) {
+  const hostRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<uPlot | null>(null);
+
+  const finalOptions = useMemo<Options>(() => {
+    const basePlugins = options.plugins ?? [];
+    const plugins = events.length ? [...basePlugins, buildEventPlugin(events)] : basePlugins;
+    return { ...options, plugins };
+  }, [events, options]);
+
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+
+    if (chartRef.current) {
+      chartRef.current.destroy();
+      chartRef.current = null;
+    }
+
+    chartRef.current = new uPlot(finalOptions, data, host);
+    return () => {
+      chartRef.current?.destroy();
+      chartRef.current = null;
+    };
+  }, [data, finalOptions]);
+
   return (
     <div class="graph-card">
-      <Plot
-        data={data}
-        layout={layout}
-        useResizeHandler
-        style={{ width: "100%" }}
-        config={{ displaylogo: false, responsive: true }}
-      />
+      <h4>{title}</h4>
+      <div ref={hostRef} class="uplot-host" />
     </div>
   );
+}
+
+function makeBaseOptions(height: number): Options {
+  return {
+    width: 900,
+    height,
+    scales: { x: { time: false } },
+    series: [{ label: "Time (s)" }],
+    axes: [
+      {
+        stroke: "#94a3b8",
+        grid: { stroke: "#334155" },
+      },
+      {
+        stroke: "#cbd5e1",
+        grid: { stroke: "#334155" },
+      },
+    ],
+    legend: { show: true },
+  };
 }
 
 export function RoastGraphs({
@@ -97,14 +126,14 @@ export function RoastGraphs({
     return <div class="graph-empty">Live roast graphs will appear after the roast starts.</div>;
   }
 
-  const sampleTimes = measurements.map((m) => (m.timestamp.getTime() - start.getTime()) / 1000);
+  const t = measurements.map((m) => (m.timestamp.getTime() - start.getTime()) / 1000);
   const bt = measurements.map((m) => m.message.BT);
   const et = measurements.map((m) => m.message.ET);
   const setpoint = measurements.map((m) => m.extra?.setpoint ?? 0);
   const fan = measurements.map((m) => m.message.FanVal);
   const heater = measurements.map((m) => m.message.BurnerVal);
-  const btRor = buildRoR(bt, sampleTimes).map((v) => v ?? null);
-  const etRor = buildRoR(et, sampleTimes).map((v) => v ?? null);
+  const btRor = buildRoR(bt, t).map((v) => v ?? null);
+  const etRor = buildRoR(et, t).map((v) => v ?? null);
 
   const eventTimes = (roast?.events ?? []).map((event) => ({
     label: String(event.label),
@@ -112,84 +141,82 @@ export function RoastGraphs({
   }));
 
   const clampedHeightScale = Math.min(1.8, Math.max(0.7, heightScale));
-  const separateHeight = Math.round(290 * clampedHeightScale);
+  const separateHeight = Math.round(300 * clampedHeightScale);
   const combinedHeight = Math.round(380 * clampedHeightScale);
 
   if (mode === "combined") {
-    const layout = {
-      ...baseLayout("Combined Roast Telemetry", combinedHeight),
-      yaxis: {
-        title: "Temperature (°C)",
-        range: [0, 300],
-        gridcolor: "#334155",
+    const options: Options = {
+      ...makeBaseOptions(combinedHeight),
+      scales: {
+        x: { time: false },
+        temp: { auto: false, range: [0, 300] },
+        power: { auto: false, range: [0, 100] },
+        ror: { auto: false, range: [-5, 60] },
       },
-      yaxis2: {
-        title: "Power (%)",
-        range: [0, 100],
-        overlaying: "y",
-        side: "right",
-      },
-      yaxis3: {
-        title: "RoR (°C/min)",
-        range: [-5, 60],
-        overlaying: "y",
-        side: "right",
-        anchor: "free",
-        position: 1,
-        showgrid: false,
-      },
-      shapes: buildEventShapes(eventTimes),
-      annotations: buildEventAnnotations(eventTimes),
+      series: [
+        { label: "Time (s)" },
+        { label: "BT", stroke: "#60a5fa", scale: "temp" },
+        { label: "ET", stroke: "#f87171", scale: "temp" },
+        { label: "Setpoint", stroke: "#34d399", scale: "temp" },
+        { label: "Fan %", stroke: "#38bdf8", scale: "power" },
+        { label: "Heater %", stroke: "#fb923c", scale: "power" },
+        { label: "BT RoR", stroke: "#22c55e", scale: "ror" },
+        { label: "ET RoR", stroke: "#a855f7", scale: "ror" },
+      ],
+      axes: [
+        { stroke: "#94a3b8", grid: { stroke: "#334155" } },
+        { stroke: "#cbd5e1", scale: "temp", label: "Temp (°C)", grid: { stroke: "#334155" } },
+        { stroke: "#cbd5e1", scale: "power", side: 1, label: "Power (%)", grid: { show: false } },
+        { stroke: "#cbd5e1", scale: "ror", side: 1, label: "RoR (°C/min)", grid: { show: false } },
+      ],
     };
 
-    const data = [
-      { x: sampleTimes, y: bt, type: "scatter", mode: "lines", name: "BT", line: { color: "#60a5fa" } },
-      { x: sampleTimes, y: et, type: "scatter", mode: "lines", name: "ET", line: { color: "#f87171" } },
-      { x: sampleTimes, y: setpoint, type: "scatter", mode: "lines", name: "Setpoint", line: { color: "#34d399" } },
-      { x: sampleTimes, y: fan, type: "scatter", mode: "lines", name: "Fan %", yaxis: "y2", line: { color: "#38bdf8" } },
-      { x: sampleTimes, y: heater, type: "scatter", mode: "lines", name: "Heater %", yaxis: "y2", line: { color: "#fb923c" } },
-      { x: sampleTimes, y: btRor, type: "scatter", mode: "lines", name: "BT RoR", yaxis: "y3", line: { color: "#22c55e" } },
-      { x: sampleTimes, y: etRor, type: "scatter", mode: "lines", name: "ET RoR", yaxis: "y3", line: { color: "#a855f7" } },
-    ];
-
-    return <PlotCard data={data} layout={layout} />;
+    return (
+      <UPlotChart
+        title="Combined Roast Telemetry"
+        options={options}
+        data={[t, bt, et, setpoint, fan, heater, btRor, etRor]}
+        events={eventTimes}
+      />
+    );
   }
+
+  const tempOptions: Options = {
+    ...makeBaseOptions(separateHeight),
+    scales: { x: { time: false }, y: { auto: false, range: [0, 300] } },
+    series: [
+      { label: "Time (s)" },
+      { label: "BT", stroke: "#60a5fa" },
+      { label: "ET", stroke: "#f87171" },
+      { label: "Setpoint", stroke: "#34d399" },
+    ],
+  };
+
+  const powerOptions: Options = {
+    ...makeBaseOptions(separateHeight),
+    scales: { x: { time: false }, y: { auto: false, range: [0, 100] } },
+    series: [
+      { label: "Time (s)" },
+      { label: "Fan %", stroke: "#38bdf8" },
+      { label: "Heater %", stroke: "#fb923c" },
+    ],
+  };
+
+  const rorOptions: Options = {
+    ...makeBaseOptions(separateHeight),
+    scales: { x: { time: false }, y: { auto: false, range: [-5, 60] } },
+    series: [
+      { label: "Time (s)" },
+      { label: "BT RoR", stroke: "#22c55e" },
+      { label: "ET RoR", stroke: "#a855f7" },
+    ],
+  };
 
   return (
     <div class="graph-stack">
-      <PlotCard
-        data={[
-          { x: sampleTimes, y: bt, type: "scatter", mode: "lines", name: "BT", line: { color: "#60a5fa" } },
-          { x: sampleTimes, y: et, type: "scatter", mode: "lines", name: "ET", line: { color: "#f87171" } },
-          { x: sampleTimes, y: setpoint, type: "scatter", mode: "lines", name: "Setpoint", line: { color: "#34d399" } },
-        ]}
-        layout={{
-          ...baseLayout("Temperature", separateHeight),
-          yaxis: { title: "Temperature (°C)", range: [0, 300], gridcolor: "#334155" },
-          shapes: buildEventShapes(eventTimes),
-          annotations: buildEventAnnotations(eventTimes),
-        }}
-      />
-      <PlotCard
-        data={[
-          { x: sampleTimes, y: fan, type: "scatter", mode: "lines", name: "Fan %", line: { color: "#38bdf8" } },
-          { x: sampleTimes, y: heater, type: "scatter", mode: "lines", name: "Heater %", line: { color: "#fb923c" } },
-        ]}
-        layout={{
-          ...baseLayout("Power", separateHeight),
-          yaxis: { title: "Power (%)", range: [0, 100], gridcolor: "#334155" },
-        }}
-      />
-      <PlotCard
-        data={[
-          { x: sampleTimes, y: btRor, type: "scatter", mode: "lines", name: "BT RoR", line: { color: "#22c55e" } },
-          { x: sampleTimes, y: etRor, type: "scatter", mode: "lines", name: "ET RoR", line: { color: "#a855f7" } },
-        ]}
-        layout={{
-          ...baseLayout("Rate of Rise", separateHeight),
-          yaxis: { title: "RoR (°C/min)", range: [-5, 60], gridcolor: "#334155" },
-        }}
-      />
+      <UPlotChart title="Temperature" options={tempOptions} data={[t, bt, et, setpoint]} events={eventTimes} />
+      <UPlotChart title="Power" options={powerOptions} data={[t, fan, heater]} />
+      <UPlotChart title="Rate of Rise" options={rorOptions} data={[t, btRor, etRor]} />
     </div>
   );
 }
@@ -204,23 +231,21 @@ export function AutotuneGraph({
   setpoint: number;
 }) {
   const values = history.map((s) => (target === "ET" ? s.ET : target === "simBT" ? s.simBT : s.BT));
-  const samples = values.map((_, i) => i);
+  const x = values.map((_, i) => i);
+  const setpointLine = values.map(() => setpoint);
 
-  return (
-    <PlotCard
-      data={[
-        { x: samples, y: values, type: "scatter", mode: "lines", name: `${target} sensor`, line: { color: "#22d3ee" } },
-        { x: samples, y: values.map(() => setpoint), type: "scatter", mode: "lines", name: "Setpoint", line: { color: "#94a3b8" } },
-      ]}
-      layout={{
-        ...baseLayout("Autotune target trend", 300),
-        xaxis: { title: "Sample", gridcolor: "#334155" },
-        yaxis: {
-          title: "Temperature (°C)",
-          range: [Math.min(...values, setpoint) - 3, Math.max(...values, setpoint) + 3],
-          gridcolor: "#334155",
-        },
-      }}
-    />
-  );
+  const options: Options = {
+    ...makeBaseOptions(320),
+    scales: {
+      x: { time: false },
+      y: { auto: false, range: [Math.min(...values, setpoint) - 3, Math.max(...values, setpoint) + 3] },
+    },
+    series: [
+      { label: "Sample" },
+      { label: `${target} sensor`, stroke: "#22d3ee" },
+      { label: "Setpoint", stroke: "#94a3b8" },
+    ],
+  };
+
+  return <UPlotChart title="Autotune target trend" options={options} data={[x, values, setpointLine]} />;
 }
