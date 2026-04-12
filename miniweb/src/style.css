@@ -26,6 +26,11 @@
   --destructive-foreground: 0 0% 98%;
 }
 
+
+* {
+  box-sizing: border-box;
+}
+
 body {
   margin: 0;
   min-width: 320px;
@@ -442,6 +447,48 @@ textarea:focus {
   margin-top: 0;
   margin-bottom: 1rem;
   font-size: 1.05rem;
+}
+
+
+input[type="file"] {
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  padding: 0.5rem 0.6rem;
+}
+
+.link-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 2.5rem;
+  padding: 0 1rem;
+  border-radius: var(--radius);
+  border: 1px solid hsl(var(--border));
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  font-weight: 600;
+  font-size: 0.875rem;
+  text-decoration: none;
+}
+
+.link-button:hover {
+  background: hsl(var(--primary) / 0.92);
+}
+
+.ota-frame-wrap {
+  margin-top: 0.9rem;
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.75rem;
+  overflow: hidden;
+  background: hsl(var(--background));
+}
+
+.ota-frame {
+  display: block;
+  width: 100%;
+  min-height: 620px;
+  border: 0;
 }
 
 @media (max-width: 880px) {
