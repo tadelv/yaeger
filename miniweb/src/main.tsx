@@ -154,6 +154,7 @@ function App() {
     profileStore.followProfileEnabled = false;
     setTick((v) => v + 1);
     const authToken = getAdminSecret();
+    sendWsCommand({ id: 1, command: "emergencyStop", authToken });
     sendWsCommand({ id: 1, BurnerVal: 0, authToken });
     sendWsCommand({ id: 1, command: "setPidControl", pidEnabled: false, setpoint: 0, pidAutotune: false, authToken });
     sendWsCommand({ id: 1, command: "endRoastSession", authToken });

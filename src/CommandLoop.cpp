@@ -172,7 +172,8 @@ bool isMutatingCommand(const char *command) {
   return strncmp(command, "setBurner", 9) == 0 || strncmp(command, "setFan", 6) == 0 ||
          strncmp(command, "setPreferences", 14) == 0 || strncmp(command, "setPidControl", 13) == 0 ||
          strncmp(command, "startRoastSession", 17) == 0 || strncmp(command, "endRoastSession", 15) == 0 ||
-         strncmp(command, "clearRoastHistory", 17) == 0;
+         strncmp(command, "clearRoastHistory", 17) == 0 || strncmp(command, "emergencyStop", 13) == 0 ||
+         strncmp(command, "clearEmergencyStop", 18) == 0;
 }
 
 bool enforceMutatingCommandAuth(AsyncWebSocketClient *client, JsonDocument &doc) {
@@ -479,6 +480,19 @@ void stopPidDelayMeasurement(const char *reason, bool failed = false) {
        reason == NULL ? "unknown" : reason, pidMeasuredProcessDelaySeconds);
 }
 
+void setEmergencyStopState(bool active) {
+  setHeaterForcedOff(active);
+  if (active) {
+    pidEnabled = false;
+    pidAutotuneActive = false;
+    pidDelayMeasureState = PidDelayMeasureState::IDLE;
+    setHeaterPower(0);
+    log("Emergency stop active: heater output clamped to 0");
+  } else {
+    log("Emergency stop cleared");
+  }
+}
+
 double readPidTargetTemp(PidTargetSensor target, const float *etbt) {
   if (target == PidTargetSensor::ET) {
     return etbt[0];
@@ -713,6 +727,9 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     }
 
     if (command != NULL && strncmp(command, "startRoastSession", 17) == 0) {
+      if (isHeaterForcedOff()) {
+        setEmergencyStopState(false);
+      }
       resetRoastHistorySession();
       roastSessionActive = true;
       log("Roast history session started");
@@ -727,6 +744,14 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       roastSessionActive = false;
       resetRoastHistorySession();
       log("Roast history cleared");
+    }
+
+    if (command != NULL && strncmp(command, "emergencyStop", 13) == 0) {
+      setEmergencyStopState(true);
+    }
+
+    if (command != NULL && strncmp(command, "clearEmergencyStop", 18) == 0) {
+      setEmergencyStopState(false);
     }
 
     if (getHeaterPower() > 0 && getFanSpeed() <= 30) {
@@ -826,6 +851,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
+      dataObj["emergencyStopActive"] = isHeaterForcedOff();
       SensorErrorCode exhaustError = getExhaustSensorError();
       SensorErrorCode beanError = getBeanSensorError();
       dataObj["exhaustSensorError"] = static_cast<int>(exhaustError);
@@ -899,6 +925,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
+      dataObj["emergencyStopActive"] = isHeaterForcedOff();
     }
 
     if (command != NULL && strncmp(command, "getRoastHistory", 15) == 0) {
