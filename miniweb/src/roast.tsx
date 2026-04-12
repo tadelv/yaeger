@@ -66,11 +66,15 @@ export function RoastApp() {
     appendCommand("heater", value);
   };
 
-  const sendPidControlConfig = (status = state.currentState.status, pidOn = pidEnabled) => {
+  const sendPidControlConfig = (
+    status = state.currentState.status,
+    pidOn = pidEnabled,
+    setpointValue = setpoint,
+  ) => {
     sendCommand({
       id: 1,
       command: "setPidControl",
-      setpoint,
+      setpoint: setpointValue,
       pidEnabled: pidOn && status === RoasterStatus.roasting,
       pidTarget,
     });
@@ -418,7 +422,7 @@ export function RoastApp() {
             onInput={(e) => {
               const value = Number((e.target as HTMLInputElement).value);
               setSetpoint(value);
-              sendPidControlConfig(state.currentState.status);
+              sendPidControlConfig(state.currentState.status, pidEnabled, value);
             }}
           />
           </div>
