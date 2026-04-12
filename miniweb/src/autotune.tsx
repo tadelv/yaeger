@@ -14,6 +14,9 @@ export function AutotuneApp() {
   const [fanSpeed, setFanSpeed] = useState(50);
   const [minHeaterPwm, setMinHeaterPwm] = useState(0);
   const [maxHeaterPwm, setMaxHeaterPwm] = useState(60);
+  const [delayFan, setDelayFan] = useState(50);
+  const [delayHeater, setDelayHeater] = useState(60);
+  const [processDelaySec, setProcessDelaySec] = useState(0);
   const [kp, setKp] = useState(1.0);
   const [ki, setKi] = useState(0.1);
   const [kd, setKd] = useState(0.01);
@@ -45,12 +48,19 @@ export function AutotuneApp() {
 
     if (typeof lastMessage.pidAutotuneMin === "number") setMinHeaterPwm(lastMessage.pidAutotuneMin);
     if (typeof lastMessage.pidAutotuneMax === "number") setMaxHeaterPwm(lastMessage.pidAutotuneMax);
+    if (typeof lastMessage.pidDelayFan === "number") setDelayFan(lastMessage.pidDelayFan);
+    if (typeof lastMessage.pidDelayHeater === "number") setDelayHeater(lastMessage.pidDelayHeater);
+    if (typeof lastMessage.pidProcessDelaySec === "number") setProcessDelaySec(lastMessage.pidProcessDelaySec);
 
     if (typeof lastMessage.ET === "number" && typeof lastMessage.BT === "number" && typeof lastMessage.simBT === "number") {
       setHistory((prev) => [...prev, { ET: lastMessage.ET, BT: lastMessage.BT, simBT: lastMessage.simBT }].slice(-300));
     }
   }, [kd, ki, lastMessage]);
 
+  const delayElapsedSec =
+    typeof lastMessage?.pidDelayMeasureElapsedSec === "number" ? lastMessage.pidDelayMeasureElapsedSec.toFixed(1) : "0.0";
+  const measuredDelaySec =
+    typeof lastMessage?.pidMeasuredProcessDelaySec === "number" ? lastMessage.pidMeasuredProcessDelaySec : processDelaySec;
 
   return (
     <div class="section">
@@ -84,6 +94,13 @@ export function AutotuneApp() {
           <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
           <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
         </div>
+        <label>Delay fan / heater</label>
+        <div class="pid-inline-inputs">
+          <input type="number" value={delayFan} onInput={(e) => setDelayFan(Number((e.target as HTMLInputElement).value) || 0)} />
+          <input type="number" value={delayHeater} onInput={(e) => setDelayHeater(Number((e.target as HTMLInputElement).value) || 0)} />
+        </div>
+        <label>Measured delay (s)</label>
+        <input type="number" value={processDelaySec} onInput={(e) => setProcessDelaySec(Number((e.target as HTMLInputElement).value) || 0)} />
       </div>
       <div class="inline-actions">
         <button
@@ -119,6 +136,37 @@ export function AutotuneApp() {
       >
         Apply PID
       </button>
+      <button
+        onClick={() => {
+          sendCommand({
+            id: 1,
+            command: "setPidControl",
+            pidEnabled: false,
+            pidDelayFan: delayFan,
+            pidDelayHeater: delayHeater,
+            pidMeasureDelay: true,
+          });
+          setAutotuneLog((prev) => [...prev.slice(-24), "Delay measurement requested (10s stabilize + heater step)"]);
+        }}
+      >
+        Measure Delay
+      </button>
+      <button
+        onClick={() => {
+          sendCommand({
+            id: 1,
+            command: "setPidControl",
+            pidProcessDelaySec: processDelaySec,
+            pidPredictorEnabled: true,
+          });
+          setAutotuneLog((prev) => [...prev.slice(-24), `Applied process delay: ${processDelaySec.toFixed(2)}s`]);
+        }}
+      >
+        Apply Delay
+      </button>
+      </div>
+      <div class="status-strip">
+        Delay measure: {lastMessage?.pidDelayMeasureState ?? "idle"} • elapsed {delayElapsedSec}s • measured {measuredDelaySec}s
       </div>
       <pre class="log-console">{autotuneLog.slice(-25).join("\n")}</pre>
     </div>
