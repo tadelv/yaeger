@@ -6,8 +6,9 @@ import { LogsApp } from "./logs";
 import { UpdateApp } from "./update";
 import { ProfileControl } from "./profiling";
 import { RoastApp } from "./roast";
-import { getBasicAuthHeaderValue } from "./auth";
+import { getAdminSecret, getBasicAuthHeaderValue } from "./auth";
 import { CoffeeBeanBackground } from "./coffeeBeans";
+import { sendWsCommand } from "./websocket";
 import { useSocketState } from "./websocket";
 
 declare const __APP_VERSION__: string;
@@ -59,6 +60,23 @@ function App() {
     void refreshDeviceInfo();
   }, []);
 
+  useEffect(() => {
+    if (typeof lastMessage?.pidKpActive === "number") setPidPFactor(lastMessage.pidKpActive);
+    if (typeof lastMessage?.pidKiActive === "number") setPidIFactor(lastMessage.pidKiActive);
+    if (typeof lastMessage?.pidKdActive === "number") setPidDFactor(lastMessage.pidKdActive);
+  }, [lastMessage]);
+
+  useEffect(() => {
+    const onPidUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ kp?: number; ki?: number; kd?: number }>;
+      if (typeof customEvent.detail?.kp === "number") setPidPFactor(customEvent.detail.kp);
+      if (typeof customEvent.detail?.ki === "number") setPidIFactor(customEvent.detail.ki);
+      if (typeof customEvent.detail?.kd === "number") setPidDFactor(customEvent.detail.kd);
+    };
+    window.addEventListener("pid-preferences-updated", onPidUpdated);
+    return () => window.removeEventListener("pid-preferences-updated", onPidUpdated);
+  }, []);
+
   const updateWifiSettings = async () => {
     try {
       const response = await fetch(`http://${location.host}/api/wifi`, {
@@ -79,6 +97,17 @@ function App() {
     } catch (error) {
       alert(error instanceof Error ? `Error: ${error.message}` : "An unknown error occurred");
     }
+  };
+
+  const applyPidFromSettings = () => {
+    sendWsCommand({
+      id: 1,
+      command: "setPreferences",
+      pidKp: pidPFactor,
+      pidKi: pidIFactor,
+      pidKd: pidDFactor,
+      authToken: getAdminSecret(),
+    });
   };
 
   return (
@@ -186,6 +215,8 @@ function App() {
                   <label for="pid-d">D</label>
                   <input id="pid-d" type="number" value={pidDFactor} onInput={(e) => setPidDFactor(Number((e.target as HTMLInputElement).value) || 0)} />
                 </div>
+                <p />
+                <button onClick={applyPidFromSettings}>Apply PID</button>
               </div>
               <div class="section">
                 <h2>Wifi Settings</h2>
