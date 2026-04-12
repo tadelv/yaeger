@@ -87,6 +87,21 @@ double averageAutotunePeaks(const double *buffer, size_t count) {
   return sum / count;
 }
 
+const char *sensorErrorSummary(SensorErrorCode exhaustError, SensorErrorCode beanError) {
+  bool exhaustFault = exhaustError != SENSOR_OK;
+  bool beanFault = beanError != SENSOR_OK;
+  if (exhaustFault && beanFault) {
+    return "ET+BT";
+  }
+  if (exhaustFault) {
+    return "ET";
+  }
+  if (beanFault) {
+    return "BT";
+  }
+  return "none";
+}
+
 struct RoastHistorySample {
   unsigned long ms;
   float et;
@@ -681,8 +696,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
-      dataObj["exhaustSensorError"] = static_cast<int>(getExhaustSensorError());
-      dataObj["beanSensorError"] = static_cast<int>(getBeanSensorError());
+      SensorErrorCode exhaustError = getExhaustSensorError();
+      SensorErrorCode beanError = getBeanSensorError();
+      dataObj["exhaustSensorError"] = static_cast<int>(exhaustError);
+      dataObj["beanSensorError"] = static_cast<int>(beanError);
+      dataObj["sensorErrorSummary"] = sensorErrorSummary(exhaustError, beanError);
     }
 
     if (command != NULL && strncmp(command, "getData", 7) == 0) {
@@ -703,6 +721,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["sensorOk"] = sensorOk;
       dataObj["exhaustSensorError"] = static_cast<int>(exhaustError);
       dataObj["beanSensorError"] = static_cast<int>(beanError);
+      dataObj["sensorErrorSummary"] = sensorErrorSummary(exhaustError, beanError);
       dataObj["BurnerVal"] = getHeaterPower();
       dataObj["FanVal"] = getFanSpeed();
       dataObj["setpoint"] = pidSetpoint;
