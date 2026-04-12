@@ -105,7 +105,9 @@ function BasicLineGraph({ title, samples, series, minY, maxY, height = DEFAULT_H
   );
 }
 
-export function RoastGraphs({ roast }: { roast?: RoastState }) {
+export type RoastGraphMode = "combined" | "separate";
+
+export function RoastGraphs({ roast, mode = "separate" }: { roast?: RoastState; mode?: RoastGraphMode }) {
   const measurements = roast?.measurements ?? [];
   const start = roast?.startDate;
   if (!start || measurements.length < 2) {
@@ -125,6 +127,30 @@ export function RoastGraphs({ roast }: { roast?: RoastState }) {
     label: String(event.label),
     sec: (event.measurement.timestamp.getTime() - start.getTime()) / 1000,
   }));
+
+  if (mode === "combined") {
+    return (
+      <div class="graph-stack">
+        <BasicLineGraph
+          title="Combined Roast Telemetry"
+          samples={sampleTimes}
+          minY={0}
+          maxY={300}
+          series={[
+            { label: "BT", color: "#60a5fa", values: bt },
+            { label: "ET", color: "#f87171", values: et },
+            { label: "Setpoint", color: "#34d399", values: setpoint },
+            { label: "Fan % (x3)", color: "#38bdf8", values: fan.map((v) => v * 3) },
+            { label: "Heater % (x3)", color: "#fb923c", values: heater.map((v) => v * 3) },
+            { label: "BT RoR (x5)", color: "#22c55e", values: btRor.map((v) => Math.max(0, v) * 5) },
+            { label: "ET RoR (x5)", color: "#a855f7", values: etRor.map((v) => Math.max(0, v) * 5) },
+          ]}
+          eventTimes={eventTimes}
+          height={240}
+        />
+      </div>
+    );
+  }
 
   return (
     <div class="graph-stack">

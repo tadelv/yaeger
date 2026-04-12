@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
-import { RoastGraphs } from "./graphs";
+import { RoastGraphMode, RoastGraphs } from "./graphs";
 import { getAdminSecret } from "./auth";
 import { getFormattedTimeDifference } from "./util";
 import { Measurement, RoastState, RoasterStatus, YaegerState } from "./model";
@@ -32,6 +32,7 @@ export function RoastApp() {
   const [pidEnabled, setPidEnabled] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
   const [refreshToken, setRefreshToken] = useState(0);
+  const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
@@ -223,6 +224,13 @@ export function RoastApp() {
           disabled={state.currentState.status === RoasterStatus.roasting}
         />
         <span class="roast-time-pill">Roast time: {roastTime}</span>
+        <label class="graph-mode-control">
+          Graph layout
+          <select value={graphMode} onChange={(e) => setGraphMode((e.target as HTMLSelectElement).value as RoastGraphMode)}>
+            <option value="combined">Single combined graph</option>
+            <option value="separate">Three separate graphs</option>
+          </select>
+        </label>
       </div>
 
       <section class="telemetry-panel">
@@ -265,7 +273,7 @@ export function RoastApp() {
         </div>
       </section>
 
-      <RoastGraphs roast={state.roast} />
+      <RoastGraphs roast={state.roast} mode={graphMode} />
 
       <section class="control-panel">
         <h3>Roast controls</h3>

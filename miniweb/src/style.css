@@ -677,3 +677,15 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   color: hsl(var(--muted-foreground));
   background: hsl(var(--secondary));
 }
+
+.graph-mode-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.graph-mode-control select {
+  min-width: 210px;
+}
