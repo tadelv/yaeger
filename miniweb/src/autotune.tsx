@@ -123,6 +123,7 @@ export function AutotuneApp() {
         Start Autotune
       </button>
       <button onClick={() => sendCommand({ id: 1, command: "setPidControl", pidAutotune: false })}>Stop</button>
+      <button onClick={() => sendCommand({ id: 1, command: "setFan", value: 0 })}>Fan Off</button>
       <button
         onClick={() => {
           sendCommand({ id: 1, command: "setPreferences", pidTarget: target, pidKp: kp, pidKi: ki, pidKd: kd });
