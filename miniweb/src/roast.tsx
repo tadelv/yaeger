@@ -26,10 +26,12 @@ export function RoastApp() {
   const [fan, setFan] = useState(50);
   const [heater, setHeater] = useState(50);
   const [setpoint, setSetpoint] = useState(20);
+  const [setpointTarget, setSetpointTarget] = useState(20);
   const [kp, setKp] = useState(1.0);
   const [ki, setKi] = useState(0.1);
   const [kd, setKd] = useState(0.01);
   const [pidEnabled, setPidEnabled] = useState(false);
+  const [roastControlActive, setRoastControlActive] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
   const [isEditingPid, setIsEditingPid] = useState(false);
   const hasHydratedPidFromTelemetry = useRef(false);
@@ -72,7 +74,7 @@ export function RoastApp() {
   const sendPidControlConfig = (
     status = state.currentState.status,
     pidOn = pidEnabled,
-    setpointValue = setpoint,
+    setpointValue = setpointTarget,
   ) => {
     sendCommand({
       id: 1,
@@ -102,17 +104,21 @@ export function RoastApp() {
         const measurement: Measurement = {
           timestamp: lastUpdate,
           message: lastMessage,
-          extra: { setpoint: lastMessage.setpoint ?? setpoint, pidData: { enabled: pidEnabled, kp, ki, kd } },
+          extra: {
+            setpoint: lastMessage.setpoint ?? setpointTarget,
+            pidData: { enabled: pidEnabled, kp, ki, kd },
+          },
         };
         next.roast = {
           ...prev.roast,
           measurements: [...prev.roast.measurements, measurement],
         };
 
-        if (profileStore.profile && profileStore.followProfileEnabled) {
+        if (profileStore.profile && profileStore.followProfileEnabled && roastControlActive) {
           const profileUpdate = followProfile(profileStore.profile, next.roast);
           if (profileUpdate) {
-            setSetpoint(profileUpdate.setPoint);
+            setSetpointTarget(profileUpdate.setPoint);
+            sendPidControlConfig(prev.currentState.status, pidEnabled, profileUpdate.setPoint);
             if (profileUpdate.fanValue != null) {
               setFan(profileUpdate.fanValue);
               updateFanPower(profileUpdate.fanValue);
@@ -124,7 +130,7 @@ export function RoastApp() {
 
       return next;
     });
-  }, [kd, ki, kp, lastMessage, lastUpdate, pidEnabled, setpoint]);
+  }, [kd, ki, kp, lastMessage, lastUpdate, pidEnabled, roastControlActive, setpointTarget]);
 
   useEffect(() => {
     if (connectionStatus === "Connected") {
@@ -179,6 +185,7 @@ export function RoastApp() {
     );
     if (Number.isFinite(recoveredSetpoint)) {
       setSetpoint(recoveredSetpoint);
+      setSetpointTarget(recoveredSetpoint);
     }
     setState((prev) => ({
       ...prev,
@@ -258,7 +265,7 @@ export function RoastApp() {
   const formatMetric = (value: number | null | undefined, digits = 2) =>
     typeof value === "number" ? value.toFixed(digits) : "N/A";
 
-  const toggleRoastStart = () => {
+  const toggleRoastRecording = () => {
     if (state.currentState.status === RoasterStatus.idle) {
       setState((prev) => ({
         ...prev,
@@ -266,8 +273,9 @@ export function RoastApp() {
         roast: { startDate: new Date(), measurements: [], events: [], commands: [] },
         profile: profileStore.profile,
       }));
+      setRoastControlActive(false);
       sendCommand({ id: 1, command: "startRoastSession" });
-      sendPidControlConfig(RoasterStatus.roasting);
+      sendPidControlConfig(RoasterStatus.roasting, false);
       return;
     }
 
@@ -277,7 +285,8 @@ export function RoastApp() {
       roast: prev.roast ? { ...prev.roast, profile: prev.profile } : prev.roast,
     }));
     sendCommand({ id: 1, command: "endRoastSession" });
-    sendPidControlConfig(RoasterStatus.idle);
+    setRoastControlActive(false);
+    sendPidControlConfig(RoasterStatus.idle, false);
   };
 
   const clearRoastGraph = () => {
@@ -315,8 +324,18 @@ export function RoastApp() {
   return (
     <div class="roast-dashboard">
       <div class="roast-toolbar">
-        <button onClick={toggleRoastStart}>
-          {state.currentState.status === RoasterStatus.idle ? "Start" : "Stop"}
+        <button onClick={toggleRoastRecording}>
+          {state.currentState.status === RoasterStatus.idle ? "Start graph" : "Stop graph"}
+        </button>
+        <button
+          onClick={() => {
+            const nextControlState = !roastControlActive;
+            setRoastControlActive(nextControlState);
+            sendPidControlConfig(state.currentState.status, nextControlState && pidEnabled, setpointTarget);
+          }}
+          disabled={state.currentState.status !== RoasterStatus.roasting}
+        >
+          {roastControlActive ? "Stop roasting" : "Start roasting"}
         </button>
         <button
           onClick={() => {
@@ -432,21 +451,23 @@ export function RoastApp() {
           <div class="slider-card">
             <div class="slider-header">
               <span>Setpoint</span>
-              <strong>{setpoint} °C</strong>
+              <strong>{setpointTarget} °C</strong>
             </div>
+            <small class="setpoint-current">Current: {setpoint.toFixed(1)} °C</small>
           <input
             type="range"
             min="0"
             max="300"
             disabled={profileStore.followProfileEnabled}
-            value={setpoint}
+            value={setpointTarget}
             onInput={(e) => {
               const value = Number((e.target as HTMLInputElement).value);
-              setSetpoint(value);
+              setSetpointTarget(value);
             }}
             onChange={(e) => {
               const value = Number((e.target as HTMLInputElement).value);
-              sendPidControlConfig(state.currentState.status, pidEnabled, value);
+              setSetpointTarget(value);
+              sendPidControlConfig(state.currentState.status, pidEnabled && roastControlActive, value);
             }}
           />
           </div>
@@ -572,7 +593,7 @@ export function RoastApp() {
               checked={pidEnabled}
               onChange={(e) => {
                 setPidEnabled(e.currentTarget.checked);
-                sendPidControlConfig(state.currentState.status, e.currentTarget.checked);
+                sendPidControlConfig(state.currentState.status, e.currentTarget.checked && roastControlActive);
               }}
             />
             PID Enabled

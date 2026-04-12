@@ -379,6 +379,12 @@ textarea:focus {
   margin-bottom: 0.35rem;
 }
 
+.setpoint-current {
+  display: block;
+  margin-bottom: 0.35rem;
+  color: #64748b;
+}
+
 .inline-actions {
   display: flex;
   flex-wrap: wrap;
@@ -708,6 +714,5 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-
 
 
