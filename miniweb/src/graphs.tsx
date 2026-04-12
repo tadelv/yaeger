@@ -1,34 +1,12 @@
+import createPlotlyComponent from "react-plotly.js/factory";
+import Plotly from "plotly.js-basic-dist-min";
 import { RoastState } from "./model";
 
-type GraphSeries = {
-  label: string;
-  color: string;
-  values: number[];
-};
+const Plot = createPlotlyComponent(Plotly);
 
-type BasicLineGraphProps = {
-  title: string;
-  samples: number[];
-  series: GraphSeries[];
-  minY?: number;
-  maxY?: number;
-  height?: number;
-  eventTimes?: Array<{ label: string; sec: number }>;
-};
+export type RoastGraphMode = "combined" | "separate";
 
-const VIEWBOX_WIDTH = 900;
-const DEFAULT_HEIGHT = 220;
-const PADDING = { top: 16, right: 16, bottom: 26, left: 34 };
-
-function toPath(points: Array<{ x: number; y: number }>) {
-  if (!points.length) return "";
-  return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(2)} ${p.y.toFixed(2)}`).join(" ");
-}
-
-function describeTime(sec: number) {
-  if (sec < 60) return `${sec.toFixed(0)}s`;
-  return `${Math.floor(sec / 60)}m`;
-}
+type EventMarker = { label: string; sec: number };
 
 function buildRoR(values: number[], timeSeconds: number[], windowSize = 20): Array<number | null> {
   const rate = values.map((temp, i) => {
@@ -46,66 +24,63 @@ function buildRoR(values: number[], timeSeconds: number[], windowSize = 20): Arr
   });
 }
 
-function BasicLineGraph({ title, samples, series, minY, maxY, height = DEFAULT_HEIGHT, eventTimes = [] }: BasicLineGraphProps) {
-  if (samples.length < 2) {
-    return <div class="graph-empty">{title}: waiting for samples…</div>;
-  }
+function buildEventShapes(eventTimes: EventMarker[], yRef = "paper") {
+  return eventTimes.map((event) => ({
+    type: "line",
+    x0: event.sec,
+    x1: event.sec,
+    y0: 0,
+    y1: 1,
+    xref: "x",
+    yref,
+    line: { color: "#ef4444", width: 1, dash: "dot" },
+  }));
+}
 
-  const innerWidth = VIEWBOX_WIDTH - PADDING.left - PADDING.right;
-  const innerHeight = height - PADDING.top - PADDING.bottom;
-  const safeMaxX = Math.max(samples[samples.length - 1], 1);
+function buildEventAnnotations(eventTimes: EventMarker[], y = 1.04) {
+  return eventTimes.map((event) => ({
+    x: event.sec,
+    y,
+    xref: "x",
+    yref: "paper",
+    text: event.label,
+    showarrow: false,
+    font: { color: "#fca5a5", size: 10 },
+  }));
+}
 
-  const flat = series.flatMap((s) => s.values).filter((v) => Number.isFinite(v));
-  const low = minY ?? Math.min(...flat);
-  const high = maxY ?? Math.max(...flat);
-  const spanY = Math.max(1, high - low);
+function baseLayout(title: string, height: number) {
+  return {
+    title: { text: title, font: { size: 14 } },
+    margin: { l: 50, r: 24, t: 40, b: 38 },
+    paper_bgcolor: "#0f172a",
+    plot_bgcolor: "#0f172a",
+    font: { color: "#cbd5e1" },
+    height,
+    legend: { orientation: "h", y: -0.22 },
+    xaxis: {
+      title: "Time (s)",
+      gridcolor: "#334155",
+      zerolinecolor: "#334155",
+      tickfont: { color: "#94a3b8" },
+      titlefont: { color: "#cbd5e1" },
+    },
+  };
+}
 
-  const x = (sec: number) => PADDING.left + (sec / safeMaxX) * innerWidth;
-  const y = (value: number) => PADDING.top + innerHeight - ((value - low) / spanY) * innerHeight;
-
-  const tickSeconds = [0, safeMaxX * 0.25, safeMaxX * 0.5, safeMaxX * 0.75, safeMaxX];
-
+function PlotCard({ data, layout }: { data: any[]; layout: any }) {
   return (
     <div class="graph-card">
-      <h4>{title}</h4>
-      <svg class="line-graph" viewBox={`0 0 ${VIEWBOX_WIDTH} ${height}`} preserveAspectRatio="none" role="img" aria-label={title}>
-        <rect x="0" y="0" width={VIEWBOX_WIDTH} height={height} fill="#0f172a" />
-        <line x1={PADDING.left} y1={PADDING.top} x2={PADDING.left} y2={height - PADDING.bottom} stroke="#334155" />
-        <line x1={PADDING.left} y1={height - PADDING.bottom} x2={VIEWBOX_WIDTH - PADDING.right} y2={height - PADDING.bottom} stroke="#334155" />
-
-        {tickSeconds.map((s) => (
-          <g key={`tick-${title}-${s}`}>
-            <line x1={x(s)} y1={height - PADDING.bottom} x2={x(s)} y2={height - PADDING.bottom + 5} stroke="#64748b" />
-            <text x={x(s)} y={height - 5} fill="#94a3b8" textAnchor="middle" fontSize="12">{describeTime(s)}</text>
-          </g>
-        ))}
-
-        {eventTimes.map((event) => (
-          <g key={`${event.label}-${event.sec}`}>
-            <line x1={x(event.sec)} y1={PADDING.top} x2={x(event.sec)} y2={height - PADDING.bottom} stroke="#ef4444" strokeDasharray="4 3" />
-            <text x={x(event.sec) + 3} y={PADDING.top + 12} fill="#fca5a5" fontSize="11">{event.label}</text>
-          </g>
-        ))}
-
-        {series.map((s) => {
-          const points = s.values
-            .map((value, i) => ({ x: x(samples[i]), y: y(value) }))
-            .filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
-          return <path key={s.label} d={toPath(points)} fill="none" stroke={s.color} strokeWidth="2" />;
-        })}
-      </svg>
-      <div class="graph-legend">
-        {series.map((s) => (
-          <span key={`${title}-legend-${s.label}`}>
-            <i style={{ backgroundColor: s.color }} /> {s.label}
-          </span>
-        ))}
-      </div>
+      <Plot
+        data={data}
+        layout={layout}
+        useResizeHandler
+        style={{ width: "100%" }}
+        config={{ displaylogo: false, responsive: true }}
+      />
     </div>
   );
 }
-
-export type RoastGraphMode = "combined" | "separate";
 
 export function RoastGraphs({
   roast,
@@ -128,8 +103,8 @@ export function RoastGraphs({
   const setpoint = measurements.map((m) => m.extra?.setpoint ?? 0);
   const fan = measurements.map((m) => m.message.FanVal);
   const heater = measurements.map((m) => m.message.BurnerVal);
-  const btRor = buildRoR(bt, sampleTimes).map((v) => v ?? 0);
-  const etRor = buildRoR(et, sampleTimes).map((v) => v ?? 0);
+  const btRor = buildRoR(bt, sampleTimes).map((v) => v ?? null);
+  const etRor = buildRoR(et, sampleTimes).map((v) => v ?? null);
 
   const eventTimes = (roast?.events ?? []).map((event) => ({
     label: String(event.label),
@@ -137,69 +112,83 @@ export function RoastGraphs({
   }));
 
   const clampedHeightScale = Math.min(1.8, Math.max(0.7, heightScale));
-  const separateHeight = Math.round(220 * clampedHeightScale);
-  const combinedHeight = Math.round(280 * clampedHeightScale);
+  const separateHeight = Math.round(290 * clampedHeightScale);
+  const combinedHeight = Math.round(380 * clampedHeightScale);
 
   if (mode === "combined") {
-    return (
-      <div class="graph-stack">
-        <BasicLineGraph
-          title="Combined Roast Telemetry"
-          samples={sampleTimes}
-          minY={0}
-          maxY={300}
-          series={[
-            { label: "BT", color: "#60a5fa", values: bt },
-            { label: "ET", color: "#f87171", values: et },
-            { label: "Setpoint", color: "#34d399", values: setpoint },
-            { label: "Fan % (x3)", color: "#38bdf8", values: fan.map((v) => v * 3) },
-            { label: "Heater % (x3)", color: "#fb923c", values: heater.map((v) => v * 3) },
-            { label: "BT RoR (x5)", color: "#22c55e", values: btRor.map((v) => Math.max(0, v) * 5) },
-            { label: "ET RoR (x5)", color: "#a855f7", values: etRor.map((v) => Math.max(0, v) * 5) },
-          ]}
-          eventTimes={eventTimes}
-          height={combinedHeight}
-        />
-      </div>
-    );
+    const layout = {
+      ...baseLayout("Combined Roast Telemetry", combinedHeight),
+      yaxis: {
+        title: "Temperature (°C)",
+        range: [0, 300],
+        gridcolor: "#334155",
+      },
+      yaxis2: {
+        title: "Power (%)",
+        range: [0, 100],
+        overlaying: "y",
+        side: "right",
+      },
+      yaxis3: {
+        title: "RoR (°C/min)",
+        range: [-5, 60],
+        overlaying: "y",
+        side: "right",
+        anchor: "free",
+        position: 1,
+        showgrid: false,
+      },
+      shapes: buildEventShapes(eventTimes),
+      annotations: buildEventAnnotations(eventTimes),
+    };
+
+    const data = [
+      { x: sampleTimes, y: bt, type: "scatter", mode: "lines", name: "BT", line: { color: "#60a5fa" } },
+      { x: sampleTimes, y: et, type: "scatter", mode: "lines", name: "ET", line: { color: "#f87171" } },
+      { x: sampleTimes, y: setpoint, type: "scatter", mode: "lines", name: "Setpoint", line: { color: "#34d399" } },
+      { x: sampleTimes, y: fan, type: "scatter", mode: "lines", name: "Fan %", yaxis: "y2", line: { color: "#38bdf8" } },
+      { x: sampleTimes, y: heater, type: "scatter", mode: "lines", name: "Heater %", yaxis: "y2", line: { color: "#fb923c" } },
+      { x: sampleTimes, y: btRor, type: "scatter", mode: "lines", name: "BT RoR", yaxis: "y3", line: { color: "#22c55e" } },
+      { x: sampleTimes, y: etRor, type: "scatter", mode: "lines", name: "ET RoR", yaxis: "y3", line: { color: "#a855f7" } },
+    ];
+
+    return <PlotCard data={data} layout={layout} />;
   }
 
   return (
     <div class="graph-stack">
-      <BasicLineGraph
-        title="Temperature"
-        samples={sampleTimes}
-        minY={0}
-        maxY={300}
-        series={[
-          { label: "BT", color: "#60a5fa", values: bt },
-          { label: "ET", color: "#f87171", values: et },
-          { label: "Setpoint", color: "#34d399", values: setpoint },
+      <PlotCard
+        data={[
+          { x: sampleTimes, y: bt, type: "scatter", mode: "lines", name: "BT", line: { color: "#60a5fa" } },
+          { x: sampleTimes, y: et, type: "scatter", mode: "lines", name: "ET", line: { color: "#f87171" } },
+          { x: sampleTimes, y: setpoint, type: "scatter", mode: "lines", name: "Setpoint", line: { color: "#34d399" } },
         ]}
-        eventTimes={eventTimes}
-        height={separateHeight}
+        layout={{
+          ...baseLayout("Temperature", separateHeight),
+          yaxis: { title: "Temperature (°C)", range: [0, 300], gridcolor: "#334155" },
+          shapes: buildEventShapes(eventTimes),
+          annotations: buildEventAnnotations(eventTimes),
+        }}
       />
-      <BasicLineGraph
-        title="Power"
-        samples={sampleTimes}
-        minY={0}
-        maxY={100}
-        series={[
-          { label: "Fan %", color: "#38bdf8", values: fan },
-          { label: "Heater %", color: "#fb923c", values: heater },
+      <PlotCard
+        data={[
+          { x: sampleTimes, y: fan, type: "scatter", mode: "lines", name: "Fan %", line: { color: "#38bdf8" } },
+          { x: sampleTimes, y: heater, type: "scatter", mode: "lines", name: "Heater %", line: { color: "#fb923c" } },
         ]}
-        height={separateHeight}
+        layout={{
+          ...baseLayout("Power", separateHeight),
+          yaxis: { title: "Power (%)", range: [0, 100], gridcolor: "#334155" },
+        }}
       />
-      <BasicLineGraph
-        title="Rate of Rise"
-        samples={sampleTimes}
-        minY={-5}
-        maxY={60}
-        series={[
-          { label: "BT RoR", color: "#22c55e", values: btRor },
-          { label: "ET RoR", color: "#a855f7", values: etRor },
+      <PlotCard
+        data={[
+          { x: sampleTimes, y: btRor, type: "scatter", mode: "lines", name: "BT RoR", line: { color: "#22c55e" } },
+          { x: sampleTimes, y: etRor, type: "scatter", mode: "lines", name: "ET RoR", line: { color: "#a855f7" } },
         ]}
-        height={separateHeight}
+        layout={{
+          ...baseLayout("Rate of Rise", separateHeight),
+          yaxis: { title: "RoR (°C/min)", range: [-5, 60], gridcolor: "#334155" },
+        }}
       />
     </div>
   );
@@ -218,16 +207,20 @@ export function AutotuneGraph({
   const samples = values.map((_, i) => i);
 
   return (
-    <BasicLineGraph
-      title="Autotune target trend"
-      samples={samples}
-      minY={Math.min(...values, setpoint) - 3}
-      maxY={Math.max(...values, setpoint) + 3}
-      series={[
-        { label: `${target} sensor`, color: "#22d3ee", values },
-        { label: "Setpoint", color: "#94a3b8", values: values.map(() => setpoint) },
+    <PlotCard
+      data={[
+        { x: samples, y: values, type: "scatter", mode: "lines", name: `${target} sensor`, line: { color: "#22d3ee" } },
+        { x: samples, y: values.map(() => setpoint), type: "scatter", mode: "lines", name: "Setpoint", line: { color: "#94a3b8" } },
       ]}
-      height={250}
+      layout={{
+        ...baseLayout("Autotune target trend", 300),
+        xaxis: { title: "Sample", gridcolor: "#334155" },
+        yaxis: {
+          title: "Temperature (°C)",
+          range: [Math.min(...values, setpoint) - 3, Math.max(...values, setpoint) + 3],
+          gridcolor: "#334155",
+        },
+      }}
     />
   );
 }

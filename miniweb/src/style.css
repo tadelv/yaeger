@@ -708,3 +708,9 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
+
+.graph-card .js-plotly-plot,
+.graph-card .plot-container,
+.graph-card .svg-container {
+  width: 100% !important;
+}
