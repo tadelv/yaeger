@@ -21,7 +21,7 @@ function dateReviver(_key: string, value: unknown): unknown {
 }
 
 export function RoastApp() {
-  const { lastMessage, lastUpdate } = useSocketState();
+  const { connectionStatus, lastData, lastMessage, lastUpdate } = useSocketState();
   const [state, setState] = useState<YaegerState>(initialState);
   const [fan, setFan] = useState(50);
   const [heater, setHeater] = useState(50);
@@ -37,6 +37,10 @@ export function RoastApp() {
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
+  };
+
+  const requestRoastHistory = () => {
+    sendWsCommand({ id: 1, command: "getRoastHistory" });
   };
 
   const appendCommand = (label: "fan" | "heater", value: number) => {
@@ -62,11 +66,15 @@ export function RoastApp() {
     appendCommand("heater", value);
   };
 
-  const sendPidControlConfig = (status = state.currentState.status, pidOn = pidEnabled) => {
+  const sendPidControlConfig = (
+    status = state.currentState.status,
+    pidOn = pidEnabled,
+    setpointValue = setpoint,
+  ) => {
     sendCommand({
       id: 1,
       command: "setPidControl",
-      setpoint,
+      setpoint: setpointValue,
       pidEnabled: pidOn && status === RoasterStatus.roasting,
       pidTarget,
     });
@@ -77,6 +85,9 @@ export function RoastApp() {
 
     setFan(lastMessage.FanVal);
     setHeater(lastMessage.BurnerVal);
+    if (typeof lastMessage.setpoint === "number") {
+      setSetpoint(lastMessage.setpoint);
+    }
 
     setState((prev) => {
       const next: YaegerState = {
@@ -88,7 +99,7 @@ export function RoastApp() {
         const measurement: Measurement = {
           timestamp: lastUpdate,
           message: lastMessage,
-          extra: { setpoint, pidData: { enabled: pidEnabled, kp, ki, kd } },
+          extra: { setpoint: lastMessage.setpoint ?? setpoint, pidData: { enabled: pidEnabled, kp, ki, kd } },
         };
         next.roast = {
           ...prev.roast,
@@ -111,6 +122,76 @@ export function RoastApp() {
       return next;
     });
   }, [kd, ki, kp, lastMessage, lastUpdate, pidEnabled, setpoint]);
+
+  useEffect(() => {
+    if (connectionStatus === "Connected") {
+      requestRoastHistory();
+    }
+  }, [connectionStatus]);
+
+  useEffect(() => {
+    if (!lastData || lastData.type !== "roastHistory") return;
+    if (state.roast?.measurements?.length) return;
+
+    const samples = Array.isArray(lastData.samples) ? lastData.samples : [];
+    if (!samples.length) return;
+
+    const latestMs = Number((samples[samples.length - 1] as Record<string, unknown>).ms ?? 0);
+    if (!Number.isFinite(latestMs) || latestMs <= 0) return;
+    const nowMs = Date.now();
+    const startDate = new Date(nowMs - latestMs);
+
+    const measurements: Measurement[] = samples
+      .map((entry) => {
+        const sample = entry as Record<string, unknown>;
+        const sampleMs = Number(sample.ms ?? 0);
+        if (!Number.isFinite(sampleMs)) return null;
+        return {
+          timestamp: new Date(nowMs - (latestMs - sampleMs)),
+          message: {
+            id: 1,
+            ET: Number(sample.ET ?? NaN),
+            BT: Number(sample.BT ?? NaN),
+            simBT: Number(sample.simBT ?? NaN),
+            Amb: Number(sample.Amb ?? NaN),
+            BurnerVal: Number(sample.BurnerVal ?? 0),
+            FanVal: Number(sample.FanVal ?? 0),
+          },
+          extra: {
+            setpoint: Number(sample.setpoint ?? 0),
+            pidData: {
+              enabled: Boolean(sample.pidEnabled),
+              kp,
+              ki,
+              kd,
+            },
+          },
+        } satisfies Measurement;
+      })
+      .filter((m): m is Measurement => m != null);
+
+    if (!measurements.length) return;
+    const recoveredSetpoint = Number(
+      (samples[samples.length - 1] as Record<string, unknown>).setpoint ?? 20,
+    );
+    if (Number.isFinite(recoveredSetpoint)) {
+      setSetpoint(recoveredSetpoint);
+    }
+    setState((prev) => ({
+      ...prev,
+      currentState: {
+        ...prev.currentState,
+        status: Boolean(lastData.active) ? RoasterStatus.roasting : RoasterStatus.idle,
+      },
+      roast: {
+        startDate,
+        measurements,
+        events: [],
+        commands: [],
+        profile: prev.profile,
+      },
+    }));
+  }, [kd, ki, kp, lastData, state.roast?.measurements?.length]);
 
   useEffect(() => {
     if (typeof lastMessage?.pidKpActive === "number") setKp(lastMessage.pidKpActive);
@@ -168,6 +249,7 @@ export function RoastApp() {
         roast: { startDate: new Date(), measurements: [], events: [], commands: [] },
         profile: profileStore.profile,
       }));
+      sendCommand({ id: 1, command: "startRoastSession" });
       sendPidControlConfig(RoasterStatus.roasting);
       return;
     }
@@ -177,7 +259,17 @@ export function RoastApp() {
       currentState: { ...prev.currentState, status: RoasterStatus.idle },
       roast: prev.roast ? { ...prev.roast, profile: prev.profile } : prev.roast,
     }));
+    sendCommand({ id: 1, command: "endRoastSession" });
     sendPidControlConfig(RoasterStatus.idle);
+  };
+
+  const clearRoastGraph = () => {
+    sendCommand({ id: 1, command: "clearRoastHistory" });
+    setState((prev) => ({
+      ...prev,
+      currentState: { ...prev.currentState, status: RoasterStatus.idle },
+      roast: undefined,
+    }));
   };
 
   const appendEvent = (label: string) => {
@@ -223,6 +315,12 @@ export function RoastApp() {
           disabled={state.currentState.status !== RoasterStatus.idle || !state.roast?.measurements.length}
         >
           Download
+        </button>
+        <button
+          onClick={clearRoastGraph}
+          disabled={state.currentState.status === RoasterStatus.roasting}
+        >
+          Clear graph
         </button>
         <input
           type="file"
@@ -324,7 +422,10 @@ export function RoastApp() {
             onInput={(e) => {
               const value = Number((e.target as HTMLInputElement).value);
               setSetpoint(value);
-              sendPidControlConfig(state.currentState.status);
+            }}
+            onChange={(e) => {
+              const value = Number((e.target as HTMLInputElement).value);
+              sendPidControlConfig(state.currentState.status, pidEnabled, value);
             }}
           />
           </div>

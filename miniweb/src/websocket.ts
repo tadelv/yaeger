@@ -6,6 +6,7 @@ type Listener = () => void;
 type SocketState = {
   connectionStatus: "Disconnected" | "Connected" | "Error";
   lastMessage: YaegerMessage | null;
+  lastData: Record<string, unknown> | null;
   lastUpdate: Date | null;
 };
 
@@ -17,6 +18,7 @@ const listeners = new Set<Listener>();
 const socketState: SocketState = {
   connectionStatus: "Disconnected",
   lastMessage: null,
+  lastData: null,
   lastUpdate: null,
 };
 
@@ -58,9 +60,14 @@ function sendGetData() {
 function handleMessage(event: MessageEvent) {
   try {
     const parsed = JSON.parse(event.data);
-    const message: YaegerMessage | undefined = parsed.data;
-    if (message) {
-      setState({ lastMessage: message, lastUpdate: new Date() });
+    const data: Record<string, unknown> | undefined = parsed.data;
+    if (data) {
+      const next: Partial<SocketState> = { lastData: data };
+      if (data.type === "status") {
+        next.lastMessage = data as YaegerMessage;
+        next.lastUpdate = new Date();
+      }
+      setState(next);
     }
   } catch (error) {
     console.error("Error parsing WebSocket message:", error);
