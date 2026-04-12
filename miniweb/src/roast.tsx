@@ -259,6 +259,15 @@ export function RoastApp() {
     sendPidControlConfig(RoasterStatus.idle);
   };
 
+  const clearRoastGraph = () => {
+    sendCommand({ id: 1, command: "clearRoastHistory" });
+    setState((prev) => ({
+      ...prev,
+      currentState: { ...prev.currentState, status: RoasterStatus.idle },
+      roast: undefined,
+    }));
+  };
+
   const appendEvent = (label: string) => {
     setState((prev) => {
       if (prev.currentState.status === RoasterStatus.idle || !prev.roast) return prev;
@@ -302,6 +311,12 @@ export function RoastApp() {
           disabled={state.currentState.status !== RoasterStatus.idle || !state.roast?.measurements.length}
         >
           Download
+        </button>
+        <button
+          onClick={clearRoastGraph}
+          disabled={state.currentState.status === RoasterStatus.roasting}
+        >
+          Clear graph
         </button>
         <input
           type="file"

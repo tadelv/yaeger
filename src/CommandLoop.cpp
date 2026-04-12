@@ -84,7 +84,8 @@ bool isMutatingCommand(const char *command) {
 
   return strncmp(command, "setBurner", 9) == 0 || strncmp(command, "setFan", 6) == 0 ||
          strncmp(command, "setPreferences", 14) == 0 || strncmp(command, "setPidControl", 13) == 0 ||
-         strncmp(command, "startRoastSession", 17) == 0 || strncmp(command, "endRoastSession", 15) == 0;
+         strncmp(command, "startRoastSession", 17) == 0 || strncmp(command, "endRoastSession", 15) == 0 ||
+         strncmp(command, "clearRoastHistory", 17) == 0;
 }
 
 bool enforceMutatingCommandAuth(AsyncWebSocketClient *client, JsonDocument &doc) {
@@ -558,6 +559,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     if (command != NULL && strncmp(command, "endRoastSession", 15) == 0) {
       roastSessionActive = false;
       log("Roast history session ended");
+    }
+
+    if (command != NULL && strncmp(command, "clearRoastHistory", 17) == 0) {
+      roastSessionActive = false;
+      resetRoastHistorySession();
+      log("Roast history cleared");
     }
 
     if (getHeaterPower() > 0 && getFanSpeed() <= 30) {
