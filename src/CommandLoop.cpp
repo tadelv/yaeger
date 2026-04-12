@@ -686,9 +686,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       }
       if (!doc["pidDelayFan"].isNull()) {
         pidDelayMeasureFan = std::clamp(doc["pidDelayFan"].as<double>(), 0.0, 100.0);
+        preferences.putDouble("pidDelayFan", pidDelayMeasureFan);
       }
       if (!doc["pidDelayHeater"].isNull()) {
         pidDelayMeasureHeater = std::clamp(doc["pidDelayHeater"].as<double>(), 0.0, 100.0);
+        preferences.putDouble("pidDelayHeater", pidDelayMeasureHeater);
       }
       if (!doc["pidProcessDelaySec"].isNull()) {
         pidProcessDelaySeconds = std::max(0.0, doc["pidProcessDelaySec"].as<double>());
@@ -958,6 +960,8 @@ void setupMainLoop(AsyncWebSocket *ws) {
   pidAutotuneActive = false;
   pidAutotuneRelayOutputLow = std::clamp(preferences.getDouble("pidAutoMin", 0.0), 0.0, 100.0);
   pidAutotuneRelayOutputHigh = std::clamp(preferences.getDouble("pidAutoMax", 60.0), 0.0, 100.0);
+  pidDelayMeasureFan = std::clamp(preferences.getDouble("pidDelayFan", 50.0), 0.0, 100.0);
+  pidDelayMeasureHeater = std::clamp(preferences.getDouble("pidDelayHeater", 60.0), 0.0, 100.0);
   pidProcessDelaySeconds = std::max(0.0, preferences.getDouble("pidProcessDelaySec", 0.0));
   pidPredictorEnabled = preferences.getBool("pidPredictorEnabled", true);
   if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
