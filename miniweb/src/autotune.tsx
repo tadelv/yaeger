@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import { AutotuneGraph } from "./graphs";
 import { getAdminSecret } from "./auth";
 import { sendWsCommand, useSocketState } from "./websocket";
 
@@ -19,7 +20,6 @@ export function AutotuneApp() {
   const [history, setHistory] = useState<Array<{ ET: number; BT: number; simBT: number }>>([]);
   const [autotuneLog, setAutotuneLog] = useState<string[]>([]);
   const lastCrossing = useRef(-1);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
 
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
@@ -51,47 +51,6 @@ export function AutotuneApp() {
     }
   }, [kd, ki, lastMessage]);
 
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    const ctx = canvas?.getContext("2d");
-    if (!canvas || !ctx) return;
-
-    const width = canvas.width;
-    const height = canvas.height;
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = "#111827";
-    ctx.fillRect(0, 0, width, height);
-
-    if (history.length < 2) {
-      ctx.fillStyle = "#9ca3af";
-      ctx.font = "14px sans-serif";
-      ctx.fillText("Waiting for sensor samples…", 16, 24);
-      return;
-    }
-
-    const values = history.map((s) => (target === "ET" ? s.ET : target === "simBT" ? s.simBT : s.BT));
-    const minV = Math.min(...values, setpoint) - 3;
-    const maxV = Math.max(...values, setpoint) + 3;
-    const range = Math.max(1, maxV - minV);
-    const xFor = (i: number) => (i / (history.length - 1)) * (width - 20) + 10;
-    const yFor = (v: number) => height - 20 - ((v - minV) / range) * (height - 40);
-
-    ctx.strokeStyle = "#374151";
-    ctx.beginPath();
-    ctx.moveTo(10, yFor(setpoint));
-    ctx.lineTo(width - 10, yFor(setpoint));
-    ctx.stroke();
-
-    ctx.strokeStyle = "#22d3ee";
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    values.forEach((v, i) => {
-      const x = xFor(i);
-      const y = yFor(v);
-      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
-    });
-    ctx.stroke();
-  }, [history, setpoint, target]);
 
   return (
     <div class="section">
@@ -100,7 +59,7 @@ export function AutotuneApp() {
         Autotune: {lastMessage?.pidAutotune ? "Running" : "Idle"} • Crossings {lastMessage?.pidAutotuneCrossings ?? 0}/
         {lastMessage?.pidAutotuneTargetCrossings ?? "?"}
       </div>
-      <canvas ref={canvasRef} width={700} height={220} class="live-chart" />
+      <AutotuneGraph history={history} target={target} setpoint={setpoint} />
       <div class="form-grid">
         <label>Target</label>
         <select value={target} onChange={(e) => setTarget((e.target as HTMLSelectElement).value as PidTarget)}>

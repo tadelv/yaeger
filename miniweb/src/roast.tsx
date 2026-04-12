@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { initializeChart, updateChart } from "./chart";
+import { useEffect, useMemo, useState } from "preact/hooks";
+import { RoastGraphs } from "./graphs";
 import { getAdminSecret } from "./auth";
 import { getFormattedTimeDifference } from "./util";
 import { Measurement, RoastState, RoasterStatus, YaegerState } from "./model";
@@ -32,16 +32,6 @@ export function RoastApp() {
   const [pidEnabled, setPidEnabled] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
   const [refreshToken, setRefreshToken] = useState(0);
-  const chartCanvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<ReturnType<typeof initializeChart> | null>(null);
-
-  useEffect(() => {
-    if (!chartCanvasRef.current || chartRef.current) return;
-    const ctx = chartCanvasRef.current.getContext("2d");
-    if (!ctx) return;
-    chartRef.current = initializeChart(ctx);
-  }, []);
-
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
@@ -114,9 +104,6 @@ export function RoastApp() {
           }
         }
 
-        if (chartRef.current) {
-          updateChart(chartRef.current, next.roast);
-        }
       }
 
       return next;
@@ -227,9 +214,6 @@ export function RoastApp() {
               try {
                 const roast = JSON.parse((evt.target?.result as string) || "{}", dateReviver) as RoastState;
                 setState((prev) => ({ ...prev, roast }));
-                if (chartRef.current) {
-                  updateChart(chartRef.current, roast);
-                }
               } catch (error) {
                 console.error("upload failed", error);
               }
@@ -281,7 +265,7 @@ export function RoastApp() {
         </div>
       </section>
 
-      <canvas id="liveChart" ref={chartCanvasRef} class="live-chart" />
+      <RoastGraphs roast={state.roast} />
 
       <section class="control-panel">
         <h3>Roast controls</h3>
