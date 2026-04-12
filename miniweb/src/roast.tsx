@@ -249,6 +249,7 @@ export function RoastApp() {
     if (m.length < 2) return null;
     const latest = m[m.length - 1];
     const prev = m[m.length - 2];
+    if (!Number.isFinite(latest.message.BT) || !Number.isFinite(prev.message.BT)) return null;
     const elapsed = (latest.timestamp.getTime() - prev.timestamp.getTime()) / 1000;
     return elapsed > 0 ? ((latest.message.BT - prev.message.BT) / elapsed) * 60 : null;
   }, [state.roast]);
@@ -258,12 +259,13 @@ export function RoastApp() {
     if (m.length < 2) return null;
     const latest = m[m.length - 1];
     const prev = m[m.length - 2];
+    if (!Number.isFinite(latest.message.ET) || !Number.isFinite(prev.message.ET)) return null;
     const elapsed = (latest.timestamp.getTime() - prev.timestamp.getTime()) / 1000;
     return elapsed > 0 ? ((latest.message.ET - prev.message.ET) / elapsed) * 60 : null;
   }, [state.roast]);
 
   const formatMetric = (value: number | null | undefined, digits = 2) =>
-    typeof value === "number" ? value.toFixed(digits) : "N/A";
+    typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "N/A";
 
   const forceStopRoastControl = (status = state.currentState.status) => {
     setRoastControlActive(false);
