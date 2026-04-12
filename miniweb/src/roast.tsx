@@ -32,6 +32,7 @@ export function RoastApp() {
   const [pidEnabled, setPidEnabled] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
   const [isEditingPid, setIsEditingPid] = useState(false);
+  const hasHydratedPidFromTelemetry = useRef(false);
   const pidSyncPausedUntilMs = useRef(0);
   const [refreshToken, setRefreshToken] = useState(0);
   const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
@@ -197,9 +198,22 @@ export function RoastApp() {
 
   useEffect(() => {
     const shouldSyncPidFromDevice = !isEditingPid && Date.now() >= pidSyncPausedUntilMs.current;
-    if (shouldSyncPidFromDevice && typeof lastMessage?.pidKpActive === "number") setKp(lastMessage.pidKpActive);
-    if (shouldSyncPidFromDevice && typeof lastMessage?.pidKiActive === "number") setKi(lastMessage.pidKiActive);
-    if (shouldSyncPidFromDevice && typeof lastMessage?.pidKdActive === "number") setKd(lastMessage.pidKdActive);
+    if (!hasHydratedPidFromTelemetry.current && shouldSyncPidFromDevice) {
+      let hydratedAny = false;
+      if (typeof lastMessage?.pidKpActive === "number") {
+        setKp(lastMessage.pidKpActive);
+        hydratedAny = true;
+      }
+      if (typeof lastMessage?.pidKiActive === "number") {
+        setKi(lastMessage.pidKiActive);
+        hydratedAny = true;
+      }
+      if (typeof lastMessage?.pidKdActive === "number") {
+        setKd(lastMessage.pidKdActive);
+        hydratedAny = true;
+      }
+      if (hydratedAny) hasHydratedPidFromTelemetry.current = true;
+    }
     if (lastMessage?.pidTarget) setPidTarget(lastMessage.pidTarget);
   }, [isEditingPid, lastMessage]);
 

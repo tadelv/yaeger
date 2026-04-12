@@ -38,7 +38,7 @@ function App() {
   const [csrfToken, setCsrfToken] = useState("");
   const [, setTick] = useState(0);
   const [isEditingPid, setIsEditingPid] = useState(false);
-  const latestPidFromDevice = useRef<{ kp?: number; ki?: number; kd?: number }>({});
+  const hasHydratedPidFromTelemetry = useRef(false);
   const pidSyncPausedUntilMs = useRef(0);
 
   const appVersion = __APP_VERSION__;
@@ -64,17 +64,23 @@ function App() {
   }, []);
 
   useEffect(() => {
-    const nextPid: { kp?: number; ki?: number; kd?: number } = {
-      kp: typeof lastMessage?.pidKpActive === "number" ? lastMessage.pidKpActive : undefined,
-      ki: typeof lastMessage?.pidKiActive === "number" ? lastMessage.pidKiActive : undefined,
-      kd: typeof lastMessage?.pidKdActive === "number" ? lastMessage.pidKdActive : undefined,
-    };
-    latestPidFromDevice.current = nextPid;
-
+    if (hasHydratedPidFromTelemetry.current) return;
     if (isEditingPid || Date.now() < pidSyncPausedUntilMs.current) return;
-    if (typeof nextPid.kp === "number") setPidPFactor(nextPid.kp);
-    if (typeof nextPid.ki === "number") setPidIFactor(nextPid.ki);
-    if (typeof nextPid.kd === "number") setPidDFactor(nextPid.kd);
+
+    let hydratedAny = false;
+    if (typeof lastMessage?.pidKpActive === "number") {
+      setPidPFactor(lastMessage.pidKpActive);
+      hydratedAny = true;
+    }
+    if (typeof lastMessage?.pidKiActive === "number") {
+      setPidIFactor(lastMessage.pidKiActive);
+      hydratedAny = true;
+    }
+    if (typeof lastMessage?.pidKdActive === "number") {
+      setPidDFactor(lastMessage.pidKdActive);
+      hydratedAny = true;
+    }
+    if (hydratedAny) hasHydratedPidFromTelemetry.current = true;
   }, [isEditingPid, lastMessage]);
 
   useEffect(() => {
