@@ -11,10 +11,19 @@ type BeanParticle = {
   opacity: number;
 };
 
+type AvoidRect = {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+};
+
 const MAX_DPR = 1.5;
 const DESKTOP_BEANS = 64;
 const MOBILE_BEANS = 36;
 const MOBILE_BREAKPOINT = 880;
+const OBSTACLE_MARGIN = 24;
+const OBSTACLE_INFLUENCE_RADIUS = 96;
 
 function normalizedRandom(seed: number) {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
@@ -37,6 +46,56 @@ function createBeans(count: number, width: number, height: number): BeanParticle
       opacity: 0.08 + normalizedRandom(s * 6.6) * 0.16,
     };
   });
+}
+
+function getAvoidRects(): AvoidRect[] {
+  const nodes = document.querySelectorAll<HTMLElement>(".tabs-nav, .tab-content");
+  return Array.from(nodes)
+    .map((node) => {
+      const rect = node.getBoundingClientRect();
+      return {
+        left: rect.left - OBSTACLE_MARGIN,
+        right: rect.right + OBSTACLE_MARGIN,
+        top: rect.top - OBSTACLE_MARGIN,
+        bottom: rect.bottom + OBSTACLE_MARGIN,
+      };
+    })
+    .filter((rect) => rect.right > 0 && rect.left < window.innerWidth && rect.bottom > 0 && rect.top < window.innerHeight);
+}
+
+function applyObstacleRepulsion(bean: BeanParticle, avoidRects: AvoidRect[]) {
+  for (const rect of avoidRects) {
+    const closestX = Math.max(rect.left, Math.min(bean.x, rect.right));
+    const closestY = Math.max(rect.top, Math.min(bean.y, rect.bottom));
+    const dx = bean.x - closestX;
+    const dy = bean.y - closestY;
+    const distanceSq = dx * dx + dy * dy;
+
+    if (distanceSq > OBSTACLE_INFLUENCE_RADIUS * OBSTACLE_INFLUENCE_RADIUS) {
+      continue;
+    }
+
+    if (distanceSq > 1) {
+      const distance = Math.sqrt(distanceSq);
+      const strength = (OBSTACLE_INFLUENCE_RADIUS - distance) / OBSTACLE_INFLUENCE_RADIUS;
+      bean.vx += (dx / distance) * strength * 0.014;
+      bean.vy += (dy / distance) * strength * 0.014;
+      continue;
+    }
+
+    const toLeft = Math.abs(bean.x - rect.left);
+    const toRight = Math.abs(rect.right - bean.x);
+    const toTop = Math.abs(bean.y - rect.top);
+    const toBottom = Math.abs(rect.bottom - bean.y);
+
+    const minEdge = Math.min(toLeft, toRight, toTop, toBottom);
+    const escapeImpulse = 0.07;
+
+    if (minEdge === toLeft) bean.vx -= escapeImpulse;
+    else if (minEdge === toRight) bean.vx += escapeImpulse;
+    else if (minEdge === toTop) bean.vy -= escapeImpulse;
+    else bean.vy += escapeImpulse;
+  }
 }
 
 export function CoffeeBeanBackground() {
@@ -102,6 +161,7 @@ export function CoffeeBeanBackground() {
       if (!running) return;
 
       ctx.clearRect(0, 0, width, height);
+      const avoidRects = getAvoidRects();
 
       for (const bean of beans) {
         if (!reducedMotion) {
@@ -118,6 +178,8 @@ export function CoffeeBeanBackground() {
               bean.vy += uy * force * 0.0017;
             }
           }
+
+          applyObstacleRepulsion(bean, avoidRects);
 
           bean.x += bean.vx;
           bean.y += bean.vy;
