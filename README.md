@@ -72,6 +72,63 @@ If Yaeger can't connect to your preferred Wifi, it will create its own access po
 
 ## Build guide (WIP)
 
+## What changed in this fork
+
+If you are reviewing this fork before opening a PR against `tadelv/yaeger`, here is the practical summary:
+
+* `miniweb` is now the canonical frontend (TypeScript + Vite). Legacy `webserver` content is gone.
+* OTA uploads are now aligned with ElegantOTA (`/update`) and no longer depend on PlatformIO `espota`.
+* A one-command OTA flow (`ota_update_all.sh`) now updates both LittleFS web assets and firmware in one run.
+* OTA tooling is isolated in a local Python virtual environment (`.ota-venv`) to avoid polluting global Python installs.
+* GitHub Actions build flow now supports PR validation and avoids publish failures on forks/non-upstream repos.
+
+## Installation / update flows
+
+There are now two recommended paths depending on how you connect to your board:
+
+### 1) USB flash (first-time install or recovery)
+
+Use this when the device is connected over USB serial:
+
+```bash
+./build_and_flash.sh s3
+# or
+./build_and_flash.sh s3-mini
+```
+
+What it does:
+1. installs frontend dependencies with `npm ci`,
+2. builds `miniweb`,
+3. optionally erases flash,
+4. uploads LittleFS (`buildfs` + `uploadfs`),
+5. uploads firmware (`upload`).
+
+### 2) OTA update (already deployed device on network)
+
+Use this once the device is reachable over Wi-Fi and ElegantOTA is available:
+
+```bash
+./ota_update_all.sh s3
+# or
+./ota_update_all.sh s3-mini
+```
+
+What it does:
+1. creates/reuses `.ota-venv`,
+2. installs OTA dependencies in that venv (`platformio`, `littlefs-python`, `fatfs-ng`, `pyyaml`),
+3. builds `miniweb`,
+4. uploads LittleFS image over ElegantOTA,
+5. uploads firmware over ElegantOTA.
+
+If your device requires OTA credentials, set:
+
+```bash
+export YAEGER_OTA_USERNAME=admin
+export YAEGER_OTA_PASSWORD='your-password'
+```
+
+(`YAEGER_OTA_USERNAME` defaults to `admin` if omitted.)
+
 ### Schema
 
 ![schema](./schema/Schematic_Yaeger_2024-12-24.svg)

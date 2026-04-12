@@ -5,6 +5,10 @@ on:
     branches:
       - main
       - develop
+  pull_request:
+    branches:
+      - main
+      - develop
 
 jobs:
   build:
@@ -31,7 +35,7 @@ jobs:
           python-version: "3.11"
 
       - name: Build webUI
-        run: cd miniweb && npm i && npm run build;
+        run: cd miniweb && npm ci && npm run build
 
       - name: Install PlatformIO Core
         run: pip install --upgrade platformio
@@ -50,6 +54,7 @@ jobs:
             .pio/build/${{ matrix.board }}/spiffs.bin
 
   publish:
+    if: ${{ github.event_name == 'push' && github.repository == 'tadelv/yaeger' }}
     needs: build
     runs-on: ubuntu-latest
     permissions:
