@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { RoastGraphMode, RoastGraphs } from "./graphs";
 import { getAdminSecret } from "./auth";
 import { getFormattedTimeDifference } from "./util";
@@ -32,6 +32,7 @@ export function RoastApp() {
   const [pidEnabled, setPidEnabled] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
   const [isEditingPid, setIsEditingPid] = useState(false);
+  const pidSyncPausedUntilMs = useRef(0);
   const [refreshToken, setRefreshToken] = useState(0);
   const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
   const [graphHeightScale, setGraphHeightScale] = useState(1.2);
@@ -195,9 +196,10 @@ export function RoastApp() {
   }, [kd, ki, kp, lastData, state.roast?.measurements?.length]);
 
   useEffect(() => {
-    if (!isEditingPid && typeof lastMessage?.pidKpActive === "number") setKp(lastMessage.pidKpActive);
-    if (!isEditingPid && typeof lastMessage?.pidKiActive === "number") setKi(lastMessage.pidKiActive);
-    if (!isEditingPid && typeof lastMessage?.pidKdActive === "number") setKd(lastMessage.pidKdActive);
+    const shouldSyncPidFromDevice = !isEditingPid && Date.now() >= pidSyncPausedUntilMs.current;
+    if (shouldSyncPidFromDevice && typeof lastMessage?.pidKpActive === "number") setKp(lastMessage.pidKpActive);
+    if (shouldSyncPidFromDevice && typeof lastMessage?.pidKiActive === "number") setKi(lastMessage.pidKiActive);
+    if (shouldSyncPidFromDevice && typeof lastMessage?.pidKdActive === "number") setKd(lastMessage.pidKdActive);
     if (lastMessage?.pidTarget) setPidTarget(lastMessage.pidTarget);
   }, [isEditingPid, lastMessage]);
 
@@ -528,6 +530,7 @@ export function RoastApp() {
         <div class="inline-actions">
           <button
             onClick={() => {
+              pidSyncPausedUntilMs.current = Date.now() + 3000;
               sendCommand({
                 id: 1,
                 command: "setPreferences",
@@ -536,6 +539,11 @@ export function RoastApp() {
                 pidKi: ki,
                 pidKd: kd,
               });
+              window.dispatchEvent(
+                new CustomEvent("pid-preferences-updated", {
+                  detail: { kp, ki, kd, pidTarget },
+                }),
+              );
             }}
           >
             Apply pid

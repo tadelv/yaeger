@@ -39,6 +39,7 @@ function App() {
   const [, setTick] = useState(0);
   const [isEditingPid, setIsEditingPid] = useState(false);
   const latestPidFromDevice = useRef<{ kp?: number; ki?: number; kd?: number }>({});
+  const pidSyncPausedUntilMs = useRef(0);
 
   const appVersion = __APP_VERSION__;
   const appVersionLabel = `V${appVersion}`;
@@ -70,7 +71,7 @@ function App() {
     };
     latestPidFromDevice.current = nextPid;
 
-    if (isEditingPid) return;
+    if (isEditingPid || Date.now() < pidSyncPausedUntilMs.current) return;
     if (typeof nextPid.kp === "number") setPidPFactor(nextPid.kp);
     if (typeof nextPid.ki === "number") setPidIFactor(nextPid.ki);
     if (typeof nextPid.kd === "number") setPidDFactor(nextPid.kd);
@@ -110,6 +111,7 @@ function App() {
   };
 
   const applyPidFromSettings = () => {
+    pidSyncPausedUntilMs.current = Date.now() + 3000;
     sendWsCommand({
       id: 1,
       command: "setPreferences",
