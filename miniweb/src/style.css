@@ -625,3 +625,89 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   border: 2px solid #ccc;
   cursor: not-allowed;
 }
+
+.graph-stack {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.graph-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: 0.9rem;
+  background: hsl(var(--background));
+  padding: 0.45rem;
+}
+
+.graph-card h4 {
+  margin: 0.25rem 0.4rem 0.45rem;
+  font-size: 0.95rem;
+}
+
+.line-graph {
+  width: 100%;
+  display: block;
+  border-radius: 0.6rem;
+}
+
+.graph-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin-top: 0.45rem;
+  font-size: 0.82rem;
+}
+
+.graph-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.graph-legend i {
+  width: 0.8rem;
+  height: 0.3rem;
+  border-radius: 999px;
+  display: inline-block;
+}
+
+.graph-empty {
+  border: 1px dashed hsl(var(--border));
+  border-radius: 0.9rem;
+  padding: 0.9rem;
+  color: hsl(var(--muted-foreground));
+  background: hsl(var(--secondary));
+}
+
+.graph-mode-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.graph-mode-control select {
+  min-width: 210px;
+}
+
+.graph-height-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.graph-height-control input[type="range"] {
+  width: 120px;
+  margin: 0;
+}
+
+.graph-height-control span {
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+
+

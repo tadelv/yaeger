@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { initializeChart, updateChart } from "./chart";
+import { useEffect, useMemo, useState } from "preact/hooks";
+import { RoastGraphMode, RoastGraphs } from "./graphs";
 import { getAdminSecret } from "./auth";
 import { getFormattedTimeDifference } from "./util";
 import { Measurement, RoastState, RoasterStatus, YaegerState } from "./model";
@@ -32,16 +32,8 @@ export function RoastApp() {
   const [pidEnabled, setPidEnabled] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
   const [refreshToken, setRefreshToken] = useState(0);
-  const chartCanvasRef = useRef<HTMLCanvasElement>(null);
-  const chartRef = useRef<ReturnType<typeof initializeChart> | null>(null);
-
-  useEffect(() => {
-    if (!chartCanvasRef.current || chartRef.current) return;
-    const ctx = chartCanvasRef.current.getContext("2d");
-    if (!ctx) return;
-    chartRef.current = initializeChart(ctx);
-  }, []);
-
+  const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
+  const [graphHeightScale, setGraphHeightScale] = useState(1.2);
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
@@ -114,9 +106,6 @@ export function RoastApp() {
           }
         }
 
-        if (chartRef.current) {
-          updateChart(chartRef.current, next.roast);
-        }
       }
 
       return next;
@@ -227,9 +216,6 @@ export function RoastApp() {
               try {
                 const roast = JSON.parse((evt.target?.result as string) || "{}", dateReviver) as RoastState;
                 setState((prev) => ({ ...prev, roast }));
-                if (chartRef.current) {
-                  updateChart(chartRef.current, roast);
-                }
               } catch (error) {
                 console.error("upload failed", error);
               }
@@ -239,6 +225,25 @@ export function RoastApp() {
           disabled={state.currentState.status === RoasterStatus.roasting}
         />
         <span class="roast-time-pill">Roast time: {roastTime}</span>
+        <label class="graph-mode-control">
+          Graph layout
+          <select value={graphMode} onChange={(e) => setGraphMode((e.target as HTMLSelectElement).value as RoastGraphMode)}>
+            <option value="combined">Single combined graph</option>
+            <option value="separate">Three separate graphs</option>
+          </select>
+        </label>
+        <label class="graph-height-control">
+          Graph height
+          <input
+            type="range"
+            min="70"
+            max="180"
+            step="10"
+            value={Math.round(graphHeightScale * 100)}
+            onInput={(e) => setGraphHeightScale(Number((e.target as HTMLInputElement).value) / 100)}
+          />
+          <span>{Math.round(graphHeightScale * 100)}%</span>
+        </label>
       </div>
 
       <section class="telemetry-panel">
@@ -281,7 +286,7 @@ export function RoastApp() {
         </div>
       </section>
 
-      <canvas id="liveChart" ref={chartCanvasRef} class="live-chart" />
+      <RoastGraphs roast={state.roast} mode={graphMode} heightScale={graphHeightScale} />
 
       <section class="control-panel">
         <h3>Roast controls</h3>
