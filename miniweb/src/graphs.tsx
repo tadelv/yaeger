@@ -17,7 +17,7 @@ type BasicLineGraphProps = {
 };
 
 const VIEWBOX_WIDTH = 900;
-const DEFAULT_HEIGHT = 180;
+const DEFAULT_HEIGHT = 220;
 const PADDING = { top: 16, right: 16, bottom: 26, left: 34 };
 
 function toPath(points: Array<{ x: number; y: number }>) {
@@ -107,7 +107,15 @@ function BasicLineGraph({ title, samples, series, minY, maxY, height = DEFAULT_H
 
 export type RoastGraphMode = "combined" | "separate";
 
-export function RoastGraphs({ roast, mode = "separate" }: { roast?: RoastState; mode?: RoastGraphMode }) {
+export function RoastGraphs({
+  roast,
+  mode = "separate",
+  heightScale = 1,
+}: {
+  roast?: RoastState;
+  mode?: RoastGraphMode;
+  heightScale?: number;
+}) {
   const measurements = roast?.measurements ?? [];
   const start = roast?.startDate;
   if (!start || measurements.length < 2) {
@@ -128,6 +136,10 @@ export function RoastGraphs({ roast, mode = "separate" }: { roast?: RoastState; 
     sec: (event.measurement.timestamp.getTime() - start.getTime()) / 1000,
   }));
 
+  const clampedHeightScale = Math.min(1.8, Math.max(0.7, heightScale));
+  const separateHeight = Math.round(220 * clampedHeightScale);
+  const combinedHeight = Math.round(280 * clampedHeightScale);
+
   if (mode === "combined") {
     return (
       <div class="graph-stack">
@@ -146,7 +158,7 @@ export function RoastGraphs({ roast, mode = "separate" }: { roast?: RoastState; 
             { label: "ET RoR (x5)", color: "#a855f7", values: etRor.map((v) => Math.max(0, v) * 5) },
           ]}
           eventTimes={eventTimes}
-          height={240}
+          height={combinedHeight}
         />
       </div>
     );
@@ -165,6 +177,7 @@ export function RoastGraphs({ roast, mode = "separate" }: { roast?: RoastState; 
           { label: "Setpoint", color: "#34d399", values: setpoint },
         ]}
         eventTimes={eventTimes}
+        height={separateHeight}
       />
       <BasicLineGraph
         title="Power"
@@ -175,6 +188,7 @@ export function RoastGraphs({ roast, mode = "separate" }: { roast?: RoastState; 
           { label: "Fan %", color: "#38bdf8", values: fan },
           { label: "Heater %", color: "#fb923c", values: heater },
         ]}
+        height={separateHeight}
       />
       <BasicLineGraph
         title="Rate of Rise"
@@ -185,6 +199,7 @@ export function RoastGraphs({ roast, mode = "separate" }: { roast?: RoastState; 
           { label: "BT RoR", color: "#22c55e", values: btRor },
           { label: "ET RoR", color: "#a855f7", values: etRor },
         ]}
+        height={separateHeight}
       />
     </div>
   );
@@ -212,7 +227,7 @@ export function AutotuneGraph({
         { label: `${target} sensor`, color: "#22d3ee", values },
         { label: "Setpoint", color: "#94a3b8", values: values.map(() => setpoint) },
       ]}
-      height={220}
+      height={250}
     />
   );
 }

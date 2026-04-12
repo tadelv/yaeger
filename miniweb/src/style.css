@@ -689,3 +689,22 @@ input[type="range"]:disabled::-webkit-slider-thumb {
 .graph-mode-control select {
   min-width: 210px;
 }
+
+.graph-height-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.graph-height-control input[type="range"] {
+  width: 120px;
+  margin: 0;
+}
+
+.graph-height-control span {
+  min-width: 44px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}

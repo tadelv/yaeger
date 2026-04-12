@@ -33,6 +33,7 @@ export function RoastApp() {
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
   const [refreshToken, setRefreshToken] = useState(0);
   const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
+  const [graphHeightScale, setGraphHeightScale] = useState(1.2);
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
@@ -231,6 +232,18 @@ export function RoastApp() {
             <option value="separate">Three separate graphs</option>
           </select>
         </label>
+        <label class="graph-height-control">
+          Graph height
+          <input
+            type="range"
+            min="70"
+            max="180"
+            step="10"
+            value={Math.round(graphHeightScale * 100)}
+            onInput={(e) => setGraphHeightScale(Number((e.target as HTMLInputElement).value) / 100)}
+          />
+          <span>{Math.round(graphHeightScale * 100)}%</span>
+        </label>
       </div>
 
       <section class="telemetry-panel">
@@ -273,7 +286,7 @@ export function RoastApp() {
         </div>
       </section>
 
-      <RoastGraphs roast={state.roast} mode={graphMode} />
+      <RoastGraphs roast={state.roast} mode={graphMode} heightScale={graphHeightScale} />
 
       <section class="control-panel">
         <h3>Roast controls</h3>
