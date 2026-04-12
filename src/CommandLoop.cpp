@@ -1027,7 +1027,9 @@ void updatePidControl() {
   }
   lastPidUpdateMs = now;
 
-  if (!pidEnabled && !pidAutotuneActive) {
+  bool pidDelayMeasureRunning =
+      pidDelayMeasureState == PidDelayMeasureState::STABILIZING || pidDelayMeasureState == PidDelayMeasureState::HEATING;
+  if (!pidEnabled && !pidAutotuneActive && !pidDelayMeasureRunning) {
     return;
   }
 
