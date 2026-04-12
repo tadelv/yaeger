@@ -681,6 +681,8 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
+      dataObj["exhaustSensorError"] = static_cast<int>(getExhaustSensorError());
+      dataObj["beanSensorError"] = static_cast<int>(getBeanSensorError());
     }
 
     if (command != NULL && strncmp(command, "getData", 7) == 0) {
@@ -689,13 +691,18 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       root["id"] = ln_id;
       float etbt[3];
       bool gotReading = getETBTReadings(etbt);
+      SensorErrorCode exhaustError = getExhaustSensorError();
+      SensorErrorCode beanError = getBeanSensorError();
+      bool sensorOk = gotReading && exhaustError == SENSOR_OK && beanError == SENSOR_OK;
       dataObj["type"] = "status";
       dataObj["ET"] = gotReading ? etbt[0] : NAN;
       dataObj["BT"] = gotReading ? etbt[1] : NAN;
       dataObj["simBT"] = getSimulatedInternalBeanTemp();
       dataObj["Amb"] = gotReading ? etbt[2] : NAN;
       dataObj["sampleAgeMs"] = millis() - getLastSensorUpdateMs();
-      dataObj["sensorOk"] = gotReading;
+      dataObj["sensorOk"] = sensorOk;
+      dataObj["exhaustSensorError"] = static_cast<int>(exhaustError);
+      dataObj["beanSensorError"] = static_cast<int>(beanError);
       dataObj["BurnerVal"] = getHeaterPower();
       dataObj["FanVal"] = getFanSpeed();
       dataObj["setpoint"] = pidSetpoint;

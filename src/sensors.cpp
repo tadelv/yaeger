@@ -185,6 +185,7 @@ void takeETReadings(float dt) {
       exhaustFaultCount = 0;
       beansFaultCount = 0;
     }
+    readings[0] = NAN;
     return;
   }
   exhaustFaultCount = 0;
@@ -232,6 +233,7 @@ void takeBTReadings(float dt) {
       exhaustFaultCount = 0;
       beansFaultCount = 0;
     }
+    readings[1] = NAN;
     return;
   }
   beansFaultCount = 0;
@@ -245,8 +247,9 @@ void takeBTReadings(float dt) {
 bool getETBTReadings(float *readingsBuf) {
   if (xSemaphoreTakeRecursive(mtx, pdMS_TO_TICKS(5)) == pdTRUE) {
     memcpy(readingsBuf, readings, 3 * sizeof(float));
+    bool sensorsHealthy = exhaustSensorError == SENSOR_OK && beanSensorError == SENSOR_OK;
     xSemaphoreGiveRecursive(mtx);
-    return true;
+    return sensorsHealthy;
   }
   return false;
 }
