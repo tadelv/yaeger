@@ -32,12 +32,15 @@ function buildRoR(values: number[], timeSeconds: number[], windowSize = 20): Arr
     if (i === 0) return null;
     const deltaT = temp - values[i - 1];
     const deltaS = timeSeconds[i] - timeSeconds[i - 1];
-    return deltaS > 0 ? (deltaT / deltaS) * 60 : null;
+    const value = deltaS > 0 ? (deltaT / deltaS) * 60 : null;
+    return value != null && Number.isFinite(value) ? value : null;
   });
 
   return rate.map((value, i, arr) => {
     if (value == null || i < windowSize - 1) return value;
-    const window = arr.slice(i - windowSize + 1, i + 1).filter((v): v is number => typeof v === "number");
+    const window = arr
+      .slice(i - windowSize + 1, i + 1)
+      .filter((v): v is number => typeof v === "number" && Number.isFinite(v));
     if (!window.length) return null;
     return window.reduce((sum, v) => sum + v, 0) / window.length;
   });
