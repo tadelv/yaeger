@@ -2,7 +2,7 @@ import { AxisBottom, AxisLeft } from "@visx/axis";
 import { Group } from "@visx/group";
 import { scaleLinear } from "@visx/scale";
 import { LinePath } from "@visx/shape";
-import { RoastState } from "./model";
+import { Profile, RoastState } from "./model";
 
 export type RoastGraphMode = "combined" | "separate";
 
@@ -46,6 +46,50 @@ function buildRoR(values: number[], timeSeconds: number[], windowSize = 20): Arr
 function gridTicks(minY: number, maxY: number, count = 5) {
   const step = (maxY - minY) / count;
   return Array.from({ length: count + 1 }, (_, i) => minY + i * step);
+}
+
+function interpolateProfileValue(
+  start: number,
+  end: number,
+  progress: number,
+  type: "linear" | "ease-in" | "ease-out" | "ease-in-out",
+): number {
+  switch (type) {
+    case "linear":
+      return start + (end - start) * progress;
+    case "ease-in":
+      return start + (end - start) * Math.pow(progress, 2);
+    case "ease-out":
+      return start + (end - start) * (1 - Math.pow(1 - progress, 2));
+    case "ease-in-out":
+      return (
+        start +
+        (end - start) *
+          (progress < 0.5
+            ? 2 * Math.pow(progress, 2)
+            : 1 - Math.pow(-2 * progress + 2, 2) / 2)
+      );
+    default:
+      return end;
+  }
+}
+
+function getProfileSetpointAtElapsed(profile: Profile, elapsedSeconds: number): number | null {
+  if (!profile.steps.length) return null;
+  let accumulated = 0;
+
+  for (let i = 0; i < profile.steps.length; i += 1) {
+    const step = profile.steps[i];
+    const stepStart = accumulated;
+    accumulated += step.duration;
+    if (elapsedSeconds <= accumulated) {
+      const progress = step.duration > 0 ? (elapsedSeconds - stepStart) / step.duration : 1;
+      const previousSetpoint = i === 0 ? step.setpoint : profile.steps[i - 1].setpoint;
+      return interpolateProfileValue(previousSetpoint, step.setpoint, progress, step.interpolation);
+    }
+  }
+
+  return profile.steps[profile.steps.length - 1].setpoint;
 }
 
 function VisxLineGraph({ title, samples, series, minY, maxY, height, eventTimes = [] }: VisxLineGraphProps) {
@@ -154,15 +198,40 @@ export function RoastGraphs({
   roast,
   mode = "separate",
   heightScale = 1,
+  profile,
 }: {
   roast?: RoastState;
   mode?: RoastGraphMode;
   heightScale?: number;
+  profile?: Profile;
 }) {
   const measurements = roast?.measurements ?? [];
   const start = roast?.startDate;
+  const activeProfile = roast?.profile ?? profile;
+
   if (!start || measurements.length < 2) {
-    return <div class="graph-empty">Live roast graphs will appear after the roast starts.</div>;
+    if (!activeProfile?.steps.length) {
+      return <div class="graph-empty">Live roast graphs will appear after the roast starts.</div>;
+    }
+
+    const totalDuration = activeProfile.steps.reduce((sum, step) => sum + Math.max(step.duration, 0), 0);
+    const previewEndSec = Math.max(1, Math.ceil(totalDuration));
+    const previewSamples = Array.from({ length: previewEndSec + 1 }, (_, i) => i);
+    const previewValues = previewSamples.map((seconds) => getProfileSetpointAtElapsed(activeProfile, seconds));
+    const validValues = previewValues.filter((value): value is number => typeof value === "number");
+    const minY = validValues.length ? Math.max(0, Math.floor(Math.min(...validValues) - 5)) : 0;
+    const maxY = validValues.length ? Math.ceil(Math.max(...validValues) + 5) : 300;
+
+    return (
+      <VisxLineGraph
+        title="Profile Preview"
+        samples={previewSamples}
+        minY={minY}
+        maxY={Math.max(maxY, minY + 10)}
+        height={Math.round(320 * Math.min(1.8, Math.max(0.7, heightScale)))}
+        series={[{ label: "Profile", color: "#facc15", values: previewValues }]}
+      />
+    );
   }
 
   const sampleTimes = measurements.map((m) => (m.timestamp.getTime() - start.getTime()) / 1000);
@@ -173,6 +242,9 @@ export function RoastGraphs({
   const heater = measurements.map((m) => m.message.BurnerVal);
   const btRor = buildRoR(bt, sampleTimes);
   const etRor = buildRoR(et, sampleTimes);
+  const profileSetpoint = activeProfile
+    ? sampleTimes.map((seconds) => getProfileSetpointAtElapsed(activeProfile, seconds))
+    : [];
 
   const eventTimes = (roast?.events ?? []).map((event) => ({
     label: String(event.label),
@@ -196,6 +268,9 @@ export function RoastGraphs({
           { label: "BT", color: "#60a5fa", values: bt },
           { label: "ET", color: "#f87171", values: et },
           { label: "Setpoint", color: "#34d399", values: setpoint },
+          ...(profileSetpoint.length
+            ? [{ label: "Profile", color: "#facc15", values: profileSetpoint }]
+            : []),
           { label: "Fan % (x3)", color: "#38bdf8", values: fan.map((v) => v * 3) },
           { label: "Heater % (x3)", color: "#fb923c", values: heater.map((v) => v * 3) },
           { label: "BT RoR (x5)", color: "#22c55e", values: btRor.map((v) => (v == null ? null : Math.max(v, 0) * 5)) },
@@ -218,6 +293,9 @@ export function RoastGraphs({
           { label: "BT", color: "#60a5fa", values: bt },
           { label: "ET", color: "#f87171", values: et },
           { label: "Setpoint", color: "#34d399", values: setpoint },
+          ...(profileSetpoint.length
+            ? [{ label: "Profile", color: "#facc15", values: profileSetpoint }]
+            : []),
         ]}
       />
       <VisxLineGraph

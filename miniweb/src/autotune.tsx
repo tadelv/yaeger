@@ -23,6 +23,8 @@ export function AutotuneApp() {
   const [history, setHistory] = useState<Array<{ ET: number; BT: number; simBT: number }>>([]);
   const [autotuneLog, setAutotuneLog] = useState<string[]>([]);
   const lastCrossing = useRef(-1);
+  const autotuneBoundsDirty = useRef(false);
+  const delayInputsDirty = useRef(false);
 
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
@@ -46,16 +48,36 @@ export function AutotuneApp() {
       setKd(lastMessage.pidKdActive ?? kd);
     }
 
-    if (typeof lastMessage.pidAutotuneMin === "number") setMinHeaterPwm(lastMessage.pidAutotuneMin);
-    if (typeof lastMessage.pidAutotuneMax === "number") setMaxHeaterPwm(lastMessage.pidAutotuneMax);
-    if (typeof lastMessage.pidDelayFan === "number") setDelayFan(lastMessage.pidDelayFan);
-    if (typeof lastMessage.pidDelayHeater === "number") setDelayHeater(lastMessage.pidDelayHeater);
+    if (typeof lastMessage.pidAutotuneMin === "number" && typeof lastMessage.pidAutotuneMax === "number") {
+      if (!autotuneBoundsDirty.current) {
+        setMinHeaterPwm(lastMessage.pidAutotuneMin);
+        setMaxHeaterPwm(lastMessage.pidAutotuneMax);
+      } else {
+        const minMatches = Math.abs(lastMessage.pidAutotuneMin - minHeaterPwm) < 0.01;
+        const maxMatches = Math.abs(lastMessage.pidAutotuneMax - maxHeaterPwm) < 0.01;
+        if (minMatches && maxMatches) {
+          autotuneBoundsDirty.current = false;
+        }
+      }
+    }
+    if (typeof lastMessage.pidDelayFan === "number" && typeof lastMessage.pidDelayHeater === "number") {
+      if (!delayInputsDirty.current) {
+        setDelayFan(lastMessage.pidDelayFan);
+        setDelayHeater(lastMessage.pidDelayHeater);
+      } else {
+        const delayFanMatches = Math.abs(lastMessage.pidDelayFan - delayFan) < 0.01;
+        const delayHeaterMatches = Math.abs(lastMessage.pidDelayHeater - delayHeater) < 0.01;
+        if (delayFanMatches && delayHeaterMatches) {
+          delayInputsDirty.current = false;
+        }
+      }
+    }
     if (typeof lastMessage.pidProcessDelaySec === "number") setProcessDelaySec(lastMessage.pidProcessDelaySec);
 
     if (typeof lastMessage.ET === "number" && typeof lastMessage.BT === "number" && typeof lastMessage.simBT === "number") {
       setHistory((prev) => [...prev, { ET: lastMessage.ET, BT: lastMessage.BT, simBT: lastMessage.simBT }].slice(-300));
     }
-  }, [kd, ki, lastMessage]);
+  }, [delayFan, delayHeater, kd, ki, lastMessage, maxHeaterPwm, minHeaterPwm]);
 
   const delayElapsedSec =
     typeof lastMessage?.pidDelayMeasureElapsedSec === "number" ? lastMessage.pidDelayMeasureElapsedSec.toFixed(1) : "0.0";
@@ -85,9 +107,23 @@ export function AutotuneApp() {
         <label>Fan</label>
         <input type="number" value={fanSpeed} onInput={(e) => setFanSpeed(Number((e.target as HTMLInputElement).value) || 0)} />
         <label>Min PWM</label>
-        <input type="number" value={minHeaterPwm} onInput={(e) => setMinHeaterPwm(Number((e.target as HTMLInputElement).value) || 0)} />
+        <input
+          type="number"
+          value={minHeaterPwm}
+          onInput={(e) => {
+            autotuneBoundsDirty.current = true;
+            setMinHeaterPwm(Number((e.target as HTMLInputElement).value) || 0);
+          }}
+        />
         <label>Max PWM</label>
-        <input type="number" value={maxHeaterPwm} onInput={(e) => setMaxHeaterPwm(Number((e.target as HTMLInputElement).value) || 0)} />
+        <input
+          type="number"
+          value={maxHeaterPwm}
+          onInput={(e) => {
+            autotuneBoundsDirty.current = true;
+            setMaxHeaterPwm(Number((e.target as HTMLInputElement).value) || 0);
+          }}
+        />
         <label>Kp / Ki / Kd</label>
         <div class="pid-inline-inputs">
           <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />
@@ -96,8 +132,22 @@ export function AutotuneApp() {
         </div>
         <label>Delay fan / heater</label>
         <div class="pid-inline-inputs">
-          <input type="number" value={delayFan} onInput={(e) => setDelayFan(Number((e.target as HTMLInputElement).value) || 0)} />
-          <input type="number" value={delayHeater} onInput={(e) => setDelayHeater(Number((e.target as HTMLInputElement).value) || 0)} />
+          <input
+            type="number"
+            value={delayFan}
+            onInput={(e) => {
+              delayInputsDirty.current = true;
+              setDelayFan(Number((e.target as HTMLInputElement).value) || 0);
+            }}
+          />
+          <input
+            type="number"
+            value={delayHeater}
+            onInput={(e) => {
+              delayInputsDirty.current = true;
+              setDelayHeater(Number((e.target as HTMLInputElement).value) || 0);
+            }}
+          />
         </div>
         <label>Measured delay (s)</label>
         <input type="number" value={processDelaySec} onInput={(e) => setProcessDelaySec(Number((e.target as HTMLInputElement).value) || 0)} />
