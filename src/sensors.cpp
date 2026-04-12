@@ -22,7 +22,7 @@ void getChipTemp() {
 Adafruit_MAX31855 tcExhaust(MAX1CLK, MAX1CS, MAX1DO);
 Adafruit_MAX31855 tcBeans(MAX2CLK, MAX2CS, MAX2DO);
 
-const uint8_t kMovingAverageWindowSize = 10;
+const uint8_t kMovingAverageWindowSize = 4;
 const unsigned long kSamplingWindowDurationMs = 400;
 const uint8_t kFaultDebounceThreshold = 3;
 

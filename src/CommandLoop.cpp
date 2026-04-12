@@ -55,6 +55,37 @@ double pidAutotuneHeaterCommand = 0.0;
 double pidAutotuneRelayOutputHigh = 60.0;
 double pidAutotuneRelayOutputLow = 0.0;
 constexpr int PID_AUTOTUNE_MIN_CROSSINGS = 8;
+constexpr size_t PID_AUTOTUNE_PEAK_WINDOW = 6;
+double pidAutotuneCyclePeak = NAN;
+double pidAutotuneHighPeaks[PID_AUTOTUNE_PEAK_WINDOW] = {0};
+double pidAutotuneLowPeaks[PID_AUTOTUNE_PEAK_WINDOW] = {0};
+size_t pidAutotuneHighPeakCount = 0;
+size_t pidAutotuneLowPeakCount = 0;
+
+void pushAutotunePeak(double *buffer, size_t &count, double value) {
+  if (isnan(value)) {
+    return;
+  }
+  if (count < PID_AUTOTUNE_PEAK_WINDOW) {
+    buffer[count++] = value;
+    return;
+  }
+  for (size_t i = 1; i < PID_AUTOTUNE_PEAK_WINDOW; i++) {
+    buffer[i - 1] = buffer[i];
+  }
+  buffer[PID_AUTOTUNE_PEAK_WINDOW - 1] = value;
+}
+
+double averageAutotunePeaks(const double *buffer, size_t count) {
+  if (count == 0) {
+    return NAN;
+  }
+  double sum = 0.0;
+  for (size_t i = 0; i < count; i++) {
+    sum += buffer[i];
+  }
+  return sum / count;
+}
 
 struct RoastHistorySample {
   unsigned long ms;
@@ -324,6 +355,9 @@ void startPidAutotune() {
   pidAutotuneKu = NAN;
   pidAutotunePu = NAN;
   pidAutotuneHeaterCommand = 0.0;
+  pidAutotuneCyclePeak = NAN;
+  pidAutotuneHighPeakCount = 0;
+  pidAutotuneLowPeakCount = 0;
   pidEnabled = false;
   preferences.putBool("pidEnabled", false);
   logf("PID autotune started (target=%s, method=%s, setpoint=%.2f)\n", pidTargetToString(pidTarget),
@@ -816,6 +850,10 @@ void updatePidControl() {
   if (now - lastPidUpdateMs < PID_UPDATE_INTERVAL_MS) {
     return;
   }
+  double dtSeconds = lastPidUpdateMs == 0 ? PID_UPDATE_INTERVAL_MS / 1000.0 : (now - lastPidUpdateMs) / 1000.0;
+  if (dtSeconds <= 0.0) {
+    dtSeconds = PID_UPDATE_INTERVAL_MS / 1000.0;
+  }
   lastPidUpdateMs = now;
 
   if (!pidEnabled && !pidAutotuneActive) {
@@ -834,12 +872,14 @@ void updatePidControl() {
 
   if (pidAutotuneActive) {
     if (pidAutotuneRelayHigh) {
-      if (isnan(pidAutotunePeakHigh) || currentTemp > pidAutotunePeakHigh) {
-        pidAutotunePeakHigh = currentTemp;
+      if (isnan(pidAutotuneCyclePeak) || currentTemp > pidAutotuneCyclePeak) {
+        pidAutotuneCyclePeak = currentTemp;
       }
       setHeaterPower(lround(pidAutotuneRelayOutputHigh));
       pidAutotuneHeaterCommand = pidAutotuneRelayOutputHigh;
       if (currentTemp >= pidSetpoint) {
+        pushAutotunePeak(pidAutotuneHighPeaks, pidAutotuneHighPeakCount, pidAutotuneCyclePeak);
+        pidAutotuneCyclePeak = NAN;
         pidAutotuneRelayHigh = false;
         if (pidAutotuneLastCrossingMs != 0) {
           pidAutotuneHalfCycleSecondsSum += (now - pidAutotuneLastCrossingMs) / 1000.0;
@@ -849,12 +889,14 @@ void updatePidControl() {
         pidAutotuneCrossings++;
       }
     } else {
-      if (isnan(pidAutotunePeakLow) || currentTemp < pidAutotunePeakLow) {
-        pidAutotunePeakLow = currentTemp;
+      if (isnan(pidAutotuneCyclePeak) || currentTemp < pidAutotuneCyclePeak) {
+        pidAutotuneCyclePeak = currentTemp;
       }
       setHeaterPower(lround(pidAutotuneRelayOutputLow));
       pidAutotuneHeaterCommand = pidAutotuneRelayOutputLow;
       if (currentTemp <= pidSetpoint) {
+        pushAutotunePeak(pidAutotuneLowPeaks, pidAutotuneLowPeakCount, pidAutotuneCyclePeak);
+        pidAutotuneCyclePeak = NAN;
         pidAutotuneRelayHigh = true;
         if (pidAutotuneLastCrossingMs != 0) {
           pidAutotuneHalfCycleSecondsSum += (now - pidAutotuneLastCrossingMs) / 1000.0;
@@ -865,17 +907,22 @@ void updatePidControl() {
       }
     }
 
+    const double avgPeakHigh = averageAutotunePeaks(pidAutotuneHighPeaks, pidAutotuneHighPeakCount);
+    const double avgPeakLow = averageAutotunePeaks(pidAutotuneLowPeaks, pidAutotuneLowPeakCount);
     if (pidAutotuneCrossings >= PID_AUTOTUNE_MIN_CROSSINGS && pidAutotuneHalfCycleCount > 0 &&
-        !isnan(pidAutotunePeakHigh) && !isnan(pidAutotunePeakLow) && pidAutotunePeakHigh > pidAutotunePeakLow) {
-      const double oscillationAmplitude = (pidAutotunePeakHigh - pidAutotunePeakLow) / 2.0;
+        pidAutotuneHighPeakCount >= 2 && pidAutotuneLowPeakCount >= 2 && !isnan(avgPeakHigh) && !isnan(avgPeakLow) &&
+        avgPeakHigh > avgPeakLow) {
+      pidAutotunePeakHigh = avgPeakHigh;
+      pidAutotunePeakLow = avgPeakLow;
+      const double oscillationAmplitude = (avgPeakHigh - avgPeakLow) / 2.0;
       const double relayAmplitude = (pidAutotuneRelayOutputHigh - pidAutotuneRelayOutputLow) / 2.0;
       const double ku = (4.0 * relayAmplitude) / (M_PI * oscillationAmplitude);
       const double puSeconds = 2.0 * (pidAutotuneHalfCycleSecondsSum / pidAutotuneHalfCycleCount);
       pidAutotuneKu = ku;
       pidAutotunePu = puSeconds;
       applyAutotunedPidGains(ku, puSeconds);
-      logf("PID autotune converged (Ku=%.4f, Pu=%.4f, peakHigh=%.2f, peakLow=%.2f)\n", ku, puSeconds,
-           pidAutotunePeakHigh, pidAutotunePeakLow);
+      logf("PID autotune converged (Ku=%.4f, Pu=%.4f, avgPeakHigh=%.2f, avgPeakLow=%.2f)\n", ku, puSeconds,
+           avgPeakHigh, avgPeakLow);
       stopPidAutotune("converged");
       resetPidState();
     }
@@ -889,10 +936,6 @@ void updatePidControl() {
   double kp = getPidGain("pidKp", pidTarget, 1.0);
   double ki = getPidGain("pidKi", pidTarget, 0.1);
   double kd = getPidGain("pidKd", pidTarget, 0.01);
-  double dtSeconds = PID_UPDATE_INTERVAL_MS / 1000.0;
-
-  pidIntegral += error * dtSeconds;
-  pidIntegral = std::clamp(pidIntegral, -100.0, 100.0);
 
   double derivative = 0.0;
   if (pidHasPreviousError) {
@@ -901,8 +944,18 @@ void updatePidControl() {
     pidHasPreviousError = true;
   }
 
-  double output = kp * error + ki * pidIntegral + kd * derivative;
-  long heaterPower = lround(std::clamp(output, 0.0, 100.0));
+  double unsaturated = kp * error + ki * pidIntegral + kd * derivative;
+  double clamped = std::clamp(unsaturated, 0.0, 100.0);
+  bool allowIntegrate = unsaturated == clamped || (unsaturated > 100.0 && error < 0.0) || (unsaturated < 0.0 && error > 0.0);
+  if (allowIntegrate) {
+    pidIntegral += error * dtSeconds;
+    pidIntegral = std::clamp(pidIntegral, -100.0, 100.0);
+    unsaturated = kp * error + ki * pidIntegral + kd * derivative;
+    clamped = std::clamp(unsaturated, 0.0, 100.0);
+  }
+
+  double output = unsaturated;
+  long heaterPower = lround(clamped);
   setHeaterPower(heaterPower);
   pidPreviousError = error;
   pidCurrentTemp = currentTemp;
