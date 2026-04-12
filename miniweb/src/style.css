@@ -710,11 +710,4 @@ input[type="range"]:disabled::-webkit-slider-thumb {
 }
 
 
-.uplot-host {
-  width: 100%;
-  overflow-x: auto;
-}
 
-.uplot {
-  max-width: 100%;
-}
