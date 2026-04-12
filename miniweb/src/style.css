@@ -142,6 +142,17 @@ h1 {
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.35);
 }
 
+.emergency-btn {
+  margin-top: 0.35rem;
+  background: linear-gradient(90deg, #b91c1c, #dc2626);
+  border-color: rgba(254, 202, 202, 0.3);
+  color: #fff;
+}
+
+.emergency-btn:hover {
+  background: linear-gradient(90deg, #991b1b, #b91c1c);
+}
+
 .tab-content {
   padding: 1.25rem;
   border-radius: 1rem;
@@ -714,5 +725,4 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-
 

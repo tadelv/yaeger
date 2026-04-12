@@ -4,7 +4,7 @@ import "./style.css";
 import { AutotuneApp } from "./autotune";
 import { LogsApp } from "./logs";
 import { UpdateApp } from "./update";
-import { ProfileControl } from "./profiling";
+import { ProfileControl, profileStore } from "./profiling";
 import { RoastApp } from "./roast";
 import { getAdminSecret, getBasicAuthHeaderValue } from "./auth";
 import { CoffeeBeanBackground } from "./coffeeBeans";
@@ -150,6 +150,16 @@ function App() {
     });
   };
 
+  const emergencyStop = () => {
+    profileStore.followProfileEnabled = false;
+    setTick((v) => v + 1);
+    const authToken = getAdminSecret();
+    sendWsCommand({ id: 1, BurnerVal: 0, authToken });
+    sendWsCommand({ id: 1, command: "setPidControl", pidEnabled: false, setpoint: 0, pidAutotune: false, authToken });
+    sendWsCommand({ id: 1, command: "endRoastSession", authToken });
+    window.dispatchEvent(new CustomEvent("emergency-stop"));
+  };
+
   return (
     <>
       <CoffeeBeanBackground />
@@ -161,6 +171,9 @@ function App() {
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
           ))}
+          <button class="tab-btn emergency-btn" onClick={emergencyStop}>
+            Emergency stop
+          </button>
           <div class="external-links">
             <a class="ext-link" href="https://github.com/tadelv/yaeger" target="_blank" rel="noreferrer">
               <svg viewBox="0 0 24 24" aria-hidden="true">

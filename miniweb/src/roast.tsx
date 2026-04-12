@@ -276,6 +276,18 @@ export function RoastApp() {
     sendPidControlConfig(status, false, 0);
   };
 
+  useEffect(() => {
+    const onEmergencyStop = () => {
+      forceStopRoastControl(RoasterStatus.roasting);
+      setState((prev) => ({
+        ...prev,
+        currentState: { ...prev.currentState, status: RoasterStatus.idle },
+      }));
+    };
+    window.addEventListener("emergency-stop", onEmergencyStop);
+    return () => window.removeEventListener("emergency-stop", onEmergencyStop);
+  }, []);
+
   const toggleRoastRecording = () => {
     if (state.currentState.status === RoasterStatus.idle) {
       setState((prev) => ({
