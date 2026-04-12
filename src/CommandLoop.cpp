@@ -61,6 +61,8 @@ double pidAutotuneHighPeaks[PID_AUTOTUNE_PEAK_WINDOW] = {0};
 double pidAutotuneLowPeaks[PID_AUTOTUNE_PEAK_WINDOW] = {0};
 size_t pidAutotuneHighPeakCount = 0;
 size_t pidAutotuneLowPeakCount = 0;
+double pidAutotuneAvgPeakHigh = NAN;
+double pidAutotuneAvgPeakLow = NAN;
 
 void pushAutotunePeak(double *buffer, size_t &count, double value) {
   if (isnan(value)) {
@@ -373,6 +375,8 @@ void startPidAutotune() {
   pidAutotuneCyclePeak = NAN;
   pidAutotuneHighPeakCount = 0;
   pidAutotuneLowPeakCount = 0;
+  pidAutotuneAvgPeakHigh = NAN;
+  pidAutotuneAvgPeakLow = NAN;
   pidEnabled = false;
   preferences.putBool("pidEnabled", false);
   logf("PID autotune started (target=%s, method=%s, setpoint=%.2f)\n", pidTargetToString(pidTarget),
@@ -693,6 +697,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidAutotuneHeaterCommand"] = pidAutotuneHeaterCommand;
       dataObj["pidAutotuneMin"] = pidAutotuneRelayOutputLow;
       dataObj["pidAutotuneMax"] = pidAutotuneRelayOutputHigh;
+      dataObj["pidAutotuneRelayHigh"] = pidAutotuneRelayHigh;
+      dataObj["pidAutotuneCyclePeak"] = pidAutotuneCyclePeak;
+      dataObj["pidAutotuneAvgPeakHigh"] = pidAutotuneAvgPeakHigh;
+      dataObj["pidAutotuneAvgPeakLow"] = pidAutotuneAvgPeakLow;
+      dataObj["pidAutotuneHighPeakCount"] = static_cast<int>(pidAutotuneHighPeakCount);
+      dataObj["pidAutotuneLowPeakCount"] = static_cast<int>(pidAutotuneLowPeakCount);
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
@@ -749,6 +759,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidAutotuneHeaterCommand"] = pidAutotuneHeaterCommand;
       dataObj["pidAutotuneMin"] = pidAutotuneRelayOutputLow;
       dataObj["pidAutotuneMax"] = pidAutotuneRelayOutputHigh;
+      dataObj["pidAutotuneRelayHigh"] = pidAutotuneRelayHigh;
+      dataObj["pidAutotuneCyclePeak"] = pidAutotuneCyclePeak;
+      dataObj["pidAutotuneAvgPeakHigh"] = pidAutotuneAvgPeakHigh;
+      dataObj["pidAutotuneAvgPeakLow"] = pidAutotuneAvgPeakLow;
+      dataObj["pidAutotuneHighPeakCount"] = static_cast<int>(pidAutotuneHighPeakCount);
+      dataObj["pidAutotuneLowPeakCount"] = static_cast<int>(pidAutotuneLowPeakCount);
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
@@ -913,6 +929,10 @@ void updatePidControl() {
         }
         pidAutotuneLastCrossingMs = now;
         pidAutotuneCrossings++;
+        logf("PID autotune crossing %d/%d (falling, peak=%.2f, avgHigh=%.2f, avgLow=%.2f)\n", pidAutotuneCrossings,
+             PID_AUTOTUNE_MIN_CROSSINGS, pidAutotuneHighPeakCount > 0 ? pidAutotuneHighPeaks[pidAutotuneHighPeakCount - 1] : NAN,
+             averageAutotunePeaks(pidAutotuneHighPeaks, pidAutotuneHighPeakCount),
+             averageAutotunePeaks(pidAutotuneLowPeaks, pidAutotuneLowPeakCount));
       }
     } else {
       if (isnan(pidAutotuneCyclePeak) || currentTemp < pidAutotuneCyclePeak) {
@@ -930,11 +950,17 @@ void updatePidControl() {
         }
         pidAutotuneLastCrossingMs = now;
         pidAutotuneCrossings++;
+        logf("PID autotune crossing %d/%d (rising, peak=%.2f, avgHigh=%.2f, avgLow=%.2f)\n", pidAutotuneCrossings,
+             PID_AUTOTUNE_MIN_CROSSINGS, pidAutotuneLowPeakCount > 0 ? pidAutotuneLowPeaks[pidAutotuneLowPeakCount - 1] : NAN,
+             averageAutotunePeaks(pidAutotuneHighPeaks, pidAutotuneHighPeakCount),
+             averageAutotunePeaks(pidAutotuneLowPeaks, pidAutotuneLowPeakCount));
       }
     }
 
     const double avgPeakHigh = averageAutotunePeaks(pidAutotuneHighPeaks, pidAutotuneHighPeakCount);
     const double avgPeakLow = averageAutotunePeaks(pidAutotuneLowPeaks, pidAutotuneLowPeakCount);
+    pidAutotuneAvgPeakHigh = avgPeakHigh;
+    pidAutotuneAvgPeakLow = avgPeakLow;
     if (pidAutotuneCrossings >= PID_AUTOTUNE_MIN_CROSSINGS && pidAutotuneHalfCycleCount > 0 &&
         pidAutotuneHighPeakCount >= 2 && pidAutotuneLowPeakCount >= 2 && !isnan(avgPeakHigh) && !isnan(avgPeakLow) &&
         avgPeakHigh > avgPeakLow) {
