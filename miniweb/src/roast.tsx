@@ -279,13 +279,22 @@ export function RoastApp() {
       return;
     }
 
+    if (roastControlActive || pidEnabled || profileStore.followProfileEnabled) {
+      setRoastControlActive(false);
+      setPidEnabled(false);
+      profileStore.followProfileEnabled = false;
+      setRefreshToken((v) => v + 1);
+      setHeater(0);
+      sendCommand({ id: 1, BurnerVal: 0 });
+      sendPidControlConfig(RoasterStatus.roasting, false);
+    }
+
     setState((prev) => ({
       ...prev,
       currentState: { ...prev.currentState, status: RoasterStatus.idle },
       roast: prev.roast ? { ...prev.roast, profile: prev.profile } : prev.roast,
     }));
     sendCommand({ id: 1, command: "endRoastSession" });
-    setRoastControlActive(false);
     sendPidControlConfig(RoasterStatus.idle, false);
   };
 
@@ -330,8 +339,19 @@ export function RoastApp() {
         <button
           onClick={() => {
             const nextControlState = !roastControlActive;
-            setRoastControlActive(nextControlState);
-            sendPidControlConfig(state.currentState.status, nextControlState && pidEnabled, setpointTarget);
+            if (!nextControlState) {
+              setRoastControlActive(false);
+              setPidEnabled(false);
+              profileStore.followProfileEnabled = false;
+              setRefreshToken((v) => v + 1);
+              setHeater(0);
+              sendCommand({ id: 1, BurnerVal: 0 });
+              sendPidControlConfig(state.currentState.status, false, setpointTarget);
+              return;
+            }
+
+            setRoastControlActive(true);
+            sendPidControlConfig(state.currentState.status, pidEnabled, setpointTarget);
           }}
           disabled={state.currentState.status !== RoasterStatus.roasting}
         >
