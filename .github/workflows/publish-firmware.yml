@@ -9,7 +9,7 @@ on:
 
 jobs:
   publish:
-    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.repository.full_name == 'tadelv/yaeger' }}
     runs-on: ubuntu-latest
     permissions:
       contents: write
