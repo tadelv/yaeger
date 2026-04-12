@@ -265,6 +265,17 @@ export function RoastApp() {
   const formatMetric = (value: number | null | undefined, digits = 2) =>
     typeof value === "number" ? value.toFixed(digits) : "N/A";
 
+  const forceStopRoastControl = (status = state.currentState.status) => {
+    setRoastControlActive(false);
+    setPidEnabled(false);
+    profileStore.followProfileEnabled = false;
+    setRefreshToken((v) => v + 1);
+    setSetpointTarget(0);
+    setHeater(0);
+    sendCommand({ id: 1, BurnerVal: 0 });
+    sendPidControlConfig(status, false, 0);
+  };
+
   const toggleRoastRecording = () => {
     if (state.currentState.status === RoasterStatus.idle) {
       setState((prev) => ({
@@ -280,13 +291,7 @@ export function RoastApp() {
     }
 
     if (roastControlActive || pidEnabled || profileStore.followProfileEnabled) {
-      setRoastControlActive(false);
-      setPidEnabled(false);
-      profileStore.followProfileEnabled = false;
-      setRefreshToken((v) => v + 1);
-      setHeater(0);
-      sendCommand({ id: 1, BurnerVal: 0 });
-      sendPidControlConfig(RoasterStatus.roasting, false);
+      forceStopRoastControl(RoasterStatus.roasting);
     }
 
     setState((prev) => ({
@@ -340,13 +345,7 @@ export function RoastApp() {
           onClick={() => {
             const nextControlState = !roastControlActive;
             if (!nextControlState) {
-              setRoastControlActive(false);
-              setPidEnabled(false);
-              profileStore.followProfileEnabled = false;
-              setRefreshToken((v) => v + 1);
-              setHeater(0);
-              sendCommand({ id: 1, BurnerVal: 0 });
-              sendPidControlConfig(state.currentState.status, false, setpointTarget);
+              forceStopRoastControl(state.currentState.status);
               return;
             }
 
