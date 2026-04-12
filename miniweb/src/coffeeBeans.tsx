@@ -9,6 +9,8 @@ type BeanParticle = {
   angle: number;
   spin: number;
   opacity: number;
+  roastLevel: number;
+  roastVelocity: number;
 };
 
 type AvoidRect = {
@@ -24,6 +26,9 @@ const MOBILE_BEANS = 36;
 const MOBILE_BREAKPOINT = 880;
 const OBSTACLE_MARGIN = 24;
 const OBSTACLE_INFLUENCE_RADIUS = 96;
+const BEAN_REPULSION_RADIUS = 42;
+const BEAN_REPULSION_STRENGTH = 0.00085;
+const LAYOUT_REFILL_RATIO = 0.26;
 
 function normalizedRandom(seed: number) {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
@@ -44,8 +49,55 @@ function createBeans(count: number, width: number, height: number): BeanParticle
       angle: normalizedRandom(s * 4.4) * Math.PI * 2,
       spin: (normalizedRandom(s * 5.8) - 0.5) * 0.0014,
       opacity: 0.08 + normalizedRandom(s * 6.6) * 0.16,
+      roastLevel: normalizedRandom(s * 8.1),
+      roastVelocity: (normalizedRandom(s * 9.2) - 0.5) * 0.0015,
     };
   });
+}
+
+function isInsideAvoidRect(x: number, y: number, avoidRects: AvoidRect[]) {
+  return avoidRects.some((rect) => x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom);
+}
+
+function randomOpenPosition(width: number, height: number, avoidRects: AvoidRect[]) {
+  for (let i = 0; i < 16; i += 1) {
+    const x = Math.random() * width;
+    const y = Math.random() * height;
+    if (!isInsideAvoidRect(x, y, avoidRects)) return { x, y };
+  }
+  return { x: Math.random() * width, y: Math.random() * height };
+}
+
+function refillBeans(beans: BeanParticle[], width: number, height: number, avoidRects: AvoidRect[]) {
+  const moved = Math.max(1, Math.floor(beans.length * LAYOUT_REFILL_RATIO));
+  for (let i = 0; i < moved; i += 1) {
+    const bean = beans[(i * 7) % beans.length];
+    const pos = randomOpenPosition(width, height, avoidRects);
+    bean.x = pos.x;
+    bean.y = pos.y;
+    bean.vx *= 0.45;
+    bean.vy *= 0.45;
+  }
+}
+
+function mixChannel(a: number, b: number, t: number) {
+  return Math.round(a + (b - a) * t);
+}
+
+function beanFill(bean: BeanParticle) {
+  const t = bean.roastLevel;
+  const r = mixChannel(141, 52, t);
+  const g = mixChannel(176, 33, t);
+  const b = mixChannel(88, 18, t);
+  return `rgba(${r}, ${g}, ${b}, ${bean.opacity.toFixed(3)})`;
+}
+
+function beanCrease(bean: BeanParticle) {
+  const t = bean.roastLevel;
+  const r = mixChannel(85, 22, t);
+  const g = mixChannel(103, 12, t);
+  const b = mixChannel(56, 8, t);
+  return `rgba(${r}, ${g}, ${b}, ${(bean.opacity * 1.2).toFixed(3)})`;
 }
 
 function getAvoidRects(): AvoidRect[] {
@@ -115,6 +167,7 @@ export function CoffeeBeanBackground() {
     let dpr = 1;
     let rafId = 0;
     let running = true;
+    let layoutSignature = "";
 
     const pointer = { x: 0, y: 0, active: false };
     let beans: BeanParticle[] = [];
@@ -142,12 +195,12 @@ export function CoffeeBeanBackground() {
       const w = bean.size;
       const h = bean.size * 1.45;
 
-      ctx.fillStyle = `rgba(71, 38, 18, ${bean.opacity.toFixed(3)})`;
+      ctx.fillStyle = beanFill(bean);
       ctx.beginPath();
       ctx.ellipse(0, 0, w * 0.55, h * 0.55, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      ctx.strokeStyle = `rgba(34, 16, 8, ${(bean.opacity * 1.2).toFixed(3)})`;
+      ctx.strokeStyle = beanCrease(bean);
       ctx.lineWidth = Math.max(1, w * 0.08);
       ctx.beginPath();
       ctx.moveTo(0, -h * 0.34);
@@ -162,6 +215,34 @@ export function CoffeeBeanBackground() {
 
       ctx.clearRect(0, 0, width, height);
       const avoidRects = getAvoidRects();
+      const nextSignature = avoidRects
+        .map((rect) => `${Math.round(rect.left)}:${Math.round(rect.top)}:${Math.round(rect.right)}:${Math.round(rect.bottom)}`)
+        .join("|");
+      if (nextSignature !== layoutSignature) {
+        layoutSignature = nextSignature;
+        refillBeans(beans, width, height, avoidRects);
+      }
+
+      if (!reducedMotion) {
+        for (let i = 0; i < beans.length; i += 1) {
+          for (let j = i + 1; j < beans.length; j += 1) {
+            const a = beans[i];
+            const b = beans[j];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const distanceSq = dx * dx + dy * dy;
+            if (distanceSq < 1 || distanceSq > BEAN_REPULSION_RADIUS * BEAN_REPULSION_RADIUS) continue;
+            const distance = Math.sqrt(distanceSq);
+            const force = ((BEAN_REPULSION_RADIUS - distance) / BEAN_REPULSION_RADIUS) * BEAN_REPULSION_STRENGTH;
+            const ux = dx / distance;
+            const uy = dy / distance;
+            a.vx += ux * force;
+            a.vy += uy * force;
+            b.vx -= ux * force;
+            b.vy -= uy * force;
+          }
+        }
+      }
 
       for (const bean of beans) {
         if (!reducedMotion) {
@@ -187,6 +268,14 @@ export function CoffeeBeanBackground() {
 
           bean.vx *= 0.995;
           bean.vy *= 0.995;
+          bean.roastLevel += bean.roastVelocity;
+          if (bean.roastLevel >= 1) {
+            bean.roastLevel = 1;
+            bean.roastVelocity = -Math.abs(bean.roastVelocity || 0.0008);
+          } else if (bean.roastLevel <= 0) {
+            bean.roastLevel = 0;
+            bean.roastVelocity = Math.abs(bean.roastVelocity || 0.0008);
+          }
 
           if (bean.x < -30) bean.x = width + 30;
           else if (bean.x > width + 30) bean.x = -30;

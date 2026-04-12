@@ -106,7 +106,19 @@ export function AutotuneApp() {
         Start Autotune
       </button>
       <button onClick={() => sendCommand({ id: 1, command: "setPidControl", pidAutotune: false })}>Stop</button>
-      <button onClick={() => sendCommand({ id: 1, command: "setPreferences", pidTarget: target, pidKp: kp, pidKi: ki, pidKd: kd })}>Apply PID</button>
+      <button
+        onClick={() => {
+          sendCommand({ id: 1, command: "setPreferences", pidTarget: target, pidKp: kp, pidKi: ki, pidKd: kd });
+          window.dispatchEvent(
+            new CustomEvent("pid-preferences-updated", {
+              detail: { kp, ki, kd, pidTarget: target },
+            }),
+          );
+          setAutotuneLog((prev) => [...prev.slice(-24), `Applied PID: Kp ${kp.toFixed(3)}, Ki ${ki.toFixed(3)}, Kd ${kd.toFixed(3)}`]);
+        }}
+      >
+        Apply PID
+      </button>
       </div>
       <pre class="log-console">{autotuneLog.slice(-25).join("\n")}</pre>
     </div>
