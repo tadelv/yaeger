@@ -198,7 +198,7 @@ export function RoastApp() {
         measurements,
         events: [],
         commands: [],
-        profile: prev.profile,
+        profile: prev.roast?.profile ?? profileStore.profile,
       },
     }));
   }, [kd, ki, kp, lastData, state.roast?.measurements?.length]);
@@ -281,8 +281,13 @@ export function RoastApp() {
       setState((prev) => ({
         ...prev,
         currentState: { ...prev.currentState, status: RoasterStatus.roasting },
-        roast: { startDate: new Date(), measurements: [], events: [], commands: [] },
-        profile: profileStore.profile,
+        roast: {
+          startDate: new Date(),
+          measurements: [],
+          events: [],
+          commands: [],
+          profile: profileStore.profile,
+        },
       }));
       setRoastControlActive(false);
       sendCommand({ id: 1, command: "startRoastSession" });
@@ -297,7 +302,7 @@ export function RoastApp() {
     setState((prev) => ({
       ...prev,
       currentState: { ...prev.currentState, status: RoasterStatus.idle },
-      roast: prev.roast ? { ...prev.roast, profile: prev.profile } : prev.roast,
+      roast: prev.roast,
     }));
     sendCommand({ id: 1, command: "endRoastSession" });
     sendPidControlConfig(RoasterStatus.idle, false);
