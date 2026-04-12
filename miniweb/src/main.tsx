@@ -3,6 +3,7 @@ import { useEffect, useState } from "preact/hooks";
 import "./style.css";
 import { AutotuneApp } from "./autotune";
 import { LogsApp } from "./logs";
+import { UpdateApp } from "./update";
 import { ProfileControl } from "./profiling";
 import { RoastApp } from "./roast";
 import { getBasicAuthHeaderValue } from "./auth";
@@ -21,7 +22,7 @@ interface DeviceInfo {
   csrfToken?: string;
 }
 
-type AppTab = "home" | "roast" | "autotune" | "logs" | "settings";
+type AppTab = "home" | "roast" | "autotune" | "logs" | "update" | "settings";
 
 function App() {
   const { connectionStatus, lastMessage, lastUpdate } = useSocketState();
@@ -86,7 +87,7 @@ function App() {
       <div class="app-layout">
         <div class="tabs-nav">
           <h2 class="tabs-title">Yaeger</h2>
-          {(["home", "roast", "autotune", "logs", "settings"] as AppTab[]).map((tab) => (
+          {(["home", "roast", "autotune", "logs", "update", "settings"] as AppTab[]).map((tab) => (
             <button class={`tab-btn ${activeTab === tab ? "active" : ""}`} onClick={() => setActiveTab(tab)}>
               {tab.charAt(0).toUpperCase() + tab.slice(1)}
             </button>
@@ -146,6 +147,7 @@ function App() {
           {activeTab === "roast" && <RoastApp />}
           {activeTab === "autotune" && <AutotuneApp />}
           {activeTab === "logs" && <LogsApp />}
+          {activeTab === "update" && <UpdateApp />}
 
           {activeTab === "settings" && (
             <div>
