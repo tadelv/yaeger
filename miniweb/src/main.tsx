@@ -68,7 +68,7 @@ function App() {
 
   useEffect(() => {
     const onPidUpdated = (event: Event) => {
-      const customEvent = event as CustomEvent<{ kp?: number; ki?: number; kd?: number }>;
+      const customEvent = event as CustomEvent<{ kp?: number; ki?: number; kd?: number; pidTarget?: "BT" | "ET" | "simBT" }>;
       if (typeof customEvent.detail?.kp === "number") setPidPFactor(customEvent.detail.kp);
       if (typeof customEvent.detail?.ki === "number") setPidIFactor(customEvent.detail.ki);
       if (typeof customEvent.detail?.kd === "number") setPidDFactor(customEvent.detail.kd);
@@ -108,6 +108,11 @@ function App() {
       pidKd: pidDFactor,
       authToken: getAdminSecret(),
     });
+    window.dispatchEvent(
+      new CustomEvent("pid-preferences-updated", {
+        detail: { kp: pidPFactor, ki: pidIFactor, kd: pidDFactor },
+      }),
+    );
   };
 
   return (

@@ -111,7 +111,7 @@ export function AutotuneApp() {
           sendCommand({ id: 1, command: "setPreferences", pidTarget: target, pidKp: kp, pidKi: ki, pidKd: kd });
           window.dispatchEvent(
             new CustomEvent("pid-preferences-updated", {
-              detail: { kp, ki, kd },
+              detail: { kp, ki, kd, pidTarget: target },
             }),
           );
           setAutotuneLog((prev) => [...prev.slice(-24), `Applied PID: Kp ${kp.toFixed(3)}, Ki ${ki.toFixed(3)}, Kd ${kd.toFixed(3)}`]);

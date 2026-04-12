@@ -112,6 +112,25 @@ export function RoastApp() {
     });
   }, [kd, ki, kp, lastMessage, lastUpdate, pidEnabled, setpoint]);
 
+  useEffect(() => {
+    if (typeof lastMessage?.pidKpActive === "number") setKp(lastMessage.pidKpActive);
+    if (typeof lastMessage?.pidKiActive === "number") setKi(lastMessage.pidKiActive);
+    if (typeof lastMessage?.pidKdActive === "number") setKd(lastMessage.pidKdActive);
+    if (lastMessage?.pidTarget) setPidTarget(lastMessage.pidTarget);
+  }, [lastMessage]);
+
+  useEffect(() => {
+    const onPidUpdated = (event: Event) => {
+      const customEvent = event as CustomEvent<{ kp?: number; ki?: number; kd?: number; pidTarget?: PidTarget }>;
+      if (typeof customEvent.detail?.kp === "number") setKp(customEvent.detail.kp);
+      if (typeof customEvent.detail?.ki === "number") setKi(customEvent.detail.ki);
+      if (typeof customEvent.detail?.kd === "number") setKd(customEvent.detail.kd);
+      if (customEvent.detail?.pidTarget) setPidTarget(customEvent.detail.pidTarget);
+    };
+    window.addEventListener("pid-preferences-updated", onPidUpdated);
+    return () => window.removeEventListener("pid-preferences-updated", onPidUpdated);
+  }, []);
+
   const roastTime = useMemo(() => {
     if (!state.roast?.measurements.length) return "00:00";
     return getFormattedTimeDifference(
