@@ -6,11 +6,12 @@ type BeanParticle = {
   vx: number;
   vy: number;
   size: number;
+  baseSize: number;
   angle: number;
   spin: number;
   opacity: number;
-  roastLevel: number;
-  roastVelocity: number;
+  roastProgress: number;
+  roastSpeed: number;
 };
 
 type AvoidRect = {
@@ -21,14 +22,15 @@ type AvoidRect = {
 };
 
 const MAX_DPR = 1.5;
-const DESKTOP_BEANS = 64;
+const DESKTOP_BEANS = 96;
 const MOBILE_BEANS = 36;
 const MOBILE_BREAKPOINT = 880;
 const OBSTACLE_MARGIN = 24;
 const OBSTACLE_INFLUENCE_RADIUS = 96;
-const BEAN_REPULSION_RADIUS = 42;
-const BEAN_REPULSION_STRENGTH = 0.00085;
+const BEAN_REPULSION_RADIUS = 52;
+const BEAN_REPULSION_STRENGTH = 0.0019;
 const LAYOUT_REFILL_RATIO = 0.26;
+const CRUMBLE_START = 0.82;
 
 function normalizedRandom(seed: number) {
   const x = Math.sin(seed * 12.9898) * 43758.5453;
@@ -40,17 +42,19 @@ function createBeans(count: number, width: number, height: number): BeanParticle
     const s = index + 1;
     const speed = 0.03 + normalizedRandom(s * 7.9) * 0.08;
     const direction = normalizedRandom(s * 2.7) * Math.PI * 2;
+    const baseSize = 8 + normalizedRandom(s * 3.33) * 14;
     return {
       x: normalizedRandom(s * 1.11) * width,
       y: normalizedRandom(s * 1.77) * height,
       vx: Math.cos(direction) * speed,
       vy: Math.sin(direction) * speed,
-      size: 8 + normalizedRandom(s * 3.33) * 14,
+      size: baseSize,
+      baseSize,
       angle: normalizedRandom(s * 4.4) * Math.PI * 2,
       spin: (normalizedRandom(s * 5.8) - 0.5) * 0.0014,
       opacity: 0.08 + normalizedRandom(s * 6.6) * 0.16,
-      roastLevel: normalizedRandom(s * 8.1),
-      roastVelocity: (normalizedRandom(s * 9.2) - 0.5) * 0.0015,
+      roastProgress: normalizedRandom(s * 8.1),
+      roastSpeed: 0.0005 + normalizedRandom(s * 9.2) * 0.0011,
     };
   });
 }
@@ -80,24 +84,46 @@ function refillBeans(beans: BeanParticle[], width: number, height: number, avoid
   }
 }
 
+function resetBean(bean: BeanParticle, width: number, height: number, avoidRects: AvoidRect[]) {
+  const pos = randomOpenPosition(width, height, avoidRects);
+  const direction = Math.random() * Math.PI * 2;
+  const speed = 0.02 + Math.random() * 0.08;
+  bean.x = pos.x;
+  bean.y = pos.y;
+  bean.vx = Math.cos(direction) * speed;
+  bean.vy = Math.sin(direction) * speed;
+  bean.size = bean.baseSize;
+  bean.roastProgress = 0;
+}
+
 function mixChannel(a: number, b: number, t: number) {
   return Math.round(a + (b - a) * t);
 }
 
 function beanFill(bean: BeanParticle) {
-  const t = bean.roastLevel;
-  const r = mixChannel(141, 52, t);
-  const g = mixChannel(176, 33, t);
-  const b = mixChannel(88, 18, t);
-  return `rgba(${r}, ${g}, ${b}, ${bean.opacity.toFixed(3)})`;
+  const t = bean.roastProgress;
+  const phase = t < 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
+  const from = t < 0.5 ? [84, 178, 74] : [214, 187, 63];
+  const to = t < 0.5 ? [214, 187, 63] : [86, 47, 23];
+  const crumble = t <= CRUMBLE_START ? 0 : (t - CRUMBLE_START) / (1 - CRUMBLE_START);
+  const alpha = bean.opacity * (1 - crumble);
+  const r = mixChannel(from[0], to[0], phase);
+  const g = mixChannel(from[1], to[1], phase);
+  const b = mixChannel(from[2], to[2], phase);
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
 }
 
 function beanCrease(bean: BeanParticle) {
-  const t = bean.roastLevel;
-  const r = mixChannel(85, 22, t);
-  const g = mixChannel(103, 12, t);
-  const b = mixChannel(56, 8, t);
-  return `rgba(${r}, ${g}, ${b}, ${(bean.opacity * 1.2).toFixed(3)})`;
+  const t = bean.roastProgress;
+  const phase = t < 0.5 ? t / 0.5 : (t - 0.5) / 0.5;
+  const from = t < 0.5 ? [43, 110, 40] : [123, 93, 30];
+  const to = t < 0.5 ? [123, 93, 30] : [38, 19, 9];
+  const crumble = t <= CRUMBLE_START ? 0 : (t - CRUMBLE_START) / (1 - CRUMBLE_START);
+  const alpha = bean.opacity * 1.2 * (1 - crumble);
+  const r = mixChannel(from[0], to[0], phase);
+  const g = mixChannel(from[1], to[1], phase);
+  const b = mixChannel(from[2], to[2], phase);
+  return `rgba(${r}, ${g}, ${b}, ${alpha.toFixed(3)})`;
 }
 
 function getAvoidRects(): AvoidRect[] {
@@ -268,13 +294,19 @@ export function CoffeeBeanBackground() {
 
           bean.vx *= 0.995;
           bean.vy *= 0.995;
-          bean.roastLevel += bean.roastVelocity;
-          if (bean.roastLevel >= 1) {
-            bean.roastLevel = 1;
-            bean.roastVelocity = -Math.abs(bean.roastVelocity || 0.0008);
-          } else if (bean.roastLevel <= 0) {
-            bean.roastLevel = 0;
-            bean.roastVelocity = Math.abs(bean.roastVelocity || 0.0008);
+          bean.roastProgress += bean.roastSpeed;
+          if (bean.roastProgress > CRUMBLE_START) {
+            const crumble = (bean.roastProgress - CRUMBLE_START) / (1 - CRUMBLE_START);
+            bean.size = bean.baseSize * (1 - Math.min(0.7, crumble * 0.7));
+            bean.vx *= 0.985;
+            bean.vy += 0.0009 * crumble;
+            bean.spin *= 1 + crumble * 0.03;
+          } else {
+            bean.size = bean.baseSize;
+          }
+
+          if (bean.roastProgress >= 1) {
+            resetBean(bean, width, height, avoidRects);
           }
 
           if (bean.x < -30) bean.x = width + 30;
