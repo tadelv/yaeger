@@ -44,6 +44,7 @@ export type YaegerMessage = {
   pidKpActive?: number;
   pidKiActive?: number;
   pidKdActive?: number;
+  emergencyStopActive?: boolean;
   id: number;
 }
 
