@@ -30,6 +30,8 @@ function App() {
   const [pidPFactor, setPidPFactor] = useState(1.0);
   const [pidIFactor, setPidIFactor] = useState(0.1);
   const [pidDFactor, setPidDFactor] = useState(0.01);
+  const [pidProcessDelaySec, setPidProcessDelaySec] = useState(0);
+  const [pidPredictorEnabled, setPidPredictorEnabled] = useState(true);
   const [ssidField, setSsidField] = useState("");
   const [passField, setPassField] = useState("");
   const [activeTab, setActiveTab] = useState<AppTab>("home");
@@ -78,6 +80,14 @@ function App() {
     }
     if (typeof lastMessage?.pidKdActive === "number") {
       setPidDFactor(lastMessage.pidKdActive);
+      hydratedAny = true;
+    }
+    if (typeof lastMessage?.pidProcessDelaySec === "number") {
+      setPidProcessDelaySec(lastMessage.pidProcessDelaySec);
+      hydratedAny = true;
+    }
+    if (typeof lastMessage?.pidPredictorEnabled === "boolean") {
+      setPidPredictorEnabled(lastMessage.pidPredictorEnabled);
       hydratedAny = true;
     }
     if (hydratedAny) hasHydratedPidFromTelemetry.current = true;
@@ -131,6 +141,13 @@ function App() {
         detail: { kp: pidPFactor, ki: pidIFactor, kd: pidDFactor },
       }),
     );
+    sendWsCommand({
+      id: 1,
+      command: "setPidControl",
+      pidProcessDelaySec,
+      pidPredictorEnabled,
+      authToken: getAdminSecret(),
+    });
   };
 
   return (
@@ -257,6 +274,20 @@ function App() {
                     onFocus={() => setIsEditingPid(true)}
                     onBlur={() => setIsEditingPid(false)}
                     onInput={(e) => setPidDFactor(Number((e.target as HTMLInputElement).value) || 0)}
+                  />
+                  <label for="pid-delay">Process delay (s)</label>
+                  <input
+                    id="pid-delay"
+                    type="number"
+                    value={pidProcessDelaySec}
+                    onInput={(e) => setPidProcessDelaySec(Number((e.target as HTMLInputElement).value) || 0)}
+                  />
+                  <label for="pid-predictor">Predictor enabled</label>
+                  <input
+                    id="pid-predictor"
+                    type="checkbox"
+                    checked={pidPredictorEnabled}
+                    onChange={(e) => setPidPredictorEnabled(e.currentTarget.checked)}
                   />
                 </div>
                 <p />

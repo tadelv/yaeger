@@ -412,10 +412,14 @@ export function RoastApp() {
           <h3>PID current values</h3>
           <div class="pid-grid">
             <span>Temp {formatMetric(lastMessage?.pidCurrentTemp, 2)}</span>
+            <span>Pred Temp {formatMetric(lastMessage?.pidPredictedTemp, 2)}</span>
             <span>Error {formatMetric(lastMessage?.pidError, 2)}</span>
             <span>Integral {formatMetric(lastMessage?.pidIntegral, 2)}</span>
             <span>Derivative {formatMetric(lastMessage?.pidDerivative, 2)}</span>
             <span>Output {formatMetric(lastMessage?.pidOutput, 2)}</span>
+            <span>Smoothed {formatMetric(lastMessage?.pidOutputSmoothed, 2)}</span>
+            <span>Delay {formatMetric(lastMessage?.pidProcessDelaySec, 2)}s</span>
+            <span>Predictor {lastMessage?.pidPredictorEnabled ? "On" : "Off"}</span>
           </div>
         </div>
       </section>
