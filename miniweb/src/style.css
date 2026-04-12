@@ -58,63 +58,14 @@ h1 {
 .bean-bg {
   position: fixed;
   inset: 0;
-  overflow: hidden;
   pointer-events: none;
   z-index: 0;
-  --bean-parallax-x: 0px;
-  --bean-parallax-y: 0px;
-  transform: translate3d(var(--bean-parallax-x), var(--bean-parallax-y), 0);
-  transition: transform 240ms ease-out;
 }
 
-.bean {
-  position: absolute;
-  left: var(--bean-left);
-  top: var(--bean-top);
-  width: 20px;
-  height: 30px;
-  opacity: var(--bean-opacity);
-  transform: translate3d(0, 0, 0) rotate(var(--bean-rotation)) scale(var(--bean-scale));
-  border-radius: 45% 55% 50% 50% / 58% 44% 56% 42%;
-  background: linear-gradient(135deg, rgba(92, 51, 23, 0.7) 0%, rgba(66, 35, 15, 0.82) 56%, rgba(34, 17, 7, 0.84) 100%);
-  box-shadow: inset -2px -3px 5px rgba(0, 0, 0, 0.2), inset 2px 2px 4px rgba(255, 233, 204, 0.12);
-  will-change: transform;
-  animation:
-    bean-drift var(--bean-drift-duration) ease-in-out infinite alternate,
-    bean-roll var(--bean-roll-duration) linear infinite;
-  animation-delay: var(--bean-drift-delay), var(--bean-roll-delay);
-}
-
-.bean::before {
-  content: "";
-  position: absolute;
-  left: 47%;
-  top: 16%;
-  width: 2px;
-  height: 68%;
-  border-radius: 999px;
-  background: rgba(31, 14, 6, 0.45);
-  box-shadow: 0 0 0 1px rgba(190, 140, 104, 0.06);
-}
-
-@keyframes bean-drift {
-  from {
-    transform: translate3d(calc(var(--bean-drift-x) * -1), calc(var(--bean-drift-y) * -1), 0)
-      rotate(var(--bean-rotation)) scale(var(--bean-scale));
-  }
-  to {
-    transform: translate3d(var(--bean-drift-x), var(--bean-drift-y), 0)
-      rotate(calc(var(--bean-rotation) + 10deg)) scale(var(--bean-scale));
-  }
-}
-
-@keyframes bean-roll {
-  from {
-    rotate: -8deg;
-  }
-  to {
-    rotate: 8deg;
-  }
+.bean-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .tabs-nav {
@@ -494,10 +445,6 @@ textarea:focus {
 }
 
 @media (max-width: 880px) {
-  .bean:nth-child(n + 9) {
-    display: none;
-  }
-
   .app-layout {
     grid-template-columns: 1fr;
   }
@@ -536,13 +483,8 @@ textarea:focus {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .bean-bg {
-    transform: none;
-    transition: none;
-  }
-
-  .bean {
-    animation: none;
+  .bean-canvas {
+    opacity: 0.8;
   }
 }
 
