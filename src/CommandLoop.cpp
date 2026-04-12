@@ -22,6 +22,7 @@ unsigned long lastWebClientDisconnectMs = 0;
 unsigned long lastMutatingCommandMs = 0;
 bool webClientGraceActive = false;
 constexpr unsigned long PID_UPDATE_INTERVAL_MS = 400;
+constexpr double PID_OUTPUT_SMOOTHING_ALPHA = 0.25;
 unsigned long lastPidUpdateMs = 0;
 constexpr unsigned long ROAST_HISTORY_SAMPLE_INTERVAL_MS = 1000;
 constexpr size_t ROAST_HISTORY_MAX_SAMPLES = 1800;
@@ -33,6 +34,7 @@ double pidCurrentTemp = NAN;
 double pidError = 0.0;
 double pidDerivative = 0.0;
 double pidOutput = 0.0;
+double pidSmoothedOutput = 0.0;
 
 double pidSetpoint = 20.0;
 bool pidEnabled = true;
@@ -357,6 +359,7 @@ void resetPidState() {
   pidIntegral = 0.0;
   pidPreviousError = 0.0;
   pidHasPreviousError = false;
+  pidSmoothedOutput = getHeaterPower();
 }
 
 void startPidAutotune() {
@@ -682,6 +685,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidIntegral"] = pidIntegral;
       dataObj["pidDerivative"] = pidDerivative;
       dataObj["pidOutput"] = pidOutput;
+      dataObj["pidOutputSmoothed"] = pidSmoothedOutput;
       dataObj["pidAutotuneCrossings"] = pidAutotuneCrossings;
       dataObj["pidAutotuneTargetCrossings"] = PID_AUTOTUNE_MIN_CROSSINGS;
       dataObj["pidAutotunePeakHigh"] = pidAutotunePeakHigh;
@@ -744,6 +748,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidIntegral"] = pidIntegral;
       dataObj["pidDerivative"] = pidDerivative;
       dataObj["pidOutput"] = pidOutput;
+      dataObj["pidOutputSmoothed"] = pidSmoothedOutput;
       dataObj["pidAutotuneCrossings"] = pidAutotuneCrossings;
       dataObj["pidAutotuneTargetCrossings"] = PID_AUTOTUNE_MIN_CROSSINGS;
       dataObj["pidAutotunePeakHigh"] = pidAutotunePeakHigh;
@@ -1006,8 +1011,11 @@ void updatePidControl() {
     clamped = std::clamp(unsaturated, 0.0, 100.0);
   }
 
+  pidSmoothedOutput += PID_OUTPUT_SMOOTHING_ALPHA * (clamped - pidSmoothedOutput);
+  pidSmoothedOutput = std::clamp(pidSmoothedOutput, 0.0, 100.0);
+
   double output = unsaturated;
-  long heaterPower = lround(clamped);
+  long heaterPower = lround(pidSmoothedOutput);
   setHeaterPower(heaterPower);
   pidPreviousError = error;
   pidCurrentTemp = currentTemp;
