@@ -1,5 +1,5 @@
 import { render } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import "./style.css";
 import { AutotuneApp } from "./autotune";
 import { LogsApp } from "./logs";
@@ -37,6 +37,9 @@ function App() {
   const [deviceInfoError, setDeviceInfoError] = useState<string | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [, setTick] = useState(0);
+  const [isEditingPid, setIsEditingPid] = useState(false);
+  const hasHydratedPidFromTelemetry = useRef(false);
+  const pidSyncPausedUntilMs = useRef(0);
 
   const appVersion = __APP_VERSION__;
   const appVersionLabel = `V${appVersion}`;
@@ -61,10 +64,24 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (typeof lastMessage?.pidKpActive === "number") setPidPFactor(lastMessage.pidKpActive);
-    if (typeof lastMessage?.pidKiActive === "number") setPidIFactor(lastMessage.pidKiActive);
-    if (typeof lastMessage?.pidKdActive === "number") setPidDFactor(lastMessage.pidKdActive);
-  }, [lastMessage]);
+    if (hasHydratedPidFromTelemetry.current) return;
+    if (isEditingPid || Date.now() < pidSyncPausedUntilMs.current) return;
+
+    let hydratedAny = false;
+    if (typeof lastMessage?.pidKpActive === "number") {
+      setPidPFactor(lastMessage.pidKpActive);
+      hydratedAny = true;
+    }
+    if (typeof lastMessage?.pidKiActive === "number") {
+      setPidIFactor(lastMessage.pidKiActive);
+      hydratedAny = true;
+    }
+    if (typeof lastMessage?.pidKdActive === "number") {
+      setPidDFactor(lastMessage.pidKdActive);
+      hydratedAny = true;
+    }
+    if (hydratedAny) hasHydratedPidFromTelemetry.current = true;
+  }, [isEditingPid, lastMessage]);
 
   useEffect(() => {
     const onPidUpdated = (event: Event) => {
@@ -100,6 +117,7 @@ function App() {
   };
 
   const applyPidFromSettings = () => {
+    pidSyncPausedUntilMs.current = Date.now() + 3000;
     sendWsCommand({
       id: 1,
       command: "setPreferences",
@@ -214,11 +232,32 @@ function App() {
                 <h2>PID Factors</h2>
                 <div class="form-grid">
                   <label for="pid-p">P</label>
-                  <input id="pid-p" type="number" value={pidPFactor} onInput={(e) => setPidPFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+                  <input
+                    id="pid-p"
+                    type="number"
+                    value={pidPFactor}
+                    onFocus={() => setIsEditingPid(true)}
+                    onBlur={() => setIsEditingPid(false)}
+                    onInput={(e) => setPidPFactor(Number((e.target as HTMLInputElement).value) || 0)}
+                  />
                   <label for="pid-i">I</label>
-                  <input id="pid-i" type="number" value={pidIFactor} onInput={(e) => setPidIFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+                  <input
+                    id="pid-i"
+                    type="number"
+                    value={pidIFactor}
+                    onFocus={() => setIsEditingPid(true)}
+                    onBlur={() => setIsEditingPid(false)}
+                    onInput={(e) => setPidIFactor(Number((e.target as HTMLInputElement).value) || 0)}
+                  />
                   <label for="pid-d">D</label>
-                  <input id="pid-d" type="number" value={pidDFactor} onInput={(e) => setPidDFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+                  <input
+                    id="pid-d"
+                    type="number"
+                    value={pidDFactor}
+                    onFocus={() => setIsEditingPid(true)}
+                    onBlur={() => setIsEditingPid(false)}
+                    onInput={(e) => setPidDFactor(Number((e.target as HTMLInputElement).value) || 0)}
+                  />
                 </div>
                 <p />
                 <button onClick={applyPidFromSettings}>Apply PID</button>
