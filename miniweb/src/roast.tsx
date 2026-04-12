@@ -31,6 +31,7 @@ export function RoastApp() {
   const [kd, setKd] = useState(0.01);
   const [pidEnabled, setPidEnabled] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
+  const [isEditingPid, setIsEditingPid] = useState(false);
   const [refreshToken, setRefreshToken] = useState(0);
   const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
   const [graphHeightScale, setGraphHeightScale] = useState(1.2);
@@ -194,11 +195,11 @@ export function RoastApp() {
   }, [kd, ki, kp, lastData, state.roast?.measurements?.length]);
 
   useEffect(() => {
-    if (typeof lastMessage?.pidKpActive === "number") setKp(lastMessage.pidKpActive);
-    if (typeof lastMessage?.pidKiActive === "number") setKi(lastMessage.pidKiActive);
-    if (typeof lastMessage?.pidKdActive === "number") setKd(lastMessage.pidKdActive);
+    if (!isEditingPid && typeof lastMessage?.pidKpActive === "number") setKp(lastMessage.pidKpActive);
+    if (!isEditingPid && typeof lastMessage?.pidKiActive === "number") setKi(lastMessage.pidKiActive);
+    if (!isEditingPid && typeof lastMessage?.pidKdActive === "number") setKd(lastMessage.pidKdActive);
     if (lastMessage?.pidTarget) setPidTarget(lastMessage.pidTarget);
-  }, [lastMessage]);
+  }, [isEditingPid, lastMessage]);
 
   useEffect(() => {
     const onPidUpdated = (event: Event) => {
@@ -494,11 +495,29 @@ export function RoastApp() {
         <h3>PID Factors</h3>
         <div class="form-grid">
           <label>P</label>
-          <input type="number" value={kp} onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)} />
+          <input
+            type="number"
+            value={kp}
+            onFocus={() => setIsEditingPid(true)}
+            onBlur={() => setIsEditingPid(false)}
+            onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)}
+          />
           <label>I</label>
-          <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
+          <input
+            type="number"
+            value={ki}
+            onFocus={() => setIsEditingPid(true)}
+            onBlur={() => setIsEditingPid(false)}
+            onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)}
+          />
           <label>D</label>
-          <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
+          <input
+            type="number"
+            value={kd}
+            onFocus={() => setIsEditingPid(true)}
+            onBlur={() => setIsEditingPid(false)}
+            onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)}
+          />
           <label>Target</label>
           <select value={pidTarget} onChange={(e) => setPidTarget((e.target as HTMLSelectElement).value as PidTarget)}>
             <option value="BT">BT</option>

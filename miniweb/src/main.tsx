@@ -1,5 +1,5 @@
 import { render } from "preact";
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import "./style.css";
 import { AutotuneApp } from "./autotune";
 import { LogsApp } from "./logs";
@@ -37,6 +37,8 @@ function App() {
   const [deviceInfoError, setDeviceInfoError] = useState<string | null>(null);
   const [csrfToken, setCsrfToken] = useState("");
   const [, setTick] = useState(0);
+  const [isEditingPid, setIsEditingPid] = useState(false);
+  const latestPidFromDevice = useRef<{ kp?: number; ki?: number; kd?: number }>({});
 
   const appVersion = __APP_VERSION__;
   const appVersionLabel = `V${appVersion}`;
@@ -61,10 +63,18 @@ function App() {
   }, []);
 
   useEffect(() => {
-    if (typeof lastMessage?.pidKpActive === "number") setPidPFactor(lastMessage.pidKpActive);
-    if (typeof lastMessage?.pidKiActive === "number") setPidIFactor(lastMessage.pidKiActive);
-    if (typeof lastMessage?.pidKdActive === "number") setPidDFactor(lastMessage.pidKdActive);
-  }, [lastMessage]);
+    const nextPid: { kp?: number; ki?: number; kd?: number } = {
+      kp: typeof lastMessage?.pidKpActive === "number" ? lastMessage.pidKpActive : undefined,
+      ki: typeof lastMessage?.pidKiActive === "number" ? lastMessage.pidKiActive : undefined,
+      kd: typeof lastMessage?.pidKdActive === "number" ? lastMessage.pidKdActive : undefined,
+    };
+    latestPidFromDevice.current = nextPid;
+
+    if (isEditingPid) return;
+    if (typeof nextPid.kp === "number") setPidPFactor(nextPid.kp);
+    if (typeof nextPid.ki === "number") setPidIFactor(nextPid.ki);
+    if (typeof nextPid.kd === "number") setPidDFactor(nextPid.kd);
+  }, [isEditingPid, lastMessage]);
 
   useEffect(() => {
     const onPidUpdated = (event: Event) => {
@@ -214,11 +224,32 @@ function App() {
                 <h2>PID Factors</h2>
                 <div class="form-grid">
                   <label for="pid-p">P</label>
-                  <input id="pid-p" type="number" value={pidPFactor} onInput={(e) => setPidPFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+                  <input
+                    id="pid-p"
+                    type="number"
+                    value={pidPFactor}
+                    onFocus={() => setIsEditingPid(true)}
+                    onBlur={() => setIsEditingPid(false)}
+                    onInput={(e) => setPidPFactor(Number((e.target as HTMLInputElement).value) || 0)}
+                  />
                   <label for="pid-i">I</label>
-                  <input id="pid-i" type="number" value={pidIFactor} onInput={(e) => setPidIFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+                  <input
+                    id="pid-i"
+                    type="number"
+                    value={pidIFactor}
+                    onFocus={() => setIsEditingPid(true)}
+                    onBlur={() => setIsEditingPid(false)}
+                    onInput={(e) => setPidIFactor(Number((e.target as HTMLInputElement).value) || 0)}
+                  />
                   <label for="pid-d">D</label>
-                  <input id="pid-d" type="number" value={pidDFactor} onInput={(e) => setPidDFactor(Number((e.target as HTMLInputElement).value) || 0)} />
+                  <input
+                    id="pid-d"
+                    type="number"
+                    value={pidDFactor}
+                    onFocus={() => setIsEditingPid(true)}
+                    onBlur={() => setIsEditingPid(false)}
+                    onInput={(e) => setPidDFactor(Number((e.target as HTMLInputElement).value) || 0)}
+                  />
                 </div>
                 <p />
                 <button onClick={applyPidFromSettings}>Apply PID</button>
