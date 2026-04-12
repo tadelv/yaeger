@@ -80,8 +80,13 @@ double pidDelayBaselineTemp = NAN;
 double pidMeasuredProcessDelaySeconds = NAN;
 double pidDelayMeasureFan = 50.0;
 double pidDelayMeasureHeater = 60.0;
+double pidDelayStabilizeTempSum = 0.0;
+int pidDelayStabilizeSampleCount = 0;
+int pidDelayRiseSampleCount = 0;
 constexpr unsigned long PID_DELAY_STABILIZE_MS = 10000;
-constexpr double PID_DELAY_RISE_THRESHOLD_C = 0.5;
+constexpr double PID_DELAY_RISE_THRESHOLD_C = 0.2;
+constexpr double PID_DELAY_RISE_SLOPE_THRESHOLD = 0.02;
+constexpr int PID_DELAY_RISE_CONSECUTIVE_SAMPLES = 3;
 
 void pushAutotunePeak(double *buffer, size_t &count, double value) {
   if (isnan(value)) {
@@ -456,6 +461,9 @@ void startPidDelayMeasurement() {
   pidDelayHeatStartMs = 0;
   pidDelayBaselineTemp = NAN;
   pidMeasuredProcessDelaySeconds = NAN;
+  pidDelayStabilizeTempSum = 0.0;
+  pidDelayStabilizeSampleCount = 0;
+  pidDelayRiseSampleCount = 0;
   pidEnabled = false;
   pidAutotuneActive = false;
   preferences.putBool("pidEnabled", false);
@@ -1042,12 +1050,19 @@ void updatePidControl() {
   if (pidDelayMeasureState == PidDelayMeasureState::STABILIZING) {
     setFanSpeed(lround(std::clamp(pidDelayMeasureFan, 0.0, 100.0)));
     setHeaterPower(0);
+    pidDelayStabilizeTempSum += currentTemp;
+    pidDelayStabilizeSampleCount++;
     if (now - pidDelayMeasureStartMs >= PID_DELAY_STABILIZE_MS) {
-      pidDelayBaselineTemp = currentTemp;
+      if (pidDelayStabilizeSampleCount > 0) {
+        pidDelayBaselineTemp = pidDelayStabilizeTempSum / pidDelayStabilizeSampleCount;
+      } else {
+        pidDelayBaselineTemp = currentTemp;
+      }
       pidDelayHeatStartMs = now;
       pidDelayMeasureState = PidDelayMeasureState::HEATING;
       setHeaterPower(lround(std::clamp(pidDelayMeasureHeater, 0.0, 100.0)));
-      logf("PID delay measurement heating phase started (baseline=%.2f)\n", pidDelayBaselineTemp);
+      logf("PID delay measurement heating phase started after fixed %lu ms (baseline=%.2f)\n",
+           PID_DELAY_STABILIZE_MS, pidDelayBaselineTemp);
     }
     pidCurrentTemp = currentTemp;
     pidPredictedTemp = currentTemp;
@@ -1057,11 +1072,18 @@ void updatePidControl() {
   if (pidDelayMeasureState == PidDelayMeasureState::HEATING) {
     setFanSpeed(lround(std::clamp(pidDelayMeasureFan, 0.0, 100.0)));
     setHeaterPower(lround(std::clamp(pidDelayMeasureHeater, 0.0, 100.0)));
-    if (!isnan(pidDelayBaselineTemp) && currentTemp >= pidDelayBaselineTemp + PID_DELAY_RISE_THRESHOLD_C) {
+    if (pidTempSlope > PID_DELAY_RISE_SLOPE_THRESHOLD) {
+      pidDelayRiseSampleCount++;
+    } else {
+      pidDelayRiseSampleCount = 0;
+    }
+    bool crossedBaseline = !isnan(pidDelayBaselineTemp) && currentTemp >= pidDelayBaselineTemp + PID_DELAY_RISE_THRESHOLD_C;
+    bool sustainedRise = pidDelayRiseSampleCount >= PID_DELAY_RISE_CONSECUTIVE_SAMPLES;
+    if (crossedBaseline || sustainedRise) {
       pidMeasuredProcessDelaySeconds = (now - pidDelayHeatStartMs) / 1000.0;
       pidProcessDelaySeconds = pidMeasuredProcessDelaySeconds;
       preferences.putDouble("pidProcessDelaySec", pidProcessDelaySeconds);
-      stopPidDelayMeasurement("temperature rise detected");
+      stopPidDelayMeasurement(crossedBaseline ? "temperature crossed baseline threshold" : "sustained positive slope detected");
     } else if (now - pidDelayHeatStartMs > 120000) {
       stopPidDelayMeasurement("timeout waiting for temperature rise", true);
     }
