@@ -21,7 +21,7 @@ function dateReviver(_key: string, value: unknown): unknown {
 }
 
 export function RoastApp() {
-  const { lastMessage, lastUpdate } = useSocketState();
+  const { connectionStatus, lastData, lastMessage, lastUpdate } = useSocketState();
   const [state, setState] = useState<YaegerState>(initialState);
   const [fan, setFan] = useState(50);
   const [heater, setHeater] = useState(50);
@@ -37,6 +37,10 @@ export function RoastApp() {
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
+  };
+
+  const requestRoastHistory = () => {
+    sendWsCommand({ id: 1, command: "getRoastHistory" });
   };
 
   const appendCommand = (label: "fan" | "heater", value: number) => {
@@ -113,6 +117,70 @@ export function RoastApp() {
   }, [kd, ki, kp, lastMessage, lastUpdate, pidEnabled, setpoint]);
 
   useEffect(() => {
+    if (connectionStatus === "Connected") {
+      requestRoastHistory();
+    }
+  }, [connectionStatus]);
+
+  useEffect(() => {
+    if (!lastData || lastData.type !== "roastHistory") return;
+    if (state.roast?.measurements?.length) return;
+
+    const samples = Array.isArray(lastData.samples) ? lastData.samples : [];
+    if (!samples.length) return;
+
+    const latestMs = Number((samples[samples.length - 1] as Record<string, unknown>).ms ?? 0);
+    if (!Number.isFinite(latestMs) || latestMs <= 0) return;
+    const nowMs = Date.now();
+    const startDate = new Date(nowMs - latestMs);
+
+    const measurements: Measurement[] = samples
+      .map((entry) => {
+        const sample = entry as Record<string, unknown>;
+        const sampleMs = Number(sample.ms ?? 0);
+        if (!Number.isFinite(sampleMs)) return null;
+        return {
+          timestamp: new Date(nowMs - (latestMs - sampleMs)),
+          message: {
+            id: 1,
+            ET: Number(sample.ET ?? NaN),
+            BT: Number(sample.BT ?? NaN),
+            simBT: Number(sample.simBT ?? NaN),
+            Amb: Number(sample.Amb ?? NaN),
+            BurnerVal: Number(sample.BurnerVal ?? 0),
+            FanVal: Number(sample.FanVal ?? 0),
+          },
+          extra: {
+            setpoint: Number(sample.setpoint ?? 0),
+            pidData: {
+              enabled: Boolean(sample.pidEnabled),
+              kp,
+              ki,
+              kd,
+            },
+          },
+        } satisfies Measurement;
+      })
+      .filter((m): m is Measurement => m != null);
+
+    if (!measurements.length) return;
+    setState((prev) => ({
+      ...prev,
+      currentState: {
+        ...prev.currentState,
+        status: Boolean(lastData.active) ? RoasterStatus.roasting : RoasterStatus.idle,
+      },
+      roast: {
+        startDate,
+        measurements,
+        events: [],
+        commands: [],
+        profile: prev.profile,
+      },
+    }));
+  }, [kd, ki, kp, lastData, state.roast?.measurements?.length]);
+
+  useEffect(() => {
     if (typeof lastMessage?.pidKpActive === "number") setKp(lastMessage.pidKpActive);
     if (typeof lastMessage?.pidKiActive === "number") setKi(lastMessage.pidKiActive);
     if (typeof lastMessage?.pidKdActive === "number") setKd(lastMessage.pidKdActive);
@@ -168,6 +236,7 @@ export function RoastApp() {
         roast: { startDate: new Date(), measurements: [], events: [], commands: [] },
         profile: profileStore.profile,
       }));
+      sendCommand({ id: 1, command: "startRoastSession" });
       sendPidControlConfig(RoasterStatus.roasting);
       return;
     }
@@ -177,6 +246,7 @@ export function RoastApp() {
       currentState: { ...prev.currentState, status: RoasterStatus.idle },
       roast: prev.roast ? { ...prev.roast, profile: prev.profile } : prev.roast,
     }));
+    sendCommand({ id: 1, command: "endRoastSession" });
     sendPidControlConfig(RoasterStatus.idle);
   };
 

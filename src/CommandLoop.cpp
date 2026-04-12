@@ -23,6 +23,8 @@ unsigned long lastMutatingCommandMs = 0;
 bool webClientGraceActive = false;
 constexpr unsigned long PID_UPDATE_INTERVAL_MS = 400;
 unsigned long lastPidUpdateMs = 0;
+constexpr unsigned long ROAST_HISTORY_SAMPLE_INTERVAL_MS = 1000;
+constexpr size_t ROAST_HISTORY_MAX_SAMPLES = 1800;
 
 double pidIntegral = 0.0;
 double pidPreviousError = 0.0;
@@ -54,6 +56,25 @@ double pidAutotuneRelayOutputHigh = 60.0;
 double pidAutotuneRelayOutputLow = 0.0;
 constexpr int PID_AUTOTUNE_MIN_CROSSINGS = 8;
 
+struct RoastHistorySample {
+  unsigned long ms;
+  float et;
+  float bt;
+  float amb;
+  float simBt;
+  long burnerVal;
+  long fanVal;
+  double setpoint;
+  bool pidEnabled;
+};
+
+RoastHistorySample roastHistory[ROAST_HISTORY_MAX_SAMPLES];
+size_t roastHistoryStart = 0;
+size_t roastHistoryCount = 0;
+bool roastSessionActive = false;
+unsigned long roastSessionStartMs = 0;
+unsigned long lastRoastHistorySampleMs = 0;
+
 bool isManualRoastModeActive() { return !pidEnabled && !pidAutotuneActive; }
 
 bool isMutatingCommand(const char *command) {
@@ -62,7 +83,8 @@ bool isMutatingCommand(const char *command) {
   }
 
   return strncmp(command, "setBurner", 9) == 0 || strncmp(command, "setFan", 6) == 0 ||
-         strncmp(command, "setPreferences", 14) == 0 || strncmp(command, "setPidControl", 13) == 0;
+         strncmp(command, "setPreferences", 14) == 0 || strncmp(command, "setPidControl", 13) == 0 ||
+         strncmp(command, "startRoastSession", 17) == 0 || strncmp(command, "endRoastSession", 15) == 0;
 }
 
 bool enforceMutatingCommandAuth(AsyncWebSocketClient *client, JsonDocument &doc) {
@@ -261,6 +283,25 @@ bool validateCommandSchema(AsyncWebSocketClient *client, JsonDocument &doc, cons
   }
 
   return true;
+}
+
+void resetRoastHistorySession() {
+  roastHistoryStart = 0;
+  roastHistoryCount = 0;
+  roastSessionStartMs = millis();
+  lastRoastHistorySampleMs = 0;
+}
+
+void appendRoastHistorySample(const RoastHistorySample &sample) {
+  if (roastHistoryCount < ROAST_HISTORY_MAX_SAMPLES) {
+    size_t index = (roastHistoryStart + roastHistoryCount) % ROAST_HISTORY_MAX_SAMPLES;
+    roastHistory[index] = sample;
+    roastHistoryCount++;
+    return;
+  }
+
+  roastHistory[roastHistoryStart] = sample;
+  roastHistoryStart = (roastHistoryStart + 1) % ROAST_HISTORY_MAX_SAMPLES;
 }
 
 void resetPidState() {
@@ -508,6 +549,17 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       }
     }
 
+    if (command != NULL && strncmp(command, "startRoastSession", 17) == 0) {
+      resetRoastHistorySession();
+      roastSessionActive = true;
+      log("Roast history session started");
+    }
+
+    if (command != NULL && strncmp(command, "endRoastSession", 15) == 0) {
+      roastSessionActive = false;
+      log("Roast history session ended");
+    }
+
     if (getHeaterPower() > 0 && getFanSpeed() <= 30) {
       setFanSpeed(30);
     }
@@ -635,6 +687,31 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
     }
 
+    if (command != NULL && strncmp(command, "getRoastHistory", 15) == 0) {
+      JsonObject root = doc.to<JsonObject>();
+      JsonObject dataObj = root["data"].to<JsonObject>();
+      root["id"] = ln_id;
+      dataObj["type"] = "roastHistory";
+      dataObj["active"] = roastSessionActive;
+      dataObj["sessionStartMs"] = roastSessionStartMs;
+      dataObj["sampleIntervalMs"] = ROAST_HISTORY_SAMPLE_INTERVAL_MS;
+      JsonArray samples = dataObj["samples"].to<JsonArray>();
+      for (size_t i = 0; i < roastHistoryCount; i++) {
+        size_t idx = (roastHistoryStart + i) % ROAST_HISTORY_MAX_SAMPLES;
+        const RoastHistorySample &sample = roastHistory[idx];
+        JsonObject sampleObj = samples.add<JsonObject>();
+        sampleObj["ms"] = sample.ms;
+        sampleObj["ET"] = sample.et;
+        sampleObj["BT"] = sample.bt;
+        sampleObj["Amb"] = sample.amb;
+        sampleObj["simBT"] = sample.simBt;
+        sampleObj["BurnerVal"] = sample.burnerVal;
+        sampleObj["FanVal"] = sample.fanVal;
+        sampleObj["setpoint"] = sample.setpoint;
+        sampleObj["pidEnabled"] = sample.pidEnabled;
+      }
+    }
+
     String response;
     response.reserve(measureJson(doc) + 1);
     serializeJson(doc, response);
@@ -697,6 +774,34 @@ void updateConnectionSafety(AsyncWebSocket *ws) {
   setFanSpeed(WEB_CLIENT_MANUAL_SAFETY_FAN_SPEED);
   webClientGraceActive = false;
   log("Manual mode websocket disconnect timeout reached, applying safety output (heater=0, fan=50)");
+}
+
+void updateRoastHistory() {
+  if (!roastSessionActive) {
+    return;
+  }
+
+  unsigned long now = millis();
+  if (lastRoastHistorySampleMs != 0 && now - lastRoastHistorySampleMs < ROAST_HISTORY_SAMPLE_INTERVAL_MS) {
+    return;
+  }
+
+  float etbt[3];
+  bool gotReading = getETBTReadings(etbt);
+  RoastHistorySample sample = {
+      .ms = now,
+      .et = gotReading ? etbt[0] : NAN,
+      .bt = gotReading ? etbt[1] : NAN,
+      .amb = gotReading ? etbt[2] : NAN,
+      .simBt = getSimulatedInternalBeanTemp(),
+      .burnerVal = getHeaterPower(),
+      .fanVal = getFanSpeed(),
+      .setpoint = pidSetpoint,
+      .pidEnabled = pidEnabled,
+  };
+
+  appendRoastHistorySample(sample);
+  lastRoastHistorySampleMs = now;
 }
 
 void updatePidControl() {

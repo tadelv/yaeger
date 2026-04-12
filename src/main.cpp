@@ -114,6 +114,7 @@ void loop(void) {
     ws.cleanupClients();
     updateConnectionSafety(&ws);
     takeReadings();
+    updateRoastHistory();
     updatePidControl();
   }
   if (now - lastDisplayRefreshMs >= DISPLAY_REFRESH_INTERVAL_MS) {
