@@ -99,7 +99,7 @@ export function RoastApp() {
         const measurement: Measurement = {
           timestamp: lastUpdate,
           message: lastMessage,
-          extra: { setpoint, pidData: { enabled: pidEnabled, kp, ki, kd } },
+          extra: { setpoint: lastMessage.setpoint ?? setpoint, pidData: { enabled: pidEnabled, kp, ki, kd } },
         };
         next.roast = {
           ...prev.roast,
@@ -422,6 +422,9 @@ export function RoastApp() {
             onInput={(e) => {
               const value = Number((e.target as HTMLInputElement).value);
               setSetpoint(value);
+            }}
+            onChange={(e) => {
+              const value = Number((e.target as HTMLInputElement).value);
               sendPidControlConfig(state.currentState.status, pidEnabled, value);
             }}
           />
