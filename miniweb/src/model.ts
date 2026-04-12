@@ -16,6 +16,16 @@ export type YaegerMessage = {
   pidIntegral?: number;
   pidDerivative?: number;
   pidOutput?: number;
+  pidOutputSmoothed?: number;
+  pidPredictedTemp?: number;
+  pidTempSlope?: number;
+  pidProcessDelaySec?: number;
+  pidPredictorEnabled?: boolean;
+  pidDelayMeasureState?: "idle" | "stabilizing" | "heating" | "complete" | "failed";
+  pidDelayMeasureElapsedSec?: number;
+  pidMeasuredProcessDelaySec?: number;
+  pidDelayFan?: number;
+  pidDelayHeater?: number;
   setpoint?: number;
   pidTarget?: "BT" | "ET" | "simBT";
   pidTuneMethod?: "ziegler-nichols" | "tyreus-luyben" | "pessen-integral" | "no-overshoot";

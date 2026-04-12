@@ -22,6 +22,7 @@ unsigned long lastWebClientDisconnectMs = 0;
 unsigned long lastMutatingCommandMs = 0;
 bool webClientGraceActive = false;
 constexpr unsigned long PID_UPDATE_INTERVAL_MS = 400;
+constexpr double PID_OUTPUT_SMOOTHING_ALPHA = 0.25;
 unsigned long lastPidUpdateMs = 0;
 constexpr unsigned long ROAST_HISTORY_SAMPLE_INTERVAL_MS = 1000;
 constexpr size_t ROAST_HISTORY_MAX_SAMPLES = 1800;
@@ -33,6 +34,13 @@ double pidCurrentTemp = NAN;
 double pidError = 0.0;
 double pidDerivative = 0.0;
 double pidOutput = 0.0;
+double pidSmoothedOutput = 0.0;
+double pidPredictedTemp = NAN;
+double pidTempSlope = 0.0;
+double pidPreviousTemp = NAN;
+bool pidHasPreviousTemp = false;
+double pidProcessDelaySeconds = 0.0;
+bool pidPredictorEnabled = true;
 
 double pidSetpoint = 20.0;
 bool pidEnabled = true;
@@ -55,6 +63,85 @@ double pidAutotuneHeaterCommand = 0.0;
 double pidAutotuneRelayOutputHigh = 60.0;
 double pidAutotuneRelayOutputLow = 0.0;
 constexpr int PID_AUTOTUNE_MIN_CROSSINGS = 8;
+constexpr size_t PID_AUTOTUNE_PEAK_WINDOW = 6;
+double pidAutotuneCyclePeak = NAN;
+double pidAutotuneHighPeaks[PID_AUTOTUNE_PEAK_WINDOW] = {0};
+double pidAutotuneLowPeaks[PID_AUTOTUNE_PEAK_WINDOW] = {0};
+size_t pidAutotuneHighPeakCount = 0;
+size_t pidAutotuneLowPeakCount = 0;
+double pidAutotuneAvgPeakHigh = NAN;
+double pidAutotuneAvgPeakLow = NAN;
+
+enum class PidDelayMeasureState { IDLE, STABILIZING, HEATING, COMPLETE, FAILED };
+PidDelayMeasureState pidDelayMeasureState = PidDelayMeasureState::IDLE;
+unsigned long pidDelayMeasureStartMs = 0;
+unsigned long pidDelayHeatStartMs = 0;
+double pidDelayBaselineTemp = NAN;
+double pidMeasuredProcessDelaySeconds = NAN;
+double pidDelayMeasureFan = 50.0;
+double pidDelayMeasureHeater = 60.0;
+double pidDelayStabilizeTempSum = 0.0;
+int pidDelayStabilizeSampleCount = 0;
+int pidDelayRiseSampleCount = 0;
+constexpr unsigned long PID_DELAY_STABILIZE_MS = 10000;
+constexpr double PID_DELAY_RISE_THRESHOLD_C = 0.2;
+constexpr double PID_DELAY_RISE_SLOPE_THRESHOLD = 0.02;
+constexpr int PID_DELAY_RISE_CONSECUTIVE_SAMPLES = 3;
+
+void pushAutotunePeak(double *buffer, size_t &count, double value) {
+  if (isnan(value)) {
+    return;
+  }
+  if (count < PID_AUTOTUNE_PEAK_WINDOW) {
+    buffer[count++] = value;
+    return;
+  }
+  for (size_t i = 1; i < PID_AUTOTUNE_PEAK_WINDOW; i++) {
+    buffer[i - 1] = buffer[i];
+  }
+  buffer[PID_AUTOTUNE_PEAK_WINDOW - 1] = value;
+}
+
+double averageAutotunePeaks(const double *buffer, size_t count) {
+  if (count == 0) {
+    return NAN;
+  }
+  double sum = 0.0;
+  for (size_t i = 0; i < count; i++) {
+    sum += buffer[i];
+  }
+  return sum / count;
+}
+
+const char *sensorErrorSummary(SensorErrorCode exhaustError, SensorErrorCode beanError) {
+  bool exhaustFault = exhaustError != SENSOR_OK;
+  bool beanFault = beanError != SENSOR_OK;
+  if (exhaustFault && beanFault) {
+    return "ET+BT";
+  }
+  if (exhaustFault) {
+    return "ET";
+  }
+  if (beanFault) {
+    return "BT";
+  }
+  return "none";
+}
+
+const char *pidDelayMeasureStateToString(PidDelayMeasureState state) {
+  switch (state) {
+  case PidDelayMeasureState::STABILIZING:
+    return "stabilizing";
+  case PidDelayMeasureState::HEATING:
+    return "heating";
+  case PidDelayMeasureState::COMPLETE:
+    return "complete";
+  case PidDelayMeasureState::FAILED:
+    return "failed";
+  default:
+    return "idle";
+  }
+}
 
 struct RoastHistorySample {
   unsigned long ms;
@@ -281,6 +368,26 @@ bool validateCommandSchema(AsyncWebSocketClient *client, JsonDocument &doc, cons
       client->text("{\"error\":\"invalid schema: pidAutotuneMax must be numeric\"}");
       return false;
     }
+    if (!doc["pidMeasureDelay"].isNull() && !doc["pidMeasureDelay"].is<bool>()) {
+      client->text("{\"error\":\"invalid schema: pidMeasureDelay must be boolean\"}");
+      return false;
+    }
+    if (!doc["pidDelayFan"].isNull() && !doc["pidDelayFan"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: pidDelayFan must be numeric\"}");
+      return false;
+    }
+    if (!doc["pidDelayHeater"].isNull() && !doc["pidDelayHeater"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: pidDelayHeater must be numeric\"}");
+      return false;
+    }
+    if (!doc["pidProcessDelaySec"].isNull() && !doc["pidProcessDelaySec"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: pidProcessDelaySec must be numeric\"}");
+      return false;
+    }
+    if (!doc["pidPredictorEnabled"].isNull() && !doc["pidPredictorEnabled"].is<bool>()) {
+      client->text("{\"error\":\"invalid schema: pidPredictorEnabled must be boolean\"}");
+      return false;
+    }
   }
 
   return true;
@@ -309,6 +416,11 @@ void resetPidState() {
   pidIntegral = 0.0;
   pidPreviousError = 0.0;
   pidHasPreviousError = false;
+  pidSmoothedOutput = getHeaterPower();
+  pidPredictedTemp = NAN;
+  pidTempSlope = 0.0;
+  pidPreviousTemp = NAN;
+  pidHasPreviousTemp = false;
 }
 
 void startPidAutotune() {
@@ -324,6 +436,11 @@ void startPidAutotune() {
   pidAutotuneKu = NAN;
   pidAutotunePu = NAN;
   pidAutotuneHeaterCommand = 0.0;
+  pidAutotuneCyclePeak = NAN;
+  pidAutotuneHighPeakCount = 0;
+  pidAutotuneLowPeakCount = 0;
+  pidAutotuneAvgPeakHigh = NAN;
+  pidAutotuneAvgPeakLow = NAN;
   pidEnabled = false;
   preferences.putBool("pidEnabled", false);
   logf("PID autotune started (target=%s, method=%s, setpoint=%.2f)\n", pidTargetToString(pidTarget),
@@ -336,6 +453,30 @@ void stopPidAutotune(const char *reason) {
   setHeaterPower(0);
   pidAutotuneHeaterCommand = 0.0;
   logf("PID autotune stopped (%s)\n", reason == NULL ? "unknown" : reason);
+}
+
+void startPidDelayMeasurement() {
+  pidDelayMeasureState = PidDelayMeasureState::STABILIZING;
+  pidDelayMeasureStartMs = millis();
+  pidDelayHeatStartMs = 0;
+  pidDelayBaselineTemp = NAN;
+  pidMeasuredProcessDelaySeconds = NAN;
+  pidDelayStabilizeTempSum = 0.0;
+  pidDelayStabilizeSampleCount = 0;
+  pidDelayRiseSampleCount = 0;
+  pidEnabled = false;
+  pidAutotuneActive = false;
+  preferences.putBool("pidEnabled", false);
+  setFanSpeed(lround(std::clamp(pidDelayMeasureFan, 0.0, 100.0)));
+  setHeaterPower(0);
+  logf("PID delay measurement started (fan=%.1f, heater=%.1f)\n", pidDelayMeasureFan, pidDelayMeasureHeater);
+}
+
+void stopPidDelayMeasurement(const char *reason, bool failed = false) {
+  pidDelayMeasureState = failed ? PidDelayMeasureState::FAILED : PidDelayMeasureState::COMPLETE;
+  setHeaterPower(0);
+  logf("PID delay measurement %s (%s, delay=%.2fs)\n", failed ? "failed" : "completed",
+       reason == NULL ? "unknown" : reason, pidMeasuredProcessDelaySeconds);
 }
 
 double readPidTargetTemp(PidTargetSensor target, const float *etbt) {
@@ -543,10 +684,27 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
         pidAutotuneRelayOutputHigh = std::clamp(doc["pidAutotuneMax"].as<double>(), 0.0, 100.0);
         preferences.putDouble("pidAutoMax", pidAutotuneRelayOutputHigh);
       }
+      if (!doc["pidDelayFan"].isNull()) {
+        pidDelayMeasureFan = std::clamp(doc["pidDelayFan"].as<double>(), 0.0, 100.0);
+      }
+      if (!doc["pidDelayHeater"].isNull()) {
+        pidDelayMeasureHeater = std::clamp(doc["pidDelayHeater"].as<double>(), 0.0, 100.0);
+      }
+      if (!doc["pidProcessDelaySec"].isNull()) {
+        pidProcessDelaySeconds = std::max(0.0, doc["pidProcessDelaySec"].as<double>());
+        preferences.putDouble("pidProcessDelaySec", pidProcessDelaySeconds);
+      }
+      if (!doc["pidPredictorEnabled"].isNull()) {
+        pidPredictorEnabled = doc["pidPredictorEnabled"].as<bool>();
+        preferences.putBool("pidPredictorEnabled", pidPredictorEnabled);
+      }
       if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
         double temp = pidAutotuneRelayOutputLow;
         pidAutotuneRelayOutputLow = pidAutotuneRelayOutputHigh;
         pidAutotuneRelayOutputHigh = temp;
+      }
+      if (!doc["pidMeasureDelay"].isNull() && doc["pidMeasureDelay"].as<bool>()) {
+        startPidDelayMeasurement();
       }
     }
 
@@ -629,6 +787,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidIntegral"] = pidIntegral;
       dataObj["pidDerivative"] = pidDerivative;
       dataObj["pidOutput"] = pidOutput;
+      dataObj["pidOutputSmoothed"] = pidSmoothedOutput;
+      dataObj["pidPredictedTemp"] = pidPredictedTemp;
+      dataObj["pidTempSlope"] = pidTempSlope;
+      dataObj["pidProcessDelaySec"] = pidProcessDelaySeconds;
+      dataObj["pidPredictorEnabled"] = pidPredictorEnabled;
       dataObj["pidAutotuneCrossings"] = pidAutotuneCrossings;
       dataObj["pidAutotuneTargetCrossings"] = PID_AUTOTUNE_MIN_CROSSINGS;
       dataObj["pidAutotunePeakHigh"] = pidAutotunePeakHigh;
@@ -644,9 +807,26 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidAutotuneHeaterCommand"] = pidAutotuneHeaterCommand;
       dataObj["pidAutotuneMin"] = pidAutotuneRelayOutputLow;
       dataObj["pidAutotuneMax"] = pidAutotuneRelayOutputHigh;
+      dataObj["pidAutotuneRelayHigh"] = pidAutotuneRelayHigh;
+      dataObj["pidAutotuneCyclePeak"] = pidAutotuneCyclePeak;
+      dataObj["pidAutotuneAvgPeakHigh"] = pidAutotuneAvgPeakHigh;
+      dataObj["pidAutotuneAvgPeakLow"] = pidAutotuneAvgPeakLow;
+      dataObj["pidAutotuneHighPeakCount"] = static_cast<int>(pidAutotuneHighPeakCount);
+      dataObj["pidAutotuneLowPeakCount"] = static_cast<int>(pidAutotuneLowPeakCount);
+      dataObj["pidDelayMeasureState"] = pidDelayMeasureStateToString(pidDelayMeasureState);
+      dataObj["pidDelayMeasureElapsedSec"] =
+          pidDelayMeasureState == PidDelayMeasureState::IDLE ? 0.0 : (millis() - pidDelayMeasureStartMs) / 1000.0;
+      dataObj["pidMeasuredProcessDelaySec"] = pidMeasuredProcessDelaySeconds;
+      dataObj["pidDelayFan"] = pidDelayMeasureFan;
+      dataObj["pidDelayHeater"] = pidDelayMeasureHeater;
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
+      SensorErrorCode exhaustError = getExhaustSensorError();
+      SensorErrorCode beanError = getBeanSensorError();
+      dataObj["exhaustSensorError"] = static_cast<int>(exhaustError);
+      dataObj["beanSensorError"] = static_cast<int>(beanError);
+      dataObj["sensorErrorSummary"] = sensorErrorSummary(exhaustError, beanError);
     }
 
     if (command != NULL && strncmp(command, "getData", 7) == 0) {
@@ -655,13 +835,19 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       root["id"] = ln_id;
       float etbt[3];
       bool gotReading = getETBTReadings(etbt);
+      SensorErrorCode exhaustError = getExhaustSensorError();
+      SensorErrorCode beanError = getBeanSensorError();
+      bool sensorOk = gotReading && exhaustError == SENSOR_OK && beanError == SENSOR_OK;
       dataObj["type"] = "status";
       dataObj["ET"] = gotReading ? etbt[0] : NAN;
       dataObj["BT"] = gotReading ? etbt[1] : NAN;
       dataObj["simBT"] = getSimulatedInternalBeanTemp();
       dataObj["Amb"] = gotReading ? etbt[2] : NAN;
       dataObj["sampleAgeMs"] = millis() - getLastSensorUpdateMs();
-      dataObj["sensorOk"] = gotReading;
+      dataObj["sensorOk"] = sensorOk;
+      dataObj["exhaustSensorError"] = static_cast<int>(exhaustError);
+      dataObj["beanSensorError"] = static_cast<int>(beanError);
+      dataObj["sensorErrorSummary"] = sensorErrorSummary(exhaustError, beanError);
       dataObj["BurnerVal"] = getHeaterPower();
       dataObj["FanVal"] = getFanSpeed();
       dataObj["setpoint"] = pidSetpoint;
@@ -674,6 +860,11 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidIntegral"] = pidIntegral;
       dataObj["pidDerivative"] = pidDerivative;
       dataObj["pidOutput"] = pidOutput;
+      dataObj["pidOutputSmoothed"] = pidSmoothedOutput;
+      dataObj["pidPredictedTemp"] = pidPredictedTemp;
+      dataObj["pidTempSlope"] = pidTempSlope;
+      dataObj["pidProcessDelaySec"] = pidProcessDelaySeconds;
+      dataObj["pidPredictorEnabled"] = pidPredictorEnabled;
       dataObj["pidAutotuneCrossings"] = pidAutotuneCrossings;
       dataObj["pidAutotuneTargetCrossings"] = PID_AUTOTUNE_MIN_CROSSINGS;
       dataObj["pidAutotunePeakHigh"] = pidAutotunePeakHigh;
@@ -689,6 +880,18 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidAutotuneHeaterCommand"] = pidAutotuneHeaterCommand;
       dataObj["pidAutotuneMin"] = pidAutotuneRelayOutputLow;
       dataObj["pidAutotuneMax"] = pidAutotuneRelayOutputHigh;
+      dataObj["pidAutotuneRelayHigh"] = pidAutotuneRelayHigh;
+      dataObj["pidAutotuneCyclePeak"] = pidAutotuneCyclePeak;
+      dataObj["pidAutotuneAvgPeakHigh"] = pidAutotuneAvgPeakHigh;
+      dataObj["pidAutotuneAvgPeakLow"] = pidAutotuneAvgPeakLow;
+      dataObj["pidAutotuneHighPeakCount"] = static_cast<int>(pidAutotuneHighPeakCount);
+      dataObj["pidAutotuneLowPeakCount"] = static_cast<int>(pidAutotuneLowPeakCount);
+      dataObj["pidDelayMeasureState"] = pidDelayMeasureStateToString(pidDelayMeasureState);
+      dataObj["pidDelayMeasureElapsedSec"] =
+          pidDelayMeasureState == PidDelayMeasureState::IDLE ? 0.0 : (millis() - pidDelayMeasureStartMs) / 1000.0;
+      dataObj["pidMeasuredProcessDelaySec"] = pidMeasuredProcessDelaySeconds;
+      dataObj["pidDelayFan"] = pidDelayMeasureFan;
+      dataObj["pidDelayHeater"] = pidDelayMeasureHeater;
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
@@ -755,6 +958,8 @@ void setupMainLoop(AsyncWebSocket *ws) {
   pidAutotuneActive = false;
   pidAutotuneRelayOutputLow = std::clamp(preferences.getDouble("pidAutoMin", 0.0), 0.0, 100.0);
   pidAutotuneRelayOutputHigh = std::clamp(preferences.getDouble("pidAutoMax", 60.0), 0.0, 100.0);
+  pidProcessDelaySeconds = std::max(0.0, preferences.getDouble("pidProcessDelaySec", 0.0));
+  pidPredictorEnabled = preferences.getBool("pidPredictorEnabled", true);
   if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
     double temp = pidAutotuneRelayOutputLow;
     pidAutotuneRelayOutputLow = pidAutotuneRelayOutputHigh;
@@ -816,9 +1021,15 @@ void updatePidControl() {
   if (now - lastPidUpdateMs < PID_UPDATE_INTERVAL_MS) {
     return;
   }
+  double dtSeconds = lastPidUpdateMs == 0 ? PID_UPDATE_INTERVAL_MS / 1000.0 : (now - lastPidUpdateMs) / 1000.0;
+  if (dtSeconds <= 0.0) {
+    dtSeconds = PID_UPDATE_INTERVAL_MS / 1000.0;
+  }
   lastPidUpdateMs = now;
 
-  if (!pidEnabled && !pidAutotuneActive) {
+  bool pidDelayMeasureRunning =
+      pidDelayMeasureState == PidDelayMeasureState::STABILIZING || pidDelayMeasureState == PidDelayMeasureState::HEATING;
+  if (!pidEnabled && !pidAutotuneActive && !pidDelayMeasureRunning) {
     return;
   }
 
@@ -832,14 +1043,67 @@ void updatePidControl() {
     return;
   }
 
+  if (pidHasPreviousTemp) {
+    pidTempSlope = (currentTemp - pidPreviousTemp) / dtSeconds;
+  }
+  pidPreviousTemp = currentTemp;
+  pidHasPreviousTemp = true;
+
+  if (pidDelayMeasureState == PidDelayMeasureState::STABILIZING) {
+    setFanSpeed(lround(std::clamp(pidDelayMeasureFan, 0.0, 100.0)));
+    setHeaterPower(0);
+    pidDelayStabilizeTempSum += currentTemp;
+    pidDelayStabilizeSampleCount++;
+    if (now - pidDelayMeasureStartMs >= PID_DELAY_STABILIZE_MS) {
+      if (pidDelayStabilizeSampleCount > 0) {
+        pidDelayBaselineTemp = pidDelayStabilizeTempSum / pidDelayStabilizeSampleCount;
+      } else {
+        pidDelayBaselineTemp = currentTemp;
+      }
+      pidDelayHeatStartMs = now;
+      pidDelayMeasureState = PidDelayMeasureState::HEATING;
+      setHeaterPower(lround(std::clamp(pidDelayMeasureHeater, 0.0, 100.0)));
+      logf("PID delay measurement heating phase started after fixed %lu ms (baseline=%.2f)\n",
+           PID_DELAY_STABILIZE_MS, pidDelayBaselineTemp);
+    }
+    pidCurrentTemp = currentTemp;
+    pidPredictedTemp = currentTemp;
+    return;
+  }
+
+  if (pidDelayMeasureState == PidDelayMeasureState::HEATING) {
+    setFanSpeed(lround(std::clamp(pidDelayMeasureFan, 0.0, 100.0)));
+    setHeaterPower(lround(std::clamp(pidDelayMeasureHeater, 0.0, 100.0)));
+    if (pidTempSlope > PID_DELAY_RISE_SLOPE_THRESHOLD) {
+      pidDelayRiseSampleCount++;
+    } else {
+      pidDelayRiseSampleCount = 0;
+    }
+    bool crossedBaseline = !isnan(pidDelayBaselineTemp) && currentTemp >= pidDelayBaselineTemp + PID_DELAY_RISE_THRESHOLD_C;
+    bool sustainedRise = pidDelayRiseSampleCount >= PID_DELAY_RISE_CONSECUTIVE_SAMPLES;
+    if (crossedBaseline || sustainedRise) {
+      pidMeasuredProcessDelaySeconds = (now - pidDelayHeatStartMs) / 1000.0;
+      pidProcessDelaySeconds = pidMeasuredProcessDelaySeconds;
+      preferences.putDouble("pidProcessDelaySec", pidProcessDelaySeconds);
+      stopPidDelayMeasurement(crossedBaseline ? "temperature crossed baseline threshold" : "sustained positive slope detected");
+    } else if (now - pidDelayHeatStartMs > 120000) {
+      stopPidDelayMeasurement("timeout waiting for temperature rise", true);
+    }
+    pidCurrentTemp = currentTemp;
+    pidPredictedTemp = currentTemp;
+    return;
+  }
+
   if (pidAutotuneActive) {
     if (pidAutotuneRelayHigh) {
-      if (isnan(pidAutotunePeakHigh) || currentTemp > pidAutotunePeakHigh) {
-        pidAutotunePeakHigh = currentTemp;
+      if (isnan(pidAutotuneCyclePeak) || currentTemp > pidAutotuneCyclePeak) {
+        pidAutotuneCyclePeak = currentTemp;
       }
       setHeaterPower(lround(pidAutotuneRelayOutputHigh));
       pidAutotuneHeaterCommand = pidAutotuneRelayOutputHigh;
       if (currentTemp >= pidSetpoint) {
+        pushAutotunePeak(pidAutotuneHighPeaks, pidAutotuneHighPeakCount, pidAutotuneCyclePeak);
+        pidAutotuneCyclePeak = NAN;
         pidAutotuneRelayHigh = false;
         if (pidAutotuneLastCrossingMs != 0) {
           pidAutotuneHalfCycleSecondsSum += (now - pidAutotuneLastCrossingMs) / 1000.0;
@@ -847,14 +1111,20 @@ void updatePidControl() {
         }
         pidAutotuneLastCrossingMs = now;
         pidAutotuneCrossings++;
+        logf("PID autotune crossing %d/%d (falling, peak=%.2f, avgHigh=%.2f, avgLow=%.2f)\n", pidAutotuneCrossings,
+             PID_AUTOTUNE_MIN_CROSSINGS, pidAutotuneHighPeakCount > 0 ? pidAutotuneHighPeaks[pidAutotuneHighPeakCount - 1] : NAN,
+             averageAutotunePeaks(pidAutotuneHighPeaks, pidAutotuneHighPeakCount),
+             averageAutotunePeaks(pidAutotuneLowPeaks, pidAutotuneLowPeakCount));
       }
     } else {
-      if (isnan(pidAutotunePeakLow) || currentTemp < pidAutotunePeakLow) {
-        pidAutotunePeakLow = currentTemp;
+      if (isnan(pidAutotuneCyclePeak) || currentTemp < pidAutotuneCyclePeak) {
+        pidAutotuneCyclePeak = currentTemp;
       }
       setHeaterPower(lround(pidAutotuneRelayOutputLow));
       pidAutotuneHeaterCommand = pidAutotuneRelayOutputLow;
       if (currentTemp <= pidSetpoint) {
+        pushAutotunePeak(pidAutotuneLowPeaks, pidAutotuneLowPeakCount, pidAutotuneCyclePeak);
+        pidAutotuneCyclePeak = NAN;
         pidAutotuneRelayHigh = true;
         if (pidAutotuneLastCrossingMs != 0) {
           pidAutotuneHalfCycleSecondsSum += (now - pidAutotuneLastCrossingMs) / 1000.0;
@@ -862,20 +1132,31 @@ void updatePidControl() {
         }
         pidAutotuneLastCrossingMs = now;
         pidAutotuneCrossings++;
+        logf("PID autotune crossing %d/%d (rising, peak=%.2f, avgHigh=%.2f, avgLow=%.2f)\n", pidAutotuneCrossings,
+             PID_AUTOTUNE_MIN_CROSSINGS, pidAutotuneLowPeakCount > 0 ? pidAutotuneLowPeaks[pidAutotuneLowPeakCount - 1] : NAN,
+             averageAutotunePeaks(pidAutotuneHighPeaks, pidAutotuneHighPeakCount),
+             averageAutotunePeaks(pidAutotuneLowPeaks, pidAutotuneLowPeakCount));
       }
     }
 
+    const double avgPeakHigh = averageAutotunePeaks(pidAutotuneHighPeaks, pidAutotuneHighPeakCount);
+    const double avgPeakLow = averageAutotunePeaks(pidAutotuneLowPeaks, pidAutotuneLowPeakCount);
+    pidAutotuneAvgPeakHigh = avgPeakHigh;
+    pidAutotuneAvgPeakLow = avgPeakLow;
     if (pidAutotuneCrossings >= PID_AUTOTUNE_MIN_CROSSINGS && pidAutotuneHalfCycleCount > 0 &&
-        !isnan(pidAutotunePeakHigh) && !isnan(pidAutotunePeakLow) && pidAutotunePeakHigh > pidAutotunePeakLow) {
-      const double oscillationAmplitude = (pidAutotunePeakHigh - pidAutotunePeakLow) / 2.0;
+        pidAutotuneHighPeakCount >= 2 && pidAutotuneLowPeakCount >= 2 && !isnan(avgPeakHigh) && !isnan(avgPeakLow) &&
+        avgPeakHigh > avgPeakLow) {
+      pidAutotunePeakHigh = avgPeakHigh;
+      pidAutotunePeakLow = avgPeakLow;
+      const double oscillationAmplitude = (avgPeakHigh - avgPeakLow) / 2.0;
       const double relayAmplitude = (pidAutotuneRelayOutputHigh - pidAutotuneRelayOutputLow) / 2.0;
       const double ku = (4.0 * relayAmplitude) / (M_PI * oscillationAmplitude);
       const double puSeconds = 2.0 * (pidAutotuneHalfCycleSecondsSum / pidAutotuneHalfCycleCount);
       pidAutotuneKu = ku;
       pidAutotunePu = puSeconds;
       applyAutotunedPidGains(ku, puSeconds);
-      logf("PID autotune converged (Ku=%.4f, Pu=%.4f, peakHigh=%.2f, peakLow=%.2f)\n", ku, puSeconds,
-           pidAutotunePeakHigh, pidAutotunePeakLow);
+      logf("PID autotune converged (Ku=%.4f, Pu=%.4f, avgPeakHigh=%.2f, avgPeakLow=%.2f)\n", ku, puSeconds,
+           avgPeakHigh, avgPeakLow);
       stopPidAutotune("converged");
       resetPidState();
     }
@@ -884,15 +1165,16 @@ void updatePidControl() {
     return;
   }
 
-  double error = pidSetpoint - currentTemp;
+  double controlTemp = currentTemp;
+  if (pidPredictorEnabled && pidProcessDelaySeconds > 0.0) {
+    controlTemp = currentTemp + pidTempSlope * pidProcessDelaySeconds;
+  }
+  pidPredictedTemp = controlTemp;
+  double error = pidSetpoint - controlTemp;
 
   double kp = getPidGain("pidKp", pidTarget, 1.0);
   double ki = getPidGain("pidKi", pidTarget, 0.1);
   double kd = getPidGain("pidKd", pidTarget, 0.01);
-  double dtSeconds = PID_UPDATE_INTERVAL_MS / 1000.0;
-
-  pidIntegral += error * dtSeconds;
-  pidIntegral = std::clamp(pidIntegral, -100.0, 100.0);
 
   double derivative = 0.0;
   if (pidHasPreviousError) {
@@ -901,8 +1183,21 @@ void updatePidControl() {
     pidHasPreviousError = true;
   }
 
-  double output = kp * error + ki * pidIntegral + kd * derivative;
-  long heaterPower = lround(std::clamp(output, 0.0, 100.0));
+  double unsaturated = kp * error + ki * pidIntegral + kd * derivative;
+  double clamped = std::clamp(unsaturated, 0.0, 100.0);
+  bool allowIntegrate = unsaturated == clamped || (unsaturated > 100.0 && error < 0.0) || (unsaturated < 0.0 && error > 0.0);
+  if (allowIntegrate) {
+    pidIntegral += error * dtSeconds;
+    pidIntegral = std::clamp(pidIntegral, -100.0, 100.0);
+    unsaturated = kp * error + ki * pidIntegral + kd * derivative;
+    clamped = std::clamp(unsaturated, 0.0, 100.0);
+  }
+
+  pidSmoothedOutput += PID_OUTPUT_SMOOTHING_ALPHA * (clamped - pidSmoothedOutput);
+  pidSmoothedOutput = std::clamp(pidSmoothedOutput, 0.0, 100.0);
+
+  double output = unsaturated;
+  long heaterPower = lround(pidSmoothedOutput);
   setHeaterPower(heaterPower);
   pidPreviousError = error;
   pidCurrentTemp = currentTemp;
