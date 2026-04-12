@@ -13,7 +13,8 @@
 Preferences preferences;
 
 namespace {
-constexpr unsigned long WEB_CLIENT_GRACE_PERIOD_MS = 10000;
+constexpr unsigned long WEB_CLIENT_MANUAL_SAFETY_DELAY_MS = 20000;
+constexpr long WEB_CLIENT_MANUAL_SAFETY_FAN_SPEED = 50;
 constexpr unsigned long MUTATING_CMD_MIN_INTERVAL_MS = 100;
 constexpr long ACTUATOR_MIN_VALUE = 0;
 constexpr long ACTUATOR_MAX_VALUE = 100;
@@ -52,6 +53,8 @@ double pidAutotuneHeaterCommand = 0.0;
 double pidAutotuneRelayOutputHigh = 60.0;
 double pidAutotuneRelayOutputLow = 0.0;
 constexpr int PID_AUTOTUNE_MIN_CROSSINGS = 8;
+
+bool isManualRoastModeActive() { return !pidEnabled && !pidAutotuneActive; }
 
 bool isMutatingCommand(const char *command) {
   if (command == NULL) {
@@ -355,8 +358,16 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
     break;
   case WS_EVT_DISCONNECT: {
     logf("[%u] Disconnected!\n", client->id());
-    webClientGraceActive = true;
-    lastWebClientDisconnectMs = millis();
+    if (isManualRoastModeActive()) {
+      webClientGraceActive = true;
+      lastWebClientDisconnectMs = millis();
+      logf("[%u] Manual mode disconnect detected; starting %lu ms safety countdown\n", client->id(),
+           WEB_CLIENT_MANUAL_SAFETY_DELAY_MS);
+    } else {
+      webClientGraceActive = false;
+      lastWebClientDisconnectMs = 0;
+      logf("[%u] Disconnect while automatic/profile control active; leaving roast control unchanged\n", client->id());
+    }
   } break;
   case WS_EVT_DATA: {
 
@@ -678,14 +689,14 @@ void updateConnectionSafety(AsyncWebSocket *ws) {
     return;
   }
 
-  if (millis() - lastWebClientDisconnectMs < WEB_CLIENT_GRACE_PERIOD_MS) {
+  if (millis() - lastWebClientDisconnectMs < WEB_CLIENT_MANUAL_SAFETY_DELAY_MS) {
     return;
   }
 
   setHeaterPower(0);
-  setFanSpeed(preferences.getLong("coolFanSpeed", 65));
+  setFanSpeed(WEB_CLIENT_MANUAL_SAFETY_FAN_SPEED);
   webClientGraceActive = false;
-  log("No websocket clients after grace period, entering cooldown safety mode");
+  log("Manual mode websocket disconnect timeout reached, applying safety output (heater=0, fan=50)");
 }
 
 void updatePidControl() {
