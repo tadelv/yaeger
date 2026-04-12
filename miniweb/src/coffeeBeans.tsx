@@ -8,6 +8,7 @@ type BeanParticle = {
   size: number;
   baseSize: number;
   angle: number;
+  baseSpin: number;
   spin: number;
   opacity: number;
   roastProgress: number;
@@ -43,6 +44,7 @@ function createBeans(count: number, width: number, height: number): BeanParticle
     const speed = 0.03 + normalizedRandom(s * 7.9) * 0.08;
     const direction = normalizedRandom(s * 2.7) * Math.PI * 2;
     const baseSize = 8 + normalizedRandom(s * 3.33) * 14;
+    const baseSpin = (normalizedRandom(s * 5.8) - 0.5) * 0.0014;
     return {
       x: normalizedRandom(s * 1.11) * width,
       y: normalizedRandom(s * 1.77) * height,
@@ -51,7 +53,8 @@ function createBeans(count: number, width: number, height: number): BeanParticle
       size: baseSize,
       baseSize,
       angle: normalizedRandom(s * 4.4) * Math.PI * 2,
-      spin: (normalizedRandom(s * 5.8) - 0.5) * 0.0014,
+      baseSpin,
+      spin: baseSpin,
       opacity: 0.08 + normalizedRandom(s * 6.6) * 0.16,
       roastProgress: normalizedRandom(s * 8.1),
       roastSpeed: 0.0005 + normalizedRandom(s * 9.2) * 0.0011,
@@ -93,6 +96,7 @@ function resetBean(bean: BeanParticle, width: number, height: number, avoidRects
   bean.vx = Math.cos(direction) * speed;
   bean.vy = Math.sin(direction) * speed;
   bean.size = bean.baseSize;
+  bean.spin = bean.baseSpin;
   bean.roastProgress = 0;
 }
 
@@ -300,9 +304,10 @@ export function CoffeeBeanBackground() {
             bean.size = bean.baseSize * (1 - Math.min(0.7, crumble * 0.7));
             bean.vx *= 0.985;
             bean.vy += 0.0009 * crumble;
-            bean.spin *= 1 + crumble * 0.03;
+            bean.spin = bean.baseSpin * (1 + crumble * 0.6);
           } else {
             bean.size = bean.baseSize;
+            bean.spin = bean.baseSpin;
           }
 
           if (bean.roastProgress >= 1) {
