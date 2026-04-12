@@ -23,6 +23,9 @@ unsigned long lastMutatingCommandMs = 0;
 bool webClientGraceActive = false;
 constexpr unsigned long PID_UPDATE_INTERVAL_MS = 400;
 constexpr double PID_OUTPUT_SMOOTHING_ALPHA = 0.25;
+constexpr const char *PREF_PID_DELAY_SEC = "pidDelaySec";
+constexpr const char *PREF_PID_MEASURED_DELAY_SEC = "pidMeasSec";
+constexpr const char *PREF_PID_PREDICTOR_ENABLED = "pidPredEn";
 unsigned long lastPidUpdateMs = 0;
 constexpr unsigned long ROAST_HISTORY_SAMPLE_INTERVAL_MS = 1000;
 constexpr size_t ROAST_HISTORY_MAX_SAMPLES = 1800;
@@ -87,6 +90,32 @@ constexpr unsigned long PID_DELAY_STABILIZE_MS = 10000;
 constexpr double PID_DELAY_RISE_THRESHOLD_C = 0.2;
 constexpr double PID_DELAY_RISE_SLOPE_THRESHOLD = 0.02;
 constexpr int PID_DELAY_RISE_CONSECUTIVE_SAMPLES = 3;
+
+double loadPidDelaySecondsPreference() {
+  double storedDelay = preferences.getDouble(PREF_PID_DELAY_SEC, NAN);
+  if (isnan(storedDelay)) {
+    // Legacy key path (too long for ESP32 NVS, kept as fallback in case target firmware supported it).
+    storedDelay = preferences.getDouble("pidProcessDelaySec", 0.0);
+  }
+  return std::max(0.0, storedDelay);
+}
+
+double loadPidMeasuredDelaySecondsPreference(double fallbackDelaySeconds) {
+  double storedMeasuredDelay = preferences.getDouble(PREF_PID_MEASURED_DELAY_SEC, NAN);
+  if (isnan(storedMeasuredDelay)) {
+    // Legacy key path (too long for ESP32 NVS, kept as fallback in case target firmware supported it).
+    storedMeasuredDelay = preferences.getDouble("pidMeasuredProcessDelaySec", fallbackDelaySeconds);
+  }
+  return std::max(0.0, storedMeasuredDelay);
+}
+
+bool loadPidPredictorEnabledPreference() {
+  if (preferences.isKey(PREF_PID_PREDICTOR_ENABLED)) {
+    return preferences.getBool(PREF_PID_PREDICTOR_ENABLED, true);
+  }
+  // Legacy key path (too long for ESP32 NVS, kept as fallback in case target firmware supported it).
+  return preferences.getBool("pidPredictorEnabled", true);
+}
 
 void pushAutotunePeak(double *buffer, size_t &count, double value) {
   if (isnan(value)) {
@@ -709,12 +738,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       if (!doc["pidProcessDelaySec"].isNull()) {
         pidProcessDelaySeconds = std::max(0.0, doc["pidProcessDelaySec"].as<double>());
         pidMeasuredProcessDelaySeconds = pidProcessDelaySeconds;
-        preferences.putDouble("pidMeasuredProcessDelaySec", pidMeasuredProcessDelaySeconds);
-        preferences.putDouble("pidProcessDelaySec", pidProcessDelaySeconds);
+        preferences.putDouble(PREF_PID_MEASURED_DELAY_SEC, pidMeasuredProcessDelaySeconds);
+        preferences.putDouble(PREF_PID_DELAY_SEC, pidProcessDelaySeconds);
       }
       if (!doc["pidPredictorEnabled"].isNull()) {
         pidPredictorEnabled = doc["pidPredictorEnabled"].as<bool>();
-        preferences.putBool("pidPredictorEnabled", pidPredictorEnabled);
+        preferences.putBool(PREF_PID_PREDICTOR_ENABLED, pidPredictorEnabled);
       }
       if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
         double temp = pidAutotuneRelayOutputLow;
@@ -991,9 +1020,9 @@ void setupMainLoop(AsyncWebSocket *ws) {
   pidAutotuneRelayOutputHigh = std::clamp(preferences.getDouble("pidAutoMax", 60.0), 0.0, 100.0);
   pidDelayMeasureFan = std::clamp(preferences.getDouble("pidDelayFan", 50.0), 0.0, 100.0);
   pidDelayMeasureHeater = std::clamp(preferences.getDouble("pidDelayHeater", 60.0), 0.0, 100.0);
-  pidProcessDelaySeconds = std::max(0.0, preferences.getDouble("pidProcessDelaySec", 0.0));
-  pidMeasuredProcessDelaySeconds = std::max(0.0, preferences.getDouble("pidMeasuredProcessDelaySec", pidProcessDelaySeconds));
-  pidPredictorEnabled = preferences.getBool("pidPredictorEnabled", true);
+  pidProcessDelaySeconds = loadPidDelaySecondsPreference();
+  pidMeasuredProcessDelaySeconds = loadPidMeasuredDelaySecondsPreference(pidProcessDelaySeconds);
+  pidPredictorEnabled = loadPidPredictorEnabledPreference();
   if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
     double temp = pidAutotuneRelayOutputLow;
     pidAutotuneRelayOutputLow = pidAutotuneRelayOutputHigh;
@@ -1118,8 +1147,8 @@ void updatePidControl() {
     if (crossedBaseline || sustainedRise) {
       pidMeasuredProcessDelaySeconds = (now - pidDelayHeatStartMs) / 1000.0;
       pidProcessDelaySeconds = pidMeasuredProcessDelaySeconds;
-      preferences.putDouble("pidMeasuredProcessDelaySec", pidMeasuredProcessDelaySeconds);
-      preferences.putDouble("pidProcessDelaySec", pidProcessDelaySeconds);
+      preferences.putDouble(PREF_PID_MEASURED_DELAY_SEC, pidMeasuredProcessDelaySeconds);
+      preferences.putDouble(PREF_PID_DELAY_SEC, pidProcessDelaySeconds);
       stopPidDelayMeasurement(crossedBaseline ? "temperature crossed baseline threshold" : "sustained positive slope detected");
     } else if (now - pidDelayHeatStartMs > 120000) {
       stopPidDelayMeasurement("timeout waiting for temperature rise", true);
