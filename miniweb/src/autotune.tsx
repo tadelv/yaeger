@@ -17,6 +17,8 @@ export function AutotuneApp() {
   const [fanSpeed, setFanSpeed] = useState(50);
   const [minHeaterPwm, setMinHeaterPwm] = useState(0);
   const [maxHeaterPwm, setMaxHeaterPwm] = useState(60);
+  const [controlFanMin, setControlFanMin] = useState(30);
+  const [controlFanMax, setControlFanMax] = useState(80);
   const [delayFan, setDelayFan] = useState(50);
   const [delayHeater, setDelayHeater] = useState(60);
   const [processDelaySec, setProcessDelaySec] = useState(0);
@@ -30,8 +32,11 @@ export function AutotuneApp() {
   const [autotuneLog, setAutotuneLog] = useState<string[]>([]);
   const lastCrossing = useRef(-1);
   const lastAdrcPhase = useRef("");
+  const wasPidAutotuneRunning = useRef(false);
   const wasAdrcAutotuneRunning = useRef(false);
+  const autotuneStopRequested = useRef(false);
   const autotuneBoundsDirty = useRef(false);
+  const controlFanBoundsDirty = useRef(false);
   const delayInputsDirty = useRef(false);
   const adrcValuesDirty = useRef(false);
   const controlModeDirty = useRef(false);
@@ -44,7 +49,9 @@ export function AutotuneApp() {
 
   useEffect(() => {
     if (!lastMessage) return;
+    const pidAutotuneRunning = Boolean(lastMessage.pidAutotune);
     const adrcAutotuneRunning = Boolean(lastMessage.adrcAutotune);
+    const pidAutotuneJustCompleted = wasPidAutotuneRunning.current && !pidAutotuneRunning;
     const adrcAutotuneJustCompleted = wasAdrcAutotuneRunning.current && !adrcAutotuneRunning;
 
     if (lastMessage.controlMode === "pid" || lastMessage.controlMode === "adrc") {
@@ -86,9 +93,19 @@ export function AutotuneApp() {
     }
 
     if (!lastMessage.pidAutotune && typeof lastMessage.pidKpActive === "number") {
-      setKp(lastMessage.pidKpActive);
-      setKi(lastMessage.pidKiActive ?? ki);
-      setKd(lastMessage.pidKdActive ?? kd);
+      const nextKp = lastMessage.pidKpActive;
+      const nextKi = lastMessage.pidKiActive ?? ki;
+      const nextKd = lastMessage.pidKdActive ?? kd;
+      setKp(nextKp);
+      setKi(nextKi);
+      setKd(nextKd);
+      if (pidAutotuneJustCompleted) {
+        const message = autotuneStopRequested.current
+          ? "PID autotune stopped."
+          : `PID tuning finished: Kp ${nextKp.toFixed(4)}, Ki ${nextKi.toFixed(4)}, Kd ${nextKd.toFixed(4)}`;
+        setAutotuneLog((prev) => [...prev.slice(-24), message]);
+        autotuneStopRequested.current = false;
+      }
     }
 
     const nextAdrcB0 = lastMessage.adrcB0;
@@ -101,10 +118,14 @@ export function AutotuneApp() {
         setAdrcWc(nextAdrcWc);
         adrcValuesDirty.current = false;
         if (adrcAutotuneJustCompleted) {
+          const message = autotuneStopRequested.current
+            ? "ADRC autotune stopped."
+            : `ADRC tuning finished: b0 ${nextAdrcB0.toFixed(4)}, w0 ${nextAdrcW0.toFixed(4)}, wc ${nextAdrcWc.toFixed(4)}`;
           setAutotuneLog((prev) => [
             ...prev.slice(-24),
-            `ADRC values updated: b0 ${nextAdrcB0.toFixed(4)}, w0 ${nextAdrcW0.toFixed(4)}, wc ${nextAdrcWc.toFixed(4)}`,
+            message,
           ]);
+          autotuneStopRequested.current = false;
         }
       } else {
         const b0Matches = Math.abs(nextAdrcB0 - adrcB0) < 0.0001;
@@ -128,6 +149,18 @@ export function AutotuneApp() {
         }
       }
     }
+    if (typeof lastMessage.controlFanMin === "number" && typeof lastMessage.controlFanMax === "number") {
+      if (!controlFanBoundsDirty.current) {
+        setControlFanMin(lastMessage.controlFanMin);
+        setControlFanMax(lastMessage.controlFanMax);
+      } else {
+        const minMatches = Math.abs(lastMessage.controlFanMin - controlFanMin) < 0.01;
+        const maxMatches = Math.abs(lastMessage.controlFanMax - controlFanMax) < 0.01;
+        if (minMatches && maxMatches) {
+          controlFanBoundsDirty.current = false;
+        }
+      }
+    }
     if (typeof lastMessage.pidDelayFan === "number" && typeof lastMessage.pidDelayHeater === "number") {
       if (!delayInputsDirty.current) {
         setDelayFan(lastMessage.pidDelayFan);
@@ -145,8 +178,24 @@ export function AutotuneApp() {
     if (typeof lastMessage.ET === "number" && typeof lastMessage.BT === "number" && typeof lastMessage.simBT === "number") {
       setHistory((prev) => [...prev, { ET: lastMessage.ET, BT: lastMessage.BT, simBT: Number(lastMessage.simBT) }].slice(-300));
     }
+    wasPidAutotuneRunning.current = pidAutotuneRunning;
     wasAdrcAutotuneRunning.current = adrcAutotuneRunning;
-  }, [adrcB0, adrcW0, adrcWc, autotuneMode, controlMode, delayFan, delayHeater, kd, ki, lastMessage, maxHeaterPwm, minHeaterPwm]);
+  }, [
+    adrcB0,
+    adrcW0,
+    adrcWc,
+    autotuneMode,
+    controlFanMax,
+    controlFanMin,
+    controlMode,
+    delayFan,
+    delayHeater,
+    kd,
+    ki,
+    lastMessage,
+    maxHeaterPwm,
+    minHeaterPwm,
+  ]);
 
   const delayElapsedSec =
     typeof lastMessage?.pidDelayMeasureElapsedSec === "number" ? lastMessage.pidDelayMeasureElapsedSec.toFixed(1) : "0.0";
@@ -180,7 +229,7 @@ export function AutotuneApp() {
             Step autotune holds heat off for 10 seconds, applies a 60% heater step for 25 seconds, then estimates b0 from the fastest
             positive temperature slope.
           </p>
-          <p>The result appears in b0, w0, and wc below. Measure delay first when possible; w0 and wc are derived from that delay.</p>
+          <p>The fan uses the automatic min/max range during tuning. The result appears in b0, w0, and wc below.</p>
         </article>
       </div>
       <div class="controller-diagnostics">
@@ -234,6 +283,25 @@ export function AutotuneApp() {
         <input type="number" value={setpoint} onInput={(e) => setSetpoint(Number((e.target as HTMLInputElement).value) || 0)} />
         <label>Fan</label>
         <input type="number" value={fanSpeed} onInput={(e) => setFanSpeed(Number((e.target as HTMLInputElement).value) || 0)} />
+        <label>Auto fan min / max</label>
+        <div class="pid-inline-inputs">
+          <input
+            type="number"
+            value={controlFanMin}
+            onInput={(e) => {
+              controlFanBoundsDirty.current = true;
+              setControlFanMin(Number((e.target as HTMLInputElement).value) || 0);
+            }}
+          />
+          <input
+            type="number"
+            value={controlFanMax}
+            onInput={(e) => {
+              controlFanBoundsDirty.current = true;
+              setControlFanMax(Number((e.target as HTMLInputElement).value) || 0);
+            }}
+          />
+        </div>
         <label>Min PWM</label>
         <input
           type="number"
@@ -310,6 +378,9 @@ export function AutotuneApp() {
       <div class="inline-actions">
         <button
           onClick={() => {
+            const fanBounds = normalizeFanBounds(controlFanMin, controlFanMax);
+            setControlFanMin(fanBounds.min);
+            setControlFanMax(fanBounds.max);
             if (autotuneMode === "adrc") {
               adrcValuesDirty.current = false;
             }
@@ -322,6 +393,8 @@ export function AutotuneApp() {
               autotuneMode,
               pidTarget: target,
               pidTuneMethod: method,
+              controlFanMin: fanBounds.min,
+              controlFanMax: fanBounds.max,
               setpoint,
               pidAutotuneMin: minHeaterPwm,
               pidAutotuneMax: maxHeaterPwm,
@@ -329,11 +402,19 @@ export function AutotuneApp() {
               adrcAutotune: autotuneMode === "adrc",
             });
             setAutotuneLog([`Autotune requested (${autotuneMode.toUpperCase()})…`]);
+            autotuneStopRequested.current = false;
           }}
         >
           Start Autotune
         </button>
-        <button onClick={() => sendCommand({ id: 1, command: "setPidControl", pidAutotune: false, adrcAutotune: false })}>Stop</button>
+        <button
+          onClick={() => {
+            autotuneStopRequested.current = true;
+            sendCommand({ id: 1, command: "setPidControl", pidAutotune: false, adrcAutotune: false });
+          }}
+        >
+          Stop
+        </button>
         <button onClick={() => sendCommand({ id: 1, command: "setFan", value: 0 })}>Fan Off</button>
         <button
           onClick={() => {
@@ -350,7 +431,19 @@ export function AutotuneApp() {
         </button>
         <button
           onClick={() => {
-            sendCommand({ id: 1, command: "setPidControl", controlMode: "adrc", adrcB0, adrcW0, adrcWc });
+            const fanBounds = normalizeFanBounds(controlFanMin, controlFanMax);
+            setControlFanMin(fanBounds.min);
+            setControlFanMax(fanBounds.max);
+            sendCommand({
+              id: 1,
+              command: "setPidControl",
+              controlMode: "adrc",
+              controlFanMin: fanBounds.min,
+              controlFanMax: fanBounds.max,
+              adrcB0,
+              adrcW0,
+              adrcWc,
+            });
             adrcValuesDirty.current = true;
             setAutotuneLog((prev) => [...prev.slice(-24), `Applied ADRC: b0 ${adrcB0.toFixed(4)}, w0 ${adrcW0.toFixed(4)}, wc ${adrcWc.toFixed(4)}`]);
           }}
@@ -396,4 +489,17 @@ export function AutotuneApp() {
 
 function formatValue(value: number | null | undefined, digits = 2) {
   return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "N/A";
+}
+
+function normalizeFanBounds(min: number, max: number) {
+  const safeMin = clampPercent(min);
+  const safeMax = clampPercent(max);
+  return {
+    min: Math.min(safeMin, safeMax),
+    max: Math.max(safeMin, safeMax),
+  };
+}
+
+function clampPercent(value: number) {
+  return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
 }
