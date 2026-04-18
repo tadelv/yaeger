@@ -7,6 +7,7 @@ import { UpdateApp } from "./update";
 import { ProfileControl, profileStore } from "./profiling";
 import { RoastApp } from "./roast";
 import { getAdminSecret, getBasicAuthHeaderValue } from "./auth";
+import { CoffeeBeanBackground } from "./coffeeBeans";
 import { sendWsCommand } from "./websocket";
 import { useSocketState } from "./websocket";
 
@@ -162,6 +163,7 @@ function App() {
 
   return (
     <>
+      <CoffeeBeanBackground />
       <div class="app-layout">
         <div class="tabs-nav">
           <h2 class="tabs-title">Yaeger</h2>
