@@ -23,11 +23,17 @@ export function AutotuneApp() {
   const [kp, setKp] = useState(1.0);
   const [ki, setKi] = useState(0.1);
   const [kd, setKd] = useState(0.01);
+  const [adrcB0, setAdrcB0] = useState(0.02);
+  const [adrcW0, setAdrcW0] = useState(1.0);
+  const [adrcWc, setAdrcWc] = useState(0.25);
   const [history, setHistory] = useState<Array<{ ET: number; BT: number; simBT: number }>>([]);
   const [autotuneLog, setAutotuneLog] = useState<string[]>([]);
   const lastCrossing = useRef(-1);
+  const lastAdrcPhase = useRef("");
+  const wasAdrcAutotuneRunning = useRef(false);
   const autotuneBoundsDirty = useRef(false);
   const delayInputsDirty = useRef(false);
+  const adrcValuesDirty = useRef(false);
   const controlModeDirty = useRef(false);
   const autotuneModeDirty = useRef(false);
 
@@ -38,6 +44,9 @@ export function AutotuneApp() {
 
   useEffect(() => {
     if (!lastMessage) return;
+    const adrcAutotuneRunning = Boolean(lastMessage.adrcAutotune);
+    const adrcAutotuneJustCompleted = wasAdrcAutotuneRunning.current && !adrcAutotuneRunning;
+
     if (lastMessage.controlMode === "pid" || lastMessage.controlMode === "adrc") {
       if (!controlModeDirty.current) {
         setControlMode(lastMessage.controlMode);
@@ -53,7 +62,12 @@ export function AutotuneApp() {
       }
     }
 
-    if (typeof lastMessage.pidAutotuneCrossings === "number" && lastMessage.pidAutotuneCrossings !== lastCrossing.current) {
+    if (
+      lastMessage.pidAutotune &&
+      typeof lastMessage.pidAutotuneCrossings === "number" &&
+      lastMessage.pidAutotuneCrossings > 0 &&
+      lastMessage.pidAutotuneCrossings !== lastCrossing.current
+    ) {
       lastCrossing.current = lastMessage.pidAutotuneCrossings;
       setAutotuneLog((prev) => [
         ...prev.slice(-24),
@@ -61,10 +75,45 @@ export function AutotuneApp() {
       ]);
     }
 
+    if (lastMessage.adrcAutotune && lastMessage.adrcAutotunePhase && lastMessage.adrcAutotunePhase !== lastAdrcPhase.current) {
+      lastAdrcPhase.current = lastMessage.adrcAutotunePhase;
+      setAutotuneLog((prev) => [
+        ...prev.slice(-24),
+        `ADRC ${lastMessage.adrcAutotunePhase} • slope ${formatValue(lastMessage.adrcAutotunePeakSlope, 4)} °C/s`,
+      ]);
+    } else if (!lastMessage.adrcAutotune && lastAdrcPhase.current) {
+      lastAdrcPhase.current = "";
+    }
+
     if (!lastMessage.pidAutotune && typeof lastMessage.pidKpActive === "number") {
       setKp(lastMessage.pidKpActive);
       setKi(lastMessage.pidKiActive ?? ki);
       setKd(lastMessage.pidKdActive ?? kd);
+    }
+
+    const nextAdrcB0 = lastMessage.adrcB0;
+    const nextAdrcW0 = lastMessage.adrcW0;
+    const nextAdrcWc = lastMessage.adrcWc;
+    if (typeof nextAdrcB0 === "number" && typeof nextAdrcW0 === "number" && typeof nextAdrcWc === "number") {
+      if (!adrcValuesDirty.current || adrcAutotuneJustCompleted) {
+        setAdrcB0(nextAdrcB0);
+        setAdrcW0(nextAdrcW0);
+        setAdrcWc(nextAdrcWc);
+        adrcValuesDirty.current = false;
+        if (adrcAutotuneJustCompleted) {
+          setAutotuneLog((prev) => [
+            ...prev.slice(-24),
+            `ADRC values updated: b0 ${nextAdrcB0.toFixed(4)}, w0 ${nextAdrcW0.toFixed(4)}, wc ${nextAdrcWc.toFixed(4)}`,
+          ]);
+        }
+      } else {
+        const b0Matches = Math.abs(nextAdrcB0 - adrcB0) < 0.0001;
+        const w0Matches = Math.abs(nextAdrcW0 - adrcW0) < 0.0001;
+        const wcMatches = Math.abs(nextAdrcWc - adrcWc) < 0.0001;
+        if (b0Matches && w0Matches && wcMatches) {
+          adrcValuesDirty.current = false;
+        }
+      }
     }
 
     if (typeof lastMessage.pidAutotuneMin === "number" && typeof lastMessage.pidAutotuneMax === "number") {
@@ -96,22 +145,61 @@ export function AutotuneApp() {
     if (typeof lastMessage.ET === "number" && typeof lastMessage.BT === "number" && typeof lastMessage.simBT === "number") {
       setHistory((prev) => [...prev, { ET: lastMessage.ET, BT: lastMessage.BT, simBT: Number(lastMessage.simBT) }].slice(-300));
     }
-  }, [autotuneMode, controlMode, delayFan, delayHeater, kd, ki, lastMessage, maxHeaterPwm, minHeaterPwm]);
+    wasAdrcAutotuneRunning.current = adrcAutotuneRunning;
+  }, [adrcB0, adrcW0, adrcWc, autotuneMode, controlMode, delayFan, delayHeater, kd, ki, lastMessage, maxHeaterPwm, minHeaterPwm]);
 
   const delayElapsedSec =
     typeof lastMessage?.pidDelayMeasureElapsedSec === "number" ? lastMessage.pidDelayMeasureElapsedSec.toFixed(1) : "0.0";
   const measuredDelaySec =
     typeof lastMessage?.pidMeasuredProcessDelaySec === "number" ? lastMessage.pidMeasuredProcessDelaySec : processDelaySec;
+  const isAutotuneRunning = Boolean(lastMessage?.pidAutotune || lastMessage?.adrcAutotune);
+  const autotuneProgress =
+    autotuneMode === "adrc"
+      ? `ADRC ${lastMessage?.adrcAutotunePhase ?? "idle"} • ${formatValue(lastMessage?.adrcAutotuneElapsedSec, 1)}s`
+      : `Crossings ${lastMessage?.pidAutotuneCrossings ?? 0}/${lastMessage?.pidAutotuneTargetCrossings ?? "?"}`;
 
   return (
     <div class="section">
       <h2>Controller Autotune</h2>
       <div class="status-strip">
-        Mode {autotuneMode.toUpperCase()} • Autotune: {lastMessage?.pidAutotune || lastMessage?.adrcAutotune ? "Running" : "Idle"} •
-        Crossings {lastMessage?.pidAutotuneCrossings ?? 0}/
-        {lastMessage?.pidAutotuneTargetCrossings ?? "?"}
+        Mode {autotuneMode.toUpperCase()} • Autotune: {isAutotuneRunning ? "Running" : "Idle"} • {autotuneProgress}
       </div>
       <AutotuneGraph history={history} target={target} setpoint={setpoint} />
+      <div class="autotune-memos">
+        <article class="memo-card">
+          <h3>PID memo</h3>
+          <p>
+            Relay autotune toggles the heater between Min PWM and Max PWM around the setpoint. After repeated crossings it estimates
+            Ku and Pu, then writes Kp, Ki, and Kd using the selected method.
+          </p>
+          <p>The result appears in Kp, Ki, and Kd below and is saved for the selected target sensor.</p>
+        </article>
+        <article class="memo-card">
+          <h3>ADRC memo</h3>
+          <p>
+            Step autotune holds heat off for 10 seconds, applies a 60% heater step for 25 seconds, then estimates b0 from the fastest
+            positive temperature slope.
+          </p>
+          <p>The result appears in b0, w0, and wc below. Measure delay first when possible; w0 and wc are derived from that delay.</p>
+        </article>
+      </div>
+      <div class="controller-diagnostics">
+        <h3>Autotune values</h3>
+        <div class="pid-grid">
+          <span>Kp {formatValue(lastMessage?.pidKpActive ?? kp, 4)}</span>
+          <span>Ki {formatValue(lastMessage?.pidKiActive ?? ki, 4)}</span>
+          <span>Kd {formatValue(lastMessage?.pidKdActive ?? kd, 4)}</span>
+          <span>Ku {formatValue(lastMessage?.pidAutotuneKu, 4)}</span>
+          <span>Pu {formatValue(lastMessage?.pidAutotunePu, 2)}s</span>
+          <span>Peaks {formatValue(lastMessage?.pidAutotuneAvgPeakLow, 2)} / {formatValue(lastMessage?.pidAutotuneAvgPeakHigh, 2)}</span>
+          <span>b0 {formatValue(lastMessage?.adrcB0 ?? adrcB0, 4)}</span>
+          <span>w0 {formatValue(lastMessage?.adrcW0 ?? adrcW0, 4)}</span>
+          <span>wc {formatValue(lastMessage?.adrcWc ?? adrcWc, 4)}</span>
+          <span>ADRC slope {formatValue(lastMessage?.adrcAutotunePeakSlope, 4)} °C/s</span>
+          <span>ADRC baseline {formatValue(lastMessage?.adrcAutotuneBaselineTemp, 2)} °C</span>
+          <span>Step {formatValue(lastMessage?.adrcAutotuneHeaterStep, 0)}%</span>
+        </div>
+      </div>
       <div class="form-grid">
         <label>Target</label>
         <select value={target} onChange={(e) => setTarget((e.target as HTMLSelectElement).value as PidTarget)}>
@@ -170,6 +258,33 @@ export function AutotuneApp() {
           <input type="number" value={ki} onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)} />
           <input type="number" value={kd} onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)} />
         </div>
+        <label>b0 / w0 / wc</label>
+        <div class="pid-inline-inputs">
+          <input
+            type="number"
+            value={adrcB0}
+            onInput={(e) => {
+              adrcValuesDirty.current = true;
+              setAdrcB0(Number((e.target as HTMLInputElement).value) || 0);
+            }}
+          />
+          <input
+            type="number"
+            value={adrcW0}
+            onInput={(e) => {
+              adrcValuesDirty.current = true;
+              setAdrcW0(Number((e.target as HTMLInputElement).value) || 0);
+            }}
+          />
+          <input
+            type="number"
+            value={adrcWc}
+            onInput={(e) => {
+              adrcValuesDirty.current = true;
+              setAdrcWc(Number((e.target as HTMLInputElement).value) || 0);
+            }}
+          />
+        </div>
         <label>Delay fan / heater</label>
         <div class="pid-inline-inputs">
           <input
@@ -194,70 +309,82 @@ export function AutotuneApp() {
       </div>
       <div class="inline-actions">
         <button
-        onClick={() => {
-          sendCommand({
-            id: 1,
-            command: "setPidControl",
-            FanVal: fanSpeed,
-            pidEnabled: false,
-            controlMode,
-            autotuneMode,
-            pidTarget: target,
-            pidTuneMethod: method,
-            setpoint,
-            pidAutotuneMin: minHeaterPwm,
-            pidAutotuneMax: maxHeaterPwm,
-            pidAutotune: true,
-            adrcAutotune: autotuneMode === "adrc",
-          });
-          setAutotuneLog([`Autotune requested (${autotuneMode.toUpperCase()})…`]);
-        }}
-      >
-        Start Autotune
-      </button>
-      <button onClick={() => sendCommand({ id: 1, command: "setPidControl", pidAutotune: false, adrcAutotune: false })}>Stop</button>
-      <button onClick={() => sendCommand({ id: 1, command: "setFan", value: 0 })}>Fan Off</button>
-      <button
-        onClick={() => {
-          sendCommand({ id: 1, command: "setPreferences", pidTarget: target, pidKp: kp, pidKi: ki, pidKd: kd });
-          window.dispatchEvent(
-            new CustomEvent("pid-preferences-updated", {
-              detail: { kp, ki, kd, pidTarget: target },
-            }),
-          );
-          setAutotuneLog((prev) => [...prev.slice(-24), `Applied PID: Kp ${kp.toFixed(3)}, Ki ${ki.toFixed(3)}, Kd ${kd.toFixed(3)}`]);
-        }}
-      >
-        Apply PID
-      </button>
-      <button
-        onClick={() => {
-          sendCommand({
-            id: 1,
-            command: "setPidControl",
-            pidEnabled: false,
-            pidDelayFan: delayFan,
-            pidDelayHeater: delayHeater,
-            pidMeasureDelay: true,
-          });
-          setAutotuneLog((prev) => [...prev.slice(-24), "Delay measurement requested (10s stabilize + heater step)"]);
-        }}
-      >
-        Measure Delay
-      </button>
-      <button
-        onClick={() => {
-          sendCommand({
-            id: 1,
-            command: "setPidControl",
-            pidProcessDelaySec: processDelaySec,
-            pidPredictorEnabled: true,
-          });
-          setAutotuneLog((prev) => [...prev.slice(-24), `Applied process delay: ${processDelaySec.toFixed(2)}s`]);
-        }}
-      >
-        Apply Delay
-      </button>
+          onClick={() => {
+            if (autotuneMode === "adrc") {
+              adrcValuesDirty.current = false;
+            }
+            sendCommand({
+              id: 1,
+              command: "setPidControl",
+              FanVal: fanSpeed,
+              pidEnabled: false,
+              controlMode,
+              autotuneMode,
+              pidTarget: target,
+              pidTuneMethod: method,
+              setpoint,
+              pidAutotuneMin: minHeaterPwm,
+              pidAutotuneMax: maxHeaterPwm,
+              pidAutotune: autotuneMode === "pid",
+              adrcAutotune: autotuneMode === "adrc",
+            });
+            setAutotuneLog([`Autotune requested (${autotuneMode.toUpperCase()})…`]);
+          }}
+        >
+          Start Autotune
+        </button>
+        <button onClick={() => sendCommand({ id: 1, command: "setPidControl", pidAutotune: false, adrcAutotune: false })}>Stop</button>
+        <button onClick={() => sendCommand({ id: 1, command: "setFan", value: 0 })}>Fan Off</button>
+        <button
+          onClick={() => {
+            sendCommand({ id: 1, command: "setPreferences", pidTarget: target, pidKp: kp, pidKi: ki, pidKd: kd });
+            window.dispatchEvent(
+              new CustomEvent("pid-preferences-updated", {
+                detail: { kp, ki, kd, pidTarget: target },
+              }),
+            );
+            setAutotuneLog((prev) => [...prev.slice(-24), `Applied PID: Kp ${kp.toFixed(3)}, Ki ${ki.toFixed(3)}, Kd ${kd.toFixed(3)}`]);
+          }}
+        >
+          Apply PID
+        </button>
+        <button
+          onClick={() => {
+            sendCommand({ id: 1, command: "setPidControl", controlMode: "adrc", adrcB0, adrcW0, adrcWc });
+            adrcValuesDirty.current = true;
+            setAutotuneLog((prev) => [...prev.slice(-24), `Applied ADRC: b0 ${adrcB0.toFixed(4)}, w0 ${adrcW0.toFixed(4)}, wc ${adrcWc.toFixed(4)}`]);
+          }}
+        >
+          Apply ADRC
+        </button>
+        <button
+          onClick={() => {
+            sendCommand({
+              id: 1,
+              command: "setPidControl",
+              pidEnabled: false,
+              pidDelayFan: delayFan,
+              pidDelayHeater: delayHeater,
+              pidMeasureDelay: true,
+            });
+            setAutotuneLog((prev) => [...prev.slice(-24), "Delay measurement requested (10s stabilize + heater step)"]);
+          }}
+        >
+          Measure Delay
+        </button>
+        <button
+          onClick={() => {
+            sendCommand({
+              id: 1,
+              command: "setPidControl",
+              pidProcessDelaySec: processDelaySec,
+              pidPredictorEnabled: true,
+            });
+            setAutotuneLog((prev) => [...prev.slice(-24), `Applied process delay: ${processDelaySec.toFixed(2)}s`]);
+          }}
+        >
+          Apply Delay
+        </button>
       </div>
       <div class="status-strip">
         Delay measure: {lastMessage?.pidDelayMeasureState ?? "idle"} • elapsed {delayElapsedSec}s • measured {measuredDelaySec}s
@@ -265,4 +392,8 @@ export function AutotuneApp() {
       <pre class="log-console">{autotuneLog.slice(-25).join("\n")}</pre>
     </div>
   );
+}
+
+function formatValue(value: number | null | undefined, digits = 2) {
+  return typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "N/A";
 }

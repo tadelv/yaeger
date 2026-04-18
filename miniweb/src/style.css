@@ -327,15 +327,28 @@ textarea:focus {
   letter-spacing: 0.01em;
 }
 
-.pid-summary {
+.pid-summary,
+.controller-summary,
+.controller-diagnostics {
   margin-top: 0.9rem;
   padding-top: 0.75rem;
   border-top: 1px dashed #93c5fd;
 }
 
-.pid-summary h3 {
+.pid-summary h3,
+.controller-summary h3,
+.controller-diagnostics h3 {
   margin: 0 0 0.55rem;
   font-size: 0.95rem;
+}
+
+.controller-diagnostics summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.controller-diagnostics .pid-grid {
+  margin-top: 0.55rem;
 }
 
 .pid-grid {
@@ -428,6 +441,8 @@ textarea:focus {
 .status-strip {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
   border: 1px solid hsl(var(--border));
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
@@ -440,6 +455,30 @@ textarea:focus {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.5rem;
+}
+
+.autotune-memos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 0.75rem;
+  margin-top: 0.9rem;
+}
+
+.memo-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 0.85rem;
+  background: hsl(var(--background));
+}
+
+.memo-card h3 {
+  margin: 0 0 0.45rem;
+  font-size: 0.95rem;
+}
+
+.memo-card p {
+  margin: 0.35rem 0;
+  color: #475569;
 }
 
 .log-console {
@@ -588,11 +627,17 @@ input[type="file"] {
     background: rgba(15, 23, 42, 0.8);
   }
 
-  .pid-summary {
+  .pid-summary,
+  .controller-summary,
+  .controller-diagnostics {
     border-top-color: #334155;
   }
 
   .pid-grid {
+    color: #cbd5e1;
+  }
+
+  .memo-card p {
     color: #cbd5e1;
   }
 }
@@ -725,4 +770,3 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
-

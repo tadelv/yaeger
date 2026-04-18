@@ -286,11 +286,6 @@ export function RoastApp() {
 
   const formatMetric = (value: number | null | undefined, digits = 2) =>
     typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "N/A";
-  const effectiveControlMode = lastMessage?.controlMode ?? controlMode;
-  const controllerCommand =
-    effectiveControlMode === "adrc"
-      ? lastMessage?.adrcLastCommand ?? lastMessage?.pidOutputSmoothed
-      : lastMessage?.pidOutputSmoothed;
 
   const forceStopRoastControl = (status = state.currentState.status) => {
     setRoastControlActive(false);
@@ -490,43 +485,19 @@ export function RoastApp() {
           </div>
         </div>
 
-        <div class="controller-summary">
-          <h3>Controller</h3>
+        <div class="pid-summary">
+          <h3>PID current values</h3>
           <div class="pid-grid">
-            <span>Mode {effectiveControlMode.toUpperCase()}</span>
-            <span>Target {lastMessage?.pidTarget ?? pidTarget}</span>
-            <span>Temp {formatMetric(lastMessage?.pidCurrentTemp, 2)} °C</span>
-            <span>Error {formatMetric(lastMessage?.pidError, 2)} °C</span>
-            <span>Setpoint {formatMetric(lastMessage?.setpoint ?? setpointTarget, 1)} °C</span>
-            <span>Command {formatMetric(controllerCommand, 2)}%</span>
+            <span>Temp {formatMetric(lastMessage?.pidCurrentTemp, 2)}</span>
+            <span>Pred Temp {formatMetric(lastMessage?.pidPredictedTemp, 2)}</span>
+            <span>Error {formatMetric(lastMessage?.pidError, 2)}</span>
+            <span>Integral {formatMetric(lastMessage?.pidIntegral, 2)}</span>
+            <span>Derivative {formatMetric(lastMessage?.pidDerivative, 2)}</span>
+            <span>Output {formatMetric(lastMessage?.pidOutput, 2)}</span>
+            <span>Smoothed {formatMetric(lastMessage?.pidOutputSmoothed, 2)}</span>
+            <span>Delay {formatMetric(lastMessage?.pidProcessDelaySec, 2)}s</span>
+            <span>Predictor {lastMessage?.pidPredictorEnabled ? "On" : "Off"}</span>
           </div>
-          <details class="controller-diagnostics roast-controller-diagnostics">
-            <summary>Debug values</summary>
-            <div class="pid-grid">
-              {effectiveControlMode === "adrc" ? (
-                <>
-                  <span>Observer z1 {formatMetric(lastMessage?.adrcZ1 ?? lastMessage?.pidPredictedTemp, 2)} °C</span>
-                  <span>Slope z2 {formatMetric(lastMessage?.adrcZ2, 4)} °C/s</span>
-                  <span>Disturbance z3 {formatMetric(lastMessage?.adrcZ3, 4)}</span>
-                  <span>Raw heater {formatMetric(lastMessage?.pidOutput, 2)}%</span>
-                  <span>Command {formatMetric(lastMessage?.adrcLastCommand ?? lastMessage?.pidOutputSmoothed, 2)}%</span>
-                  <span>b0 {formatMetric(lastMessage?.adrcB0 ?? adrcB0, 4)}</span>
-                  <span>w0 {formatMetric(lastMessage?.adrcW0 ?? adrcW0, 4)}</span>
-                  <span>wc {formatMetric(lastMessage?.adrcWc ?? adrcWc, 4)}</span>
-                </>
-              ) : (
-                <>
-                  <span>Pred Temp {formatMetric(lastMessage?.pidPredictedTemp, 2)} °C</span>
-                  <span>Integral {formatMetric(lastMessage?.pidIntegral, 2)}</span>
-                  <span>Derivative {formatMetric(lastMessage?.pidDerivative, 2)}</span>
-                  <span>Output {formatMetric(lastMessage?.pidOutput, 2)}%</span>
-                  <span>Smoothed {formatMetric(lastMessage?.pidOutputSmoothed, 2)}%</span>
-                  <span>Delay {formatMetric(lastMessage?.pidProcessDelaySec, 2)}s</span>
-                  <span>Predictor {lastMessage?.pidPredictorEnabled ? "On" : "Off"}</span>
-                </>
-              )}
-            </div>
-          </details>
         </div>
       </section>
 

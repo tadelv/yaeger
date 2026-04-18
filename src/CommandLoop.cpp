@@ -196,6 +196,20 @@ const char *pidDelayMeasureStateToString(PidDelayMeasureState state) {
   }
 }
 
+const char *adrcAutotunePhaseToString() {
+  if (!adrcAutotuneActive || adrcAutotuneStartMs == 0) {
+    return "idle";
+  }
+  const unsigned long elapsed = millis() - adrcAutotuneStartMs;
+  if (elapsed < 10000) {
+    return "baseline";
+  }
+  if (elapsed < 35000) {
+    return "step";
+  }
+  return "applying";
+}
+
 struct RoastHistorySample {
   unsigned long ms;
   float et;
@@ -1089,6 +1103,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["adrcZ3"] = adrcObserverZ3;
       dataObj["adrcLastCommand"] = adrcLastCommand;
       dataObj["adrcAutotunePeakSlope"] = adrcAutotunePeakSlope;
+      dataObj["adrcAutotuneElapsedSec"] =
+          (adrcAutotuneActive && adrcAutotuneStartMs > 0) ? (millis() - adrcAutotuneStartMs) / 1000.0 : 0.0;
+      dataObj["adrcAutotunePhase"] = adrcAutotunePhaseToString();
+      dataObj["adrcAutotuneBaselineTemp"] = adrcAutotuneBaselineTemp;
+      dataObj["adrcAutotuneHeaterStep"] = adrcAutotuneHeaterStep;
+      dataObj["adrcAutotuneBaselineSamples"] = adrcAutotuneBaselineSamples;
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);
@@ -1176,6 +1196,12 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["adrcZ3"] = adrcObserverZ3;
       dataObj["adrcLastCommand"] = adrcLastCommand;
       dataObj["adrcAutotunePeakSlope"] = adrcAutotunePeakSlope;
+      dataObj["adrcAutotuneElapsedSec"] =
+          (adrcAutotuneActive && adrcAutotuneStartMs > 0) ? (millis() - adrcAutotuneStartMs) / 1000.0 : 0.0;
+      dataObj["adrcAutotunePhase"] = adrcAutotunePhaseToString();
+      dataObj["adrcAutotuneBaselineTemp"] = adrcAutotuneBaselineTemp;
+      dataObj["adrcAutotuneHeaterStep"] = adrcAutotuneHeaterStep;
+      dataObj["adrcAutotuneBaselineSamples"] = adrcAutotuneBaselineSamples;
       dataObj["pidKpActive"] = getPidGain("pidKp", pidTarget, 1.0);
       dataObj["pidKiActive"] = getPidGain("pidKi", pidTarget, 0.1);
       dataObj["pidKdActive"] = getPidGain("pidKd", pidTarget, 0.01);

@@ -21,6 +21,7 @@ export type YaegerMessage = {
   pidTempSlope?: number;
   pidProcessDelaySec?: number;
   pidPredictorEnabled?: boolean;
+  pidEnabled?: boolean;
   pidDelayMeasureState?: "idle" | "stabilizing" | "heating" | "complete" | "failed";
   pidDelayMeasureElapsedSec?: number;
   pidMeasuredProcessDelaySec?: number;
@@ -44,6 +45,12 @@ export type YaegerMessage = {
   pidAutotuneHeaterCommand?: number;
   pidAutotuneMin?: number;
   pidAutotuneMax?: number;
+  pidAutotuneRelayHigh?: boolean;
+  pidAutotuneCyclePeak?: number;
+  pidAutotuneAvgPeakHigh?: number;
+  pidAutotuneAvgPeakLow?: number;
+  pidAutotuneHighPeakCount?: number;
+  pidAutotuneLowPeakCount?: number;
   pidKpActive?: number;
   pidKiActive?: number;
   pidKdActive?: number;
@@ -57,6 +64,11 @@ export type YaegerMessage = {
   adrcZ3?: number;
   adrcLastCommand?: number;
   adrcAutotunePeakSlope?: number;
+  adrcAutotuneElapsedSec?: number;
+  adrcAutotunePhase?: "idle" | "baseline" | "step" | "applying";
+  adrcAutotuneBaselineTemp?: number;
+  adrcAutotuneHeaterStep?: number;
+  adrcAutotuneBaselineSamples?: number;
   emergencyStopActive?: boolean;
   id: number;
 }
