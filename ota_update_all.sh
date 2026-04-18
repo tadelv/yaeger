@@ -59,6 +59,22 @@ if match:
 PY
 }
 
+extract_missing_filesystem_output() {
+  local log_file="$1"
+  local py_cmd="${PYTHON_BIN:-python3}"
+
+  "$py_cmd" - "$log_file" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(errors="ignore")
+match = re.search(r"Error building filesystem image: \[Errno 2\] No such file or directory: '([^']+)'", text)
+if match:
+    print(match.group(1))
+PY
+}
+
 ensure_ota_venv() {
   local python_cmd="${PYTHON_BIN:-python3}"
 
@@ -107,6 +123,18 @@ run_pio_with_auto_deps() {
 
     local missing_module
     missing_module=$(extract_missing_module "$log_file")
+
+    local missing_fs_output
+    missing_fs_output=$(extract_missing_filesystem_output "$log_file")
+    if [[ -n "$missing_fs_output" ]]; then
+      local missing_fs_dir
+      missing_fs_dir=$(dirname "$missing_fs_output")
+      echo "Detected missing filesystem output path '$missing_fs_output'. Creating '$missing_fs_dir' and retrying..."
+      mkdir -p "$missing_fs_dir"
+      rm -f "$log_file"
+      attempt=$((attempt + 1))
+      continue
+    fi
 
     if [[ -z "$missing_module" ]]; then
       echo "PlatformIO failed, but no missing Python module could be detected."
