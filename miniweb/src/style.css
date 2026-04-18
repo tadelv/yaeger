@@ -54,10 +54,25 @@ h1 {
 }
 
 .app-layout {
+  position: relative;
+  z-index: 1;
   display: grid;
   grid-template-columns: 220px 1fr;
   gap: 1rem;
   align-items: start;
+}
+
+.bean-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.bean-canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
 .tabs-nav {
@@ -386,12 +401,84 @@ textarea:focus {
   gap: 0.65rem;
 }
 
+.profile-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: center;
+}
+
 .profile-chip {
   width: fit-content;
   border: 1px solid hsl(var(--border));
   border-radius: 999px;
   padding: 0.3rem 0.7rem;
   background: hsl(var(--background));
+}
+
+.profile-builder {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.profile-builder-header {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) auto;
+  gap: 0.75rem;
+  align-items: end;
+}
+
+.profile-builder-header label,
+.phase-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.profile-total {
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 0.55rem 0.75rem;
+  background: hsl(var(--background));
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.phase-list {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.phase-card {
+  border: 1px solid hsl(var(--border));
+  border-radius: 8px;
+  padding: 0.8rem;
+  background: hsl(var(--background));
+}
+
+.phase-card-header {
+  display: grid;
+  grid-template-columns: auto minmax(170px, 1fr) auto;
+  gap: 0.65rem;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.phase-card-header span {
+  font-weight: 800;
+}
+
+.phase-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.phase-slider input[type="range"] {
+  width: 100%;
+  margin: 0.45rem 0 0.15rem;
 }
 
 .status-strip {
@@ -539,6 +626,15 @@ input[type="file"] {
     flex-direction: column;
     align-items: flex-start;
   }
+
+  .profile-builder-header,
+  .phase-card-header {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-total {
+    white-space: normal;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -644,11 +740,6 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   cursor: not-allowed;
 }
 
-.graph-stack {
-  display: grid;
-  gap: 0.8rem;
-}
-
 .graph-card {
   border: 1px solid hsl(var(--border));
   border-radius: 0.9rem;
@@ -694,18 +785,6 @@ input[type="range"]:disabled::-webkit-slider-thumb {
   padding: 0.9rem;
   color: hsl(var(--muted-foreground));
   background: hsl(var(--secondary));
-}
-
-.graph-mode-control {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.45rem;
-  font-size: 0.88rem;
-  font-weight: 600;
-}
-
-.graph-mode-control select {
-  min-width: 210px;
 }
 
 .graph-height-control {

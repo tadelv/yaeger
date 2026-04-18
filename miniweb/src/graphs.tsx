@@ -1,12 +1,11 @@
-import { Profile, RoastState } from "./model";
+import { Profile, ProfileStep, RoastState } from "./model";
 
-export type RoastGraphMode = "combined" | "separate";
-
-type EventMarker = { label: string; sec: number };
+type EventMarker = { label: string; sec: number; color?: string };
 
 type GraphSeries = {
   label: string;
   color: string;
+  samples?: number[];
   values: Array<number | null>;
 };
 
@@ -47,12 +46,13 @@ function linePath(
 
   for (let i = 0; i < values.length; i += 1) {
     const value = values[i];
-    if (value == null || !Number.isFinite(value)) {
+    const sample = samples[i];
+    if (value == null || sample == null || !Number.isFinite(value) || !Number.isFinite(sample)) {
       drawing = false;
       continue;
     }
 
-    const x = xScale(samples[i]);
+    const x = xScale(sample);
     const y = yScale(value);
     path += `${drawing ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)} `;
     drawing = true;
@@ -89,7 +89,7 @@ function interpolateProfileValue(
   start: number,
   end: number,
   progress: number,
-  type: "linear" | "ease-in" | "ease-out" | "ease-in-out",
+  type: ProfileStep["interpolation"],
 ): number {
   switch (type) {
     case "linear":
@@ -111,6 +111,10 @@ function interpolateProfileValue(
   }
 }
 
+function clampProgress(value: number) {
+  return Math.min(1, Math.max(0, value));
+}
+
 function getProfileSetpointAtElapsed(profile: Profile, elapsedSeconds: number): number | null {
   if (!profile.steps.length) return null;
   let accumulated = 0;
@@ -122,21 +126,99 @@ function getProfileSetpointAtElapsed(profile: Profile, elapsedSeconds: number): 
     if (elapsedSeconds <= accumulated) {
       const progress = step.duration > 0 ? (elapsedSeconds - stepStart) / step.duration : 1;
       const previousSetpoint = i === 0 ? step.setpoint : profile.steps[i - 1].setpoint;
-      return interpolateProfileValue(previousSetpoint, step.setpoint, progress, step.interpolation);
+      return interpolateProfileValue(previousSetpoint, step.setpoint, clampProgress(progress), step.interpolation);
     }
   }
 
   return profile.steps[profile.steps.length - 1].setpoint;
 }
 
+function getProfileFanAtElapsed(profile: Profile, elapsedSeconds: number): number | null {
+  if (!profile.steps.length) return null;
+  let accumulated = 0;
+
+  for (const step of profile.steps) {
+    accumulated += Math.max(0, step.duration);
+    if (elapsedSeconds <= accumulated) {
+      return typeof step.fanValue === "number" ? step.fanValue : null;
+    }
+  }
+
+  const lastStep = profile.steps[profile.steps.length - 1];
+  return typeof lastStep.fanValue === "number" ? lastStep.fanValue : null;
+}
+
+function getProfileTotalDuration(profile: Profile) {
+  return profile.steps.reduce((sum, step) => sum + Math.max(0, step.duration), 0);
+}
+
+function buildProfileSamples(profile: Profile) {
+  const totalDuration = Math.max(1, Math.ceil(getProfileTotalDuration(profile)));
+  const sampleStep = Math.max(1, Math.ceil(totalDuration / 360));
+  const samples = new Set<number>([0, totalDuration]);
+
+  for (let seconds = 0; seconds <= totalDuration; seconds += sampleStep) {
+    samples.add(seconds);
+  }
+
+  let accumulated = 0;
+  for (const step of profile.steps) {
+    accumulated += Math.max(0, step.duration);
+    samples.add(Math.min(totalDuration, Math.max(0, Math.round(accumulated))));
+  }
+
+  return [...samples].sort((a, b) => a - b);
+}
+
+function getProfileMarkers(profile: Profile): EventMarker[] {
+  let accumulated = 0;
+  return profile.steps.map((step, index) => {
+    const marker = {
+      label: step.name || step.tag || `Phase ${index + 1}`,
+      sec: accumulated,
+      color: "#facc15",
+    };
+    accumulated += Math.max(0, step.duration);
+    return marker;
+  });
+}
+
+function hasDrawableSeries(samples: number[], series: GraphSeries[]) {
+  return series.some((s) => {
+    const seriesSamples = s.samples ?? samples;
+    let pointCount = 0;
+    for (let i = 0; i < s.values.length; i += 1) {
+      const value = s.values[i];
+      const sample = seriesSamples[i];
+      if (value != null && sample != null && Number.isFinite(value) && Number.isFinite(sample)) {
+        pointCount += 1;
+        if (pointCount >= 2) return true;
+      }
+    }
+    return false;
+  });
+}
+
+function getMaxSample(samples: number[], series: GraphSeries[], eventTimes: EventMarker[]) {
+  let maxSample = 1;
+  const consider = (value: number) => {
+    if (Number.isFinite(value)) maxSample = Math.max(maxSample, value);
+  };
+
+  samples.forEach(consider);
+  eventTimes.forEach((event) => consider(event.sec));
+  series.forEach((s) => (s.samples ?? samples).forEach(consider));
+  return maxSample;
+}
+
 function LineGraph({ title, samples, series, minY, maxY, height, eventTimes = [] }: LineGraphProps) {
-  if (samples.length < 2) {
+  if (!hasDrawableSeries(samples, series)) {
     return <div class="graph-empty">{title}: waiting for samples…</div>;
   }
 
   const innerWidth = WIDTH - MARGIN.left - MARGIN.right;
   const innerHeight = height - MARGIN.top - MARGIN.bottom;
-  const maxSample = Math.max(1, samples[samples.length - 1]);
+  const maxSample = getMaxSample(samples, series, eventTimes);
   const xScale = createScale(0, maxSample, 0, innerWidth);
   const yScale = createScale(minY, maxY, innerHeight, 0);
   const yTicks = gridTicks(minY, maxY, 5);
@@ -174,16 +256,17 @@ function LineGraph({ title, samples, series, minY, maxY, height, eventTimes = []
 
           {eventTimes.map((event) => {
             const x = xScale(event.sec);
+            const color = event.color ?? "#ef4444";
             return (
               <g key={`${event.label}-${event.sec}`}>
-                <line x1={x} y1={0} x2={x} y2={innerHeight} stroke="#ef4444" strokeDasharray="4 3" strokeWidth={1} />
-                <text x={x + 2} y={12} fill="#fca5a5" fontSize={10}>{event.label}</text>
+                <line x1={x} y1={0} x2={x} y2={innerHeight} stroke={color} strokeDasharray="4 3" strokeWidth={1} />
+                <text x={x + 2} y={12} fill={color} fontSize={10}>{event.label}</text>
               </g>
             );
           })}
 
           {series.map((s) => {
-            const path = linePath(samples, s.values, xScale, yScale);
+            const path = linePath(s.samples ?? samples, s.values, xScale, yScale);
             return path ? (
               <path
                 key={`${title}-${s.label}`}
@@ -231,45 +314,23 @@ function LineGraph({ title, samples, series, minY, maxY, height, eventTimes = []
 
 export function RoastGraphs({
   roast,
-  mode = "separate",
   heightScale = 1,
   profile,
 }: {
   roast?: RoastState;
-  mode?: RoastGraphMode;
   heightScale?: number;
   profile?: Profile;
 }) {
   const measurements = roast?.measurements ?? [];
   const start = roast?.startDate;
   const activeProfile = roast?.profile ?? profile;
+  const profileSamples = activeProfile?.steps.length ? buildProfileSamples(activeProfile) : [];
 
-  if (!start || measurements.length < 2) {
-    if (!activeProfile?.steps.length) {
-      return <div class="graph-empty">Live roast graphs will appear after the roast starts.</div>;
-    }
-
-    const totalDuration = activeProfile.steps.reduce((sum, step) => sum + Math.max(step.duration, 0), 0);
-    const previewEndSec = Math.max(1, Math.ceil(totalDuration));
-    const previewSamples = Array.from({ length: previewEndSec + 1 }, (_, i) => i);
-    const previewValues = previewSamples.map((seconds) => getProfileSetpointAtElapsed(activeProfile, seconds));
-    const validValues = previewValues.filter((value): value is number => typeof value === "number");
-    const minY = validValues.length ? Math.max(0, Math.floor(Math.min(...validValues) - 5)) : 0;
-    const maxY = validValues.length ? Math.ceil(Math.max(...validValues) + 5) : 300;
-
-    return (
-      <LineGraph
-        title="Profile Preview"
-        samples={previewSamples}
-        minY={minY}
-        maxY={Math.max(maxY, minY + 10)}
-        height={Math.round(320 * Math.min(1.8, Math.max(0.7, heightScale)))}
-        series={[{ label: "Profile", color: "#facc15", values: previewValues }]}
-      />
-    );
+  if (!measurements.length && !profileSamples.length) {
+    return <div class="graph-empty">Load a profile or start logging to see the roast graph.</div>;
   }
 
-  const sampleTimes = measurements.map((m) => (m.timestamp.getTime() - start.getTime()) / 1000);
+  const sampleTimes = start ? measurements.map((m) => (m.timestamp.getTime() - start.getTime()) / 1000) : [];
   const bt = measurements.map((m) => m.message.BT);
   const et = measurements.map((m) => m.message.ET);
   const setpoint = measurements.map((m) => m.extra?.setpoint ?? 0);
@@ -278,84 +339,55 @@ export function RoastGraphs({
   const btRor = buildRoR(bt, sampleTimes);
   const etRor = buildRoR(et, sampleTimes);
   const profileSetpoint = activeProfile
-    ? sampleTimes.map((seconds) => getProfileSetpointAtElapsed(activeProfile, seconds))
+    ? profileSamples.map((seconds) => getProfileSetpointAtElapsed(activeProfile, seconds))
+    : [];
+  const profileFan = activeProfile
+    ? profileSamples.map((seconds) => {
+        const value = getProfileFanAtElapsed(activeProfile, seconds);
+        return value == null ? null : value * 3;
+      })
     : [];
 
-  const eventTimes = (roast?.events ?? []).map((event) => ({
-    label: String(event.label),
-    sec: (event.measurement.timestamp.getTime() - start.getTime()) / 1000,
-  }));
+  const eventTimes = start
+    ? (roast?.events ?? []).map((event) => ({
+        label: String(event.label),
+        sec: (event.measurement.timestamp.getTime() - start.getTime()) / 1000,
+      }))
+    : [];
+  const profileMarkers = activeProfile ? getProfileMarkers(activeProfile) : [];
 
   const clampedHeightScale = Math.min(1.8, Math.max(0.7, heightScale));
-  const separateHeight = Math.round(300 * clampedHeightScale);
   const combinedHeight = Math.round(380 * clampedHeightScale);
+  const series: GraphSeries[] = [];
 
-  if (mode === "combined") {
-    return (
-      <LineGraph
-        title="Combined Roast Telemetry"
-        samples={sampleTimes}
-        minY={0}
-        maxY={300}
-        height={combinedHeight}
-        eventTimes={eventTimes}
-        series={[
-          { label: "BT", color: "#60a5fa", values: bt },
-          { label: "ET", color: "#f87171", values: et },
-          { label: "Setpoint", color: "#34d399", values: setpoint },
-          ...(profileSetpoint.length
-            ? [{ label: "Profile", color: "#facc15", values: profileSetpoint }]
-            : []),
-          { label: "Fan % (x3)", color: "#38bdf8", values: fan.map((v) => v * 3) },
-          { label: "Heater % (x3)", color: "#fb923c", values: heater.map((v) => v * 3) },
-          { label: "BT RoR (x5)", color: "#22c55e", values: btRor.map((v) => (v == null ? null : Math.max(v, 0) * 5)) },
-          { label: "ET RoR (x5)", color: "#a855f7", values: etRor.map((v) => (v == null ? null : Math.max(v, 0) * 5)) },
-        ]}
-      />
+  if (profileSetpoint.length) {
+    series.push({ label: "Profile setpoint", color: "#facc15", samples: profileSamples, values: profileSetpoint });
+  }
+  if (profileFan.some((value) => value != null)) {
+    series.push({ label: "Profile fan % (x3)", color: "#67e8f9", samples: profileSamples, values: profileFan });
+  }
+  if (measurements.length) {
+    series.push(
+      { label: "BT", color: "#60a5fa", values: bt },
+      { label: "ET", color: "#f87171", values: et },
+      { label: "Setpoint", color: "#34d399", values: setpoint },
+      { label: "Fan % (x3)", color: "#38bdf8", values: fan.map((v) => v * 3) },
+      { label: "Heater % (x3)", color: "#fb923c", values: heater.map((v) => v * 3) },
+      { label: "BT RoR (x5)", color: "#22c55e", values: btRor.map((v) => (v == null ? null : Math.max(v, 0) * 5)) },
+      { label: "ET RoR (x5)", color: "#a855f7", values: etRor.map((v) => (v == null ? null : Math.max(v, 0) * 5)) },
     );
   }
 
   return (
-    <div class="graph-stack">
-      <LineGraph
-        title="Temperature"
-        samples={sampleTimes}
-        minY={0}
-        maxY={300}
-        height={separateHeight}
-        eventTimes={eventTimes}
-        series={[
-          { label: "BT", color: "#60a5fa", values: bt },
-          { label: "ET", color: "#f87171", values: et },
-          { label: "Setpoint", color: "#34d399", values: setpoint },
-          ...(profileSetpoint.length
-            ? [{ label: "Profile", color: "#facc15", values: profileSetpoint }]
-            : []),
-        ]}
-      />
-      <LineGraph
-        title="Power"
-        samples={sampleTimes}
-        minY={0}
-        maxY={100}
-        height={separateHeight}
-        series={[
-          { label: "Fan %", color: "#38bdf8", values: fan },
-          { label: "Heater %", color: "#fb923c", values: heater },
-        ]}
-      />
-      <LineGraph
-        title="Rate of Rise"
-        samples={sampleTimes}
-        minY={-5}
-        maxY={60}
-        height={separateHeight}
-        series={[
-          { label: "BT RoR", color: "#22c55e", values: btRor },
-          { label: "ET RoR", color: "#a855f7", values: etRor },
-        ]}
-      />
-    </div>
+    <LineGraph
+      title="Roast Logging Graph"
+      samples={sampleTimes.length ? sampleTimes : profileSamples}
+      minY={0}
+      maxY={300}
+      height={combinedHeight}
+      eventTimes={[...profileMarkers, ...eventTimes]}
+      series={series}
+    />
   );
 }
 

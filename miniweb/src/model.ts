@@ -130,10 +130,13 @@ export type PIDData = {
 }
 
 export type Profile = {
+	name?: string
 	steps: ProfileStep[]
 }
 
 export type ProfileStep = {
+	name?: string
+	tag?: string
 	interpolation: 'linear' | 'ease-in' | 'ease-out' | 'ease-in-out'
 	setpoint: number
 	duration: number
