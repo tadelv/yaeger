@@ -128,6 +128,11 @@ run_pio_with_auto_deps() {
   return 1
 }
 
+ensure_pio_build_dir() {
+  local env_name="$1"
+  mkdir -p ".pio/build/${env_name}"
+}
+
 echo "Using OTA PlatformIO environment: $PIO_ENV"
 
 
@@ -153,7 +158,9 @@ npm run build
 popd >/dev/null
 
 echo "Step 1/2: Uploading LittleFS image via OTA..."
-run_pio_with_auto_deps -e "$PIO_ENV" -t buildfs -t uploadfs
+ensure_pio_build_dir "$PIO_ENV"
+run_pio_with_auto_deps -e "$PIO_ENV" -t buildfs
+run_pio_with_auto_deps -e "$PIO_ENV" -t uploadfs
 
 echo "Step 2/2: Uploading firmware via OTA..."
 run_pio_with_auto_deps -e "$PIO_ENV" -t upload
