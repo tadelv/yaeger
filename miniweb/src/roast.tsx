@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "preact/hooks";
-import { RoastGraphMode, RoastGraphs } from "./graphs";
+import { RoastGraphs } from "./graphs";
 import { getAdminSecret } from "./auth";
 import { getFormattedTimeDifference } from "./util";
 import { Measurement, RoastState, RoasterStatus, YaegerState } from "./model";
-import { followProfile, ProfileControl, profileStore } from "./profiling";
+import { followProfile, ProfileControl, profileStore, ROAST_EVENT_TAGS } from "./profiling";
 import { sendWsCommand, useSocketState } from "./websocket";
 
 type PidTarget = "BT" | "ET" | "simBT";
@@ -44,7 +44,6 @@ export function RoastApp() {
   const hasHydratedPidFromTelemetry = useRef(false);
   const pidSyncPausedUntilMs = useRef(0);
   const [refreshToken, setRefreshToken] = useState(0);
-  const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
   const [graphHeightScale, setGraphHeightScale] = useState(1.2);
   const controlModeDirty = useRef(false);
   const controlFanBoundsDirty = useRef(false);
@@ -399,11 +398,26 @@ export function RoastApp() {
     });
   };
 
+  const onProfileStateChange = () => {
+    setRefreshToken((v) => v + 1);
+    setState((prev) =>
+      prev.roast
+        ? {
+            ...prev,
+            roast: {
+              ...prev.roast,
+              profile: profileStore.profile,
+            },
+          }
+        : prev,
+    );
+  };
+
   return (
     <div class="roast-dashboard">
       <div class="roast-toolbar">
         <button onClick={toggleRoastRecording}>
-          {state.currentState.status === RoasterStatus.idle ? "Start graph" : "Stop graph"}
+          {state.currentState.status === RoasterStatus.idle ? "Start logging" : "Stop logging"}
         </button>
         <button
           onClick={() => {
@@ -461,13 +475,6 @@ export function RoastApp() {
           disabled={state.currentState.status === RoasterStatus.roasting}
         />
         <span class="roast-time-pill">Roast time: {roastTime}</span>
-        <label class="graph-mode-control">
-          Graph layout
-          <select value={graphMode} onChange={(e) => setGraphMode((e.target as HTMLSelectElement).value as RoastGraphMode)}>
-            <option value="combined">Single combined graph</option>
-            <option value="separate">Three separate graphs</option>
-          </select>
-        </label>
         <label class="graph-height-control">
           Graph height
           <input
@@ -553,7 +560,6 @@ export function RoastApp() {
 
       <RoastGraphs
         roast={state.roast}
-        mode={graphMode}
         heightScale={graphHeightScale}
         profile={profileStore.profile}
       />
@@ -629,19 +635,11 @@ export function RoastApp() {
       <section class="section">
         <h3>Roast events</h3>
         <div class="event-buttons">
-        {[
-          ["charge", "Charge"],
-          ["dry-end", "Dry End"],
-          ["first-crack-start", "First crack start"],
-          ["first-crack-end", "First crack end"],
-          ["second-crack-start", "Second crack start"],
-          ["second-crack-end", "Second crack end"],
-          ["drop", "Drop"],
-        ].map(([key, text]) => (
-          <button key={key} onClick={() => appendEvent(key)}>
-            {text}
-          </button>
-        ))}
+          {ROAST_EVENT_TAGS.map((tag) => (
+            <button key={tag.key} onClick={() => appendEvent(tag.key)}>
+              {tag.label}
+            </button>
+          ))}
         </div>
       </section>
 
@@ -772,7 +770,7 @@ export function RoastApp() {
 
       <div class="section">
         <h3>Profile Selection</h3>
-        <ProfileControl onStateChange={() => setRefreshToken((v) => v + 1)} />
+        <ProfileControl onStateChange={onProfileStateChange} />
       </div>
       <div style="display:none">{refreshToken}</div>
     </div>
