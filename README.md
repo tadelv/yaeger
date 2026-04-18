@@ -176,6 +176,8 @@ npm run build
 
 PID temp follower, set the temperature setpoint and the PID controller will try and follow. You'll need to find your own PID values
 
+A controller review with alternatives (including MPC/LQR and fan min/max envelope design) is available at `docs/control_strategy_review_2026-04-14.md` (current recommendation: ADRC as primary advanced controller, with an ADRC autotune workflow proposal).
+
 ### Profile
 
 Still in the works, but there is now a profile follower, it follows a simple .json format. You can have a go at [Gaggiuino web profiler](https://matthew73210.github.io/Gaggiuino-web-profiler/) under the _pun_ "Yägermeister Mode"

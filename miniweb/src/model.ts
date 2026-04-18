@@ -27,9 +27,12 @@ export type YaegerMessage = {
   pidDelayFan?: number;
   pidDelayHeater?: number;
   setpoint?: number;
+  controlMode?: "pid" | "adrc";
+  autotuneMode?: "pid" | "adrc";
   pidTarget?: "BT" | "ET" | "simBT";
   pidTuneMethod?: "ziegler-nichols" | "tyreus-luyben" | "pessen-integral" | "no-overshoot";
   pidAutotune?: boolean;
+  adrcAutotune?: boolean;
   pidAutotuneCrossings?: number;
   pidAutotuneTargetCrossings?: number;
   pidAutotunePeakHigh?: number;
@@ -44,6 +47,16 @@ export type YaegerMessage = {
   pidKpActive?: number;
   pidKiActive?: number;
   pidKdActive?: number;
+  controlFanMin?: number;
+  controlFanMax?: number;
+  adrcB0?: number;
+  adrcW0?: number;
+  adrcWc?: number;
+  adrcZ1?: number;
+  adrcZ2?: number;
+  adrcZ3?: number;
+  adrcLastCommand?: number;
+  adrcAutotunePeakSlope?: number;
   emergencyStopActive?: boolean;
   id: number;
 }

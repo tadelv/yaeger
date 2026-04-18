@@ -7,6 +7,7 @@ import { followProfile, ProfileControl, profileStore } from "./profiling";
 import { sendWsCommand, useSocketState } from "./websocket";
 
 type PidTarget = "BT" | "ET" | "simBT";
+type ControlMode = "pid" | "adrc";
 
 const initialState = new YaegerState();
 
@@ -33,6 +34,7 @@ export function RoastApp() {
   const [pidEnabled, setPidEnabled] = useState(false);
   const [roastControlActive, setRoastControlActive] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
+  const [controlMode, setControlMode] = useState<ControlMode>("pid");
   const [isEditingPid, setIsEditingPid] = useState(false);
   const hasHydratedPidFromTelemetry = useRef(false);
   const pidSyncPausedUntilMs = useRef(0);
@@ -82,6 +84,7 @@ export function RoastApp() {
       setpoint: setpointValue,
       pidEnabled: pidOn && status === RoasterStatus.roasting,
       pidTarget,
+      controlMode,
     });
   };
 
@@ -222,6 +225,9 @@ export function RoastApp() {
       if (hydratedAny) hasHydratedPidFromTelemetry.current = true;
     }
     if (lastMessage?.pidTarget) setPidTarget(lastMessage.pidTarget);
+    if (lastMessage?.controlMode === "pid" || lastMessage?.controlMode === "adrc") {
+      setControlMode(lastMessage.controlMode);
+    }
   }, [isEditingPid, lastMessage]);
 
   useEffect(() => {
@@ -608,6 +614,11 @@ export function RoastApp() {
             <option value="ET">ET</option>
             <option value="simBT">Sim BT</option>
           </select>
+          <label>Control</label>
+          <select value={controlMode} onChange={(e) => setControlMode((e.target as HTMLSelectElement).value as ControlMode)}>
+            <option value="pid">PID</option>
+            <option value="adrc">ADRC</option>
+          </select>
         </div>
         <div class="inline-actions">
           <button
@@ -621,6 +632,7 @@ export function RoastApp() {
                 pidKi: ki,
                 pidKd: kd,
               });
+              sendCommand({ id: 1, command: "setPidControl", controlMode, pidTarget });
               window.dispatchEvent(
                 new CustomEvent("pid-preferences-updated", {
                   detail: { kp, ki, kd, pidTarget },

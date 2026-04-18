@@ -5,11 +5,14 @@ import { sendWsCommand, useSocketState } from "./websocket";
 
 type PidTarget = "BT" | "ET" | "simBT";
 type PidMethod = "ziegler-nichols" | "tyreus-luyben" | "pessen-integral" | "no-overshoot";
+type ControlMode = "pid" | "adrc";
 
 export function AutotuneApp() {
   const { lastMessage } = useSocketState();
   const [target, setTarget] = useState<PidTarget>("BT");
   const [method, setMethod] = useState<PidMethod>("ziegler-nichols");
+  const [controlMode, setControlMode] = useState<ControlMode>("pid");
+  const [autotuneMode, setAutotuneMode] = useState<ControlMode>("pid");
   const [setpoint, setSetpoint] = useState(20);
   const [fanSpeed, setFanSpeed] = useState(50);
   const [minHeaterPwm, setMinHeaterPwm] = useState(0);
@@ -33,6 +36,12 @@ export function AutotuneApp() {
 
   useEffect(() => {
     if (!lastMessage) return;
+    if (lastMessage.controlMode === "pid" || lastMessage.controlMode === "adrc") {
+      setControlMode(lastMessage.controlMode);
+    }
+    if (lastMessage.autotuneMode === "pid" || lastMessage.autotuneMode === "adrc") {
+      setAutotuneMode(lastMessage.autotuneMode);
+    }
 
     if (typeof lastMessage.pidAutotuneCrossings === "number" && lastMessage.pidAutotuneCrossings !== lastCrossing.current) {
       lastCrossing.current = lastMessage.pidAutotuneCrossings;
@@ -75,7 +84,7 @@ export function AutotuneApp() {
     if (typeof lastMessage.pidProcessDelaySec === "number") setProcessDelaySec(lastMessage.pidProcessDelaySec);
 
     if (typeof lastMessage.ET === "number" && typeof lastMessage.BT === "number" && typeof lastMessage.simBT === "number") {
-      setHistory((prev) => [...prev, { ET: lastMessage.ET, BT: lastMessage.BT, simBT: lastMessage.simBT }].slice(-300));
+      setHistory((prev) => [...prev, { ET: lastMessage.ET, BT: lastMessage.BT, simBT: Number(lastMessage.simBT) }].slice(-300));
     }
   }, [delayFan, delayHeater, kd, ki, lastMessage, maxHeaterPwm, minHeaterPwm]);
 
@@ -86,9 +95,10 @@ export function AutotuneApp() {
 
   return (
     <div class="section">
-      <h2>PID Autotune</h2>
+      <h2>Controller Autotune</h2>
       <div class="status-strip">
-        Autotune: {lastMessage?.pidAutotune ? "Running" : "Idle"} • Crossings {lastMessage?.pidAutotuneCrossings ?? 0}/
+        Mode {autotuneMode.toUpperCase()} • Autotune: {lastMessage?.pidAutotune || lastMessage?.adrcAutotune ? "Running" : "Idle"} •
+        Crossings {lastMessage?.pidAutotuneCrossings ?? 0}/
         {lastMessage?.pidAutotuneTargetCrossings ?? "?"}
       </div>
       <AutotuneGraph history={history} target={target} setpoint={setpoint} />
@@ -101,6 +111,14 @@ export function AutotuneApp() {
         <select value={method} onChange={(e) => setMethod((e.target as HTMLSelectElement).value as PidMethod)}>
           <option value="ziegler-nichols">Ziegler–Nichols</option><option value="tyreus-luyben">Tyreus–Luyben</option>
           <option value="pessen-integral">Pessen Integral</option><option value="no-overshoot">No overshoot</option>
+        </select>
+        <label>Control mode</label>
+        <select value={controlMode} onChange={(e) => setControlMode((e.target as HTMLSelectElement).value as ControlMode)}>
+          <option value="pid">PID</option><option value="adrc">ADRC</option>
+        </select>
+        <label>Autotune mode</label>
+        <select value={autotuneMode} onChange={(e) => setAutotuneMode((e.target as HTMLSelectElement).value as ControlMode)}>
+          <option value="pid">PID</option><option value="adrc">ADRC</option>
         </select>
         <label>Setpoint</label>
         <input type="number" value={setpoint} onInput={(e) => setSetpoint(Number((e.target as HTMLInputElement).value) || 0)} />
@@ -160,19 +178,22 @@ export function AutotuneApp() {
             command: "setPidControl",
             FanVal: fanSpeed,
             pidEnabled: false,
+            controlMode,
+            autotuneMode,
             pidTarget: target,
             pidTuneMethod: method,
             setpoint,
             pidAutotuneMin: minHeaterPwm,
             pidAutotuneMax: maxHeaterPwm,
             pidAutotune: true,
+            adrcAutotune: autotuneMode === "adrc",
           });
-          setAutotuneLog(["Autotune requested… waiting for crossings"]);
+          setAutotuneLog([`Autotune requested (${autotuneMode.toUpperCase()})…`]);
         }}
       >
         Start Autotune
       </button>
-      <button onClick={() => sendCommand({ id: 1, command: "setPidControl", pidAutotune: false })}>Stop</button>
+      <button onClick={() => sendCommand({ id: 1, command: "setPidControl", pidAutotune: false, adrcAutotune: false })}>Stop</button>
       <button onClick={() => sendCommand({ id: 1, command: "setFan", value: 0 })}>Fan Off</button>
       <button
         onClick={() => {
