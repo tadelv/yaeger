@@ -34,8 +34,6 @@ export function RoastApp() {
   const [adrcB0, setAdrcB0] = useState(0.02);
   const [adrcW0, setAdrcW0] = useState(1.0);
   const [adrcWc, setAdrcWc] = useState(0.25);
-  const [controlFanMin, setControlFanMin] = useState(30);
-  const [controlFanMax, setControlFanMax] = useState(80);
   const [pidEnabled, setPidEnabled] = useState(false);
   const [roastControlActive, setRoastControlActive] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
@@ -47,7 +45,6 @@ export function RoastApp() {
   const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
   const [graphHeightScale, setGraphHeightScale] = useState(1.2);
   const controlModeDirty = useRef(false);
-  const controlFanBoundsDirty = useRef(false);
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
@@ -85,9 +82,6 @@ export function RoastApp() {
     pidOn = pidEnabled,
     setpointValue = setpointTarget,
   ) => {
-    const fanBounds = normalizeFanBounds(controlFanMin, controlFanMax);
-    if (fanBounds.min !== controlFanMin) setControlFanMin(fanBounds.min);
-    if (fanBounds.max !== controlFanMax) setControlFanMax(fanBounds.max);
     sendCommand({
       id: 1,
       command: "setPidControl",
@@ -95,8 +89,6 @@ export function RoastApp() {
       pidEnabled: pidOn && status === RoasterStatus.roasting,
       pidTarget,
       controlMode,
-      controlFanMin: fanBounds.min,
-      controlFanMax: fanBounds.max,
       adrcB0,
       adrcW0,
       adrcWc,
@@ -243,18 +235,6 @@ export function RoastApp() {
     if (typeof lastMessage?.adrcB0 === "number") setAdrcB0(lastMessage.adrcB0);
     if (typeof lastMessage?.adrcW0 === "number") setAdrcW0(lastMessage.adrcW0);
     if (typeof lastMessage?.adrcWc === "number") setAdrcWc(lastMessage.adrcWc);
-    if (typeof lastMessage?.controlFanMin === "number" && typeof lastMessage?.controlFanMax === "number") {
-      if (!controlFanBoundsDirty.current) {
-        setControlFanMin(lastMessage.controlFanMin);
-        setControlFanMax(lastMessage.controlFanMax);
-      } else {
-        const minMatches = Math.abs(lastMessage.controlFanMin - controlFanMin) < 0.01;
-        const maxMatches = Math.abs(lastMessage.controlFanMax - controlFanMax) < 0.01;
-        if (minMatches && maxMatches) {
-          controlFanBoundsDirty.current = false;
-        }
-      }
-    }
     if (lastMessage?.controlMode === "pid" || lastMessage?.controlMode === "adrc") {
       if (!controlModeDirty.current) {
         setControlMode(lastMessage.controlMode);
@@ -262,7 +242,7 @@ export function RoastApp() {
         controlModeDirty.current = false;
       }
     }
-  }, [controlFanMax, controlFanMin, controlMode, isEditingPid, lastMessage]);
+  }, [controlMode, isEditingPid, lastMessage]);
 
   useEffect(() => {
     const onPidUpdated = (event: Event) => {
@@ -306,11 +286,6 @@ export function RoastApp() {
 
   const formatMetric = (value: number | null | undefined, digits = 2) =>
     typeof value === "number" && Number.isFinite(value) ? value.toFixed(digits) : "N/A";
-  const effectiveControlMode = lastMessage?.controlMode ?? controlMode;
-  const controllerCommand =
-    effectiveControlMode === "adrc"
-      ? lastMessage?.adrcLastCommand ?? lastMessage?.pidOutputSmoothed
-      : lastMessage?.pidOutputSmoothed;
 
   const forceStopRoastControl = (status = state.currentState.status) => {
     setRoastControlActive(false);
@@ -510,44 +485,19 @@ export function RoastApp() {
           </div>
         </div>
 
-        <div class="controller-summary">
-          <h3>Controller</h3>
+        <div class="pid-summary">
+          <h3>PID current values</h3>
           <div class="pid-grid">
-            <span>Mode {effectiveControlMode.toUpperCase()}</span>
-            <span>Target {lastMessage?.pidTarget ?? pidTarget}</span>
-            <span>Temp {formatMetric(lastMessage?.pidCurrentTemp, 2)} °C</span>
-            <span>Error {formatMetric(lastMessage?.pidError, 2)} °C</span>
-            <span>Setpoint {formatMetric(lastMessage?.setpoint ?? setpointTarget, 1)} °C</span>
-            <span>Command {formatMetric(controllerCommand, 2)}%</span>
-            <span>Fan range {formatMetric(lastMessage?.controlFanMin ?? controlFanMin, 0)}-{formatMetric(lastMessage?.controlFanMax ?? controlFanMax, 0)}%</span>
+            <span>Temp {formatMetric(lastMessage?.pidCurrentTemp, 2)}</span>
+            <span>Pred Temp {formatMetric(lastMessage?.pidPredictedTemp, 2)}</span>
+            <span>Error {formatMetric(lastMessage?.pidError, 2)}</span>
+            <span>Integral {formatMetric(lastMessage?.pidIntegral, 2)}</span>
+            <span>Derivative {formatMetric(lastMessage?.pidDerivative, 2)}</span>
+            <span>Output {formatMetric(lastMessage?.pidOutput, 2)}</span>
+            <span>Smoothed {formatMetric(lastMessage?.pidOutputSmoothed, 2)}</span>
+            <span>Delay {formatMetric(lastMessage?.pidProcessDelaySec, 2)}s</span>
+            <span>Predictor {lastMessage?.pidPredictorEnabled ? "On" : "Off"}</span>
           </div>
-          <details class="controller-diagnostics roast-controller-diagnostics">
-            <summary>Debug values</summary>
-            <div class="pid-grid">
-              {effectiveControlMode === "adrc" ? (
-                <>
-                  <span>Observer z1 {formatMetric(lastMessage?.adrcZ1 ?? lastMessage?.pidPredictedTemp, 2)} °C</span>
-                  <span>Slope z2 {formatMetric(lastMessage?.adrcZ2, 4)} °C/s</span>
-                  <span>Disturbance z3 {formatMetric(lastMessage?.adrcZ3, 4)}</span>
-                  <span>Raw heater {formatMetric(lastMessage?.pidOutput, 2)}%</span>
-                  <span>Command {formatMetric(lastMessage?.adrcLastCommand ?? lastMessage?.pidOutputSmoothed, 2)}%</span>
-                  <span>b0 {formatMetric(lastMessage?.adrcB0 ?? adrcB0, 4)}</span>
-                  <span>w0 {formatMetric(lastMessage?.adrcW0 ?? adrcW0, 4)}</span>
-                  <span>wc {formatMetric(lastMessage?.adrcWc ?? adrcWc, 4)}</span>
-                </>
-              ) : (
-                <>
-                  <span>Pred Temp {formatMetric(lastMessage?.pidPredictedTemp, 2)} °C</span>
-                  <span>Integral {formatMetric(lastMessage?.pidIntegral, 2)}</span>
-                  <span>Derivative {formatMetric(lastMessage?.pidDerivative, 2)}</span>
-                  <span>Output {formatMetric(lastMessage?.pidOutput, 2)}%</span>
-                  <span>Smoothed {formatMetric(lastMessage?.pidOutputSmoothed, 2)}%</span>
-                  <span>Delay {formatMetric(lastMessage?.pidProcessDelaySec, 2)}s</span>
-                  <span>Predictor {lastMessage?.pidPredictorEnabled ? "On" : "Off"}</span>
-                </>
-              )}
-            </div>
-          </details>
         </div>
       </section>
 
@@ -702,31 +652,10 @@ export function RoastApp() {
             <option value="pid">PID</option>
             <option value="adrc">ADRC</option>
           </select>
-          <label>Auto fan min</label>
-          <input
-            type="number"
-            value={controlFanMin}
-            onInput={(e) => {
-              controlFanBoundsDirty.current = true;
-              setControlFanMin(Number((e.target as HTMLInputElement).value) || 0);
-            }}
-          />
-          <label>Auto fan max</label>
-          <input
-            type="number"
-            value={controlFanMax}
-            onInput={(e) => {
-              controlFanBoundsDirty.current = true;
-              setControlFanMax(Number((e.target as HTMLInputElement).value) || 0);
-            }}
-          />
         </div>
         <div class="inline-actions">
           <button
             onClick={() => {
-              const fanBounds = normalizeFanBounds(controlFanMin, controlFanMax);
-              setControlFanMin(fanBounds.min);
-              setControlFanMax(fanBounds.max);
               pidSyncPausedUntilMs.current = Date.now() + 3000;
               sendCommand({
                 id: 1,
@@ -736,17 +665,7 @@ export function RoastApp() {
                 pidKi: ki,
                 pidKd: kd,
               });
-              sendCommand({
-                id: 1,
-                command: "setPidControl",
-                controlMode,
-                pidTarget,
-                controlFanMin: fanBounds.min,
-                controlFanMax: fanBounds.max,
-                adrcB0,
-                adrcW0,
-                adrcWc,
-              });
+              sendCommand({ id: 1, command: "setPidControl", controlMode, pidTarget, adrcB0, adrcW0, adrcWc });
               window.dispatchEvent(
                 new CustomEvent("pid-preferences-updated", {
                   detail: { kp, ki, kd, pidTarget },
@@ -777,17 +696,4 @@ export function RoastApp() {
       <div style="display:none">{refreshToken}</div>
     </div>
   );
-}
-
-function normalizeFanBounds(min: number, max: number) {
-  const safeMin = clampPercent(min);
-  const safeMax = clampPercent(max);
-  return {
-    min: Math.min(safeMin, safeMax),
-    max: Math.max(safeMin, safeMax),
-  };
-}
-
-function clampPercent(value: number) {
-  return Number.isFinite(value) ? Math.min(100, Math.max(0, value)) : 0;
 }
