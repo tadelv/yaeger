@@ -11,7 +11,7 @@ jobs:
     outputs:
       matrix: ${{ steps.collect.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Collect PlatformIO environments
         id: collect
@@ -43,26 +43,55 @@ jobs:
       matrix: ${{ fromJson(needs.determine-boards.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
             ~/.platformio/.cache
-          key: ${{ runner.os }}-pio
+          key: ${{ runner.os }}-python-3.12-pio-${{ hashFiles('platformio.ini', 'miniweb/package-lock.json') }}
+          restore-keys: |
+            ${{ runner.os }}-python-3.12-pio-
 
-      - uses: actions/setup-node@v4.1.0
-
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-node@v6
         with:
-          python-version: "3.11"
+          node-version: "24"
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
 
       - name: Build webUI
-        run: cd miniweb && npm i && npm run build
+        run: cd miniweb && npm ci && npm run build
 
       - name: Install PlatformIO Core
-        run: pip install --upgrade platformio
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "platformio==6.1.19"
+
+      - name: Prime pioarduino Python environment
+        run: |
+          python -m venv ~/.platformio/penv
+          ~/.platformio/penv/bin/python -m pip install --upgrade pip
+          ~/.platformio/penv/bin/python -m pip install \
+            "uv>=0.1.0" \
+            "https://github.com/pioarduino/platformio-core/archive/refs/tags/v6.1.19.zip" \
+            "littlefs-python>=0.16.0" \
+            "fatfs-ng>=0.1.14" \
+            "pyyaml>=6.0.2" \
+            "rich-click>=1.8.6" \
+            "zopfli>=0.2.2" \
+            "intelhex>=2.3.0" \
+            "rich>=14.0.0" \
+            "urllib3<2" \
+            "cryptography>=45.0.3" \
+            "certifi>=2025.8.3" \
+            "ecdsa>=0.19.1" \
+            "bitstring>=4.3.1" \
+            "reedsolo>=1.5.3,<1.8" \
+            "esp-idf-size>=2.0.0" \
+            "esp-coredump>=1.14.0"
 
       - name: Build PlatformIO Project
         run: |
@@ -73,7 +102,7 @@ jobs:
         run: |
           mkdir -p release/${{ matrix.board }}
           cp .pio/build/${{ matrix.board }}/firmware.bin release/${{ matrix.board }}/firmware.bin
-          cp .pio/build/${{ matrix.board }}/spiffs.bin release/${{ matrix.board }}/spiffs.bin
+          cp .pio/build/${{ matrix.board }}/littlefs.bin release/${{ matrix.board }}/littlefs.bin
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4

@@ -7,7 +7,6 @@ import { UpdateApp } from "./update";
 import { ProfileControl, profileStore } from "./profiling";
 import { RoastApp } from "./roast";
 import { getAdminSecret, getBasicAuthHeaderValue } from "./auth";
-import { CoffeeBeanBackground } from "./coffeeBeans";
 import { sendWsCommand } from "./websocket";
 import { useSocketState } from "./websocket";
 
@@ -163,7 +162,6 @@ function App() {
 
   return (
     <>
-      <CoffeeBeanBackground />
       <div class="app-layout">
         <div class="tabs-nav">
           <h2 class="tabs-title">Yaeger</h2>
@@ -175,20 +173,6 @@ function App() {
           <button class="tab-btn emergency-btn" onClick={emergencyStop}>
             Emergency stop
           </button>
-          <div class="external-links">
-            <a class="ext-link" href="https://github.com/tadelv/yaeger" target="_blank" rel="noreferrer">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 .5a12 12 0 0 0-3.8 23.4c.6.1.8-.3.8-.6v-2.2c-3.3.7-4-1.4-4-1.4-.5-1.3-1.2-1.6-1.2-1.6-1-.7.1-.7.1-.7 1.1.1 1.7 1.1 1.7 1.1 1 .1.7 2.6 3.3 1.8.1-.7.4-1.2.7-1.5-2.7-.3-5.5-1.4-5.5-6a4.7 4.7 0 0 1 1.2-3.2c-.1-.3-.5-1.6.1-3.2 0 0 1-.3 3.3 1.2a11.3 11.3 0 0 1 6 0c2.2-1.5 3.2-1.2 3.2-1.2.6 1.6.2 2.9.1 3.2a4.7 4.7 0 0 1 1.2 3.2c0 4.7-2.8 5.7-5.5 6 .4.3.8 1 .8 2v3c0 .3.2.7.8.6A12 12 0 0 0 12 .5Z" />
-              </svg>
-              Yaeger GitHub
-            </a>
-            <a class="ext-link" href="https://matthew73210.github.io/Gaggiuino-web-profiler/" target="_blank" rel="noreferrer">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2Zm1 5v4.6l3.3 3.3-1.4 1.4L11 12V7Z" />
-              </svg>
-              Gaggiuino Profiler
-            </a>
-          </div>
         </div>
         <div class="tab-content">
           {activeTab === "home" && (

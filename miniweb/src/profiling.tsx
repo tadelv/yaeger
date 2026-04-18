@@ -23,16 +23,16 @@ export function followProfile(
   const elapsedTime = (new Date().getTime() - roast.startDate.getTime()) / 1000;
   let accumulatedTime = 0;
 
-  for (const step of profile.steps) {
+  for (let stepIndex = 0; stepIndex < profile.steps.length; stepIndex += 1) {
+    const step = profile.steps[stepIndex];
     accumulatedTime += step.duration;
     if (elapsedTime <= accumulatedTime) {
       const stepStartTime = accumulatedTime - step.duration;
       const progress = (elapsedTime - stepStartTime) / step.duration;
       const prevSetpoint =
-        stepStartTime === 0
+        stepIndex === 0
           ? profile.steps[0].setpoint
-          : profile.steps.find((s, i) => profile.steps[i + 1] === step)?.setpoint ||
-            step.setpoint;
+          : profile.steps[stepIndex - 1].setpoint;
 
       return {
         setPoint:
