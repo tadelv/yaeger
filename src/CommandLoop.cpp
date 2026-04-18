@@ -510,6 +510,18 @@ bool validateCommandSchema(AsyncWebSocketClient *client, JsonDocument &doc, cons
       client->text("{\"error\":\"invalid schema: adrcAutotune must be boolean\"}");
       return false;
     }
+    if (!doc["adrcB0"].isNull() && !doc["adrcB0"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: adrcB0 must be numeric\"}");
+      return false;
+    }
+    if (!doc["adrcW0"].isNull() && !doc["adrcW0"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: adrcW0 must be numeric\"}");
+      return false;
+    }
+    if (!doc["adrcWc"].isNull() && !doc["adrcWc"].is<double>()) {
+      client->text("{\"error\":\"invalid schema: adrcWc must be numeric\"}");
+      return false;
+    }
   }
 
   return true;
@@ -918,6 +930,18 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       if (!doc["pidPredictorEnabled"].isNull()) {
         pidPredictorEnabled = doc["pidPredictorEnabled"].as<bool>();
         preferences.putBool(PREF_PID_PREDICTOR_ENABLED, pidPredictorEnabled);
+      }
+      if (!doc["adrcB0"].isNull()) {
+        adrcB0 = std::max(0.001, doc["adrcB0"].as<double>());
+        preferences.putDouble("adrcB0", adrcB0);
+      }
+      if (!doc["adrcW0"].isNull()) {
+        adrcW0 = std::max(0.1, doc["adrcW0"].as<double>());
+        preferences.putDouble("adrcW0", adrcW0);
+      }
+      if (!doc["adrcWc"].isNull()) {
+        adrcWc = std::max(0.05, doc["adrcWc"].as<double>());
+        preferences.putDouble("adrcWc", adrcWc);
       }
       if (pidAutotuneRelayOutputLow > pidAutotuneRelayOutputHigh) {
         double temp = pidAutotuneRelayOutputLow;

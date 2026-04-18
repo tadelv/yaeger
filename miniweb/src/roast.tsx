@@ -31,6 +31,9 @@ export function RoastApp() {
   const [kp, setKp] = useState(1.0);
   const [ki, setKi] = useState(0.1);
   const [kd, setKd] = useState(0.01);
+  const [adrcB0, setAdrcB0] = useState(0.02);
+  const [adrcW0, setAdrcW0] = useState(1.0);
+  const [adrcWc, setAdrcWc] = useState(0.25);
   const [pidEnabled, setPidEnabled] = useState(false);
   const [roastControlActive, setRoastControlActive] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
@@ -41,6 +44,7 @@ export function RoastApp() {
   const [refreshToken, setRefreshToken] = useState(0);
   const [graphMode, setGraphMode] = useState<RoastGraphMode>("separate");
   const [graphHeightScale, setGraphHeightScale] = useState(1.2);
+  const controlModeDirty = useRef(false);
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
@@ -85,6 +89,9 @@ export function RoastApp() {
       pidEnabled: pidOn && status === RoasterStatus.roasting,
       pidTarget,
       controlMode,
+      adrcB0,
+      adrcW0,
+      adrcWc,
     });
   };
 
@@ -225,10 +232,17 @@ export function RoastApp() {
       if (hydratedAny) hasHydratedPidFromTelemetry.current = true;
     }
     if (lastMessage?.pidTarget) setPidTarget(lastMessage.pidTarget);
+    if (typeof lastMessage?.adrcB0 === "number") setAdrcB0(lastMessage.adrcB0);
+    if (typeof lastMessage?.adrcW0 === "number") setAdrcW0(lastMessage.adrcW0);
+    if (typeof lastMessage?.adrcWc === "number") setAdrcWc(lastMessage.adrcWc);
     if (lastMessage?.controlMode === "pid" || lastMessage?.controlMode === "adrc") {
-      setControlMode(lastMessage.controlMode);
+      if (!controlModeDirty.current) {
+        setControlMode(lastMessage.controlMode);
+      } else if (lastMessage.controlMode === controlMode) {
+        controlModeDirty.current = false;
+      }
     }
-  }, [isEditingPid, lastMessage]);
+  }, [controlMode, isEditingPid, lastMessage]);
 
   useEffect(() => {
     const onPidUpdated = (event: Event) => {
@@ -582,32 +596,45 @@ export function RoastApp() {
       </section>
 
       <div class="section">
-        <h3>PID Factors</h3>
+        <h3>Controller Factors</h3>
         <div class="form-grid">
-          <label>P</label>
-          <input
-            type="number"
-            value={kp}
-            onFocus={() => setIsEditingPid(true)}
-            onBlur={() => setIsEditingPid(false)}
-            onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)}
-          />
-          <label>I</label>
-          <input
-            type="number"
-            value={ki}
-            onFocus={() => setIsEditingPid(true)}
-            onBlur={() => setIsEditingPid(false)}
-            onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)}
-          />
-          <label>D</label>
-          <input
-            type="number"
-            value={kd}
-            onFocus={() => setIsEditingPid(true)}
-            onBlur={() => setIsEditingPid(false)}
-            onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)}
-          />
+          {controlMode === "pid" ? (
+            <>
+              <label>P</label>
+              <input
+                type="number"
+                value={kp}
+                onFocus={() => setIsEditingPid(true)}
+                onBlur={() => setIsEditingPid(false)}
+                onInput={(e) => setKp(Number((e.target as HTMLInputElement).value) || 0)}
+              />
+              <label>I</label>
+              <input
+                type="number"
+                value={ki}
+                onFocus={() => setIsEditingPid(true)}
+                onBlur={() => setIsEditingPid(false)}
+                onInput={(e) => setKi(Number((e.target as HTMLInputElement).value) || 0)}
+              />
+              <label>D</label>
+              <input
+                type="number"
+                value={kd}
+                onFocus={() => setIsEditingPid(true)}
+                onBlur={() => setIsEditingPid(false)}
+                onInput={(e) => setKd(Number((e.target as HTMLInputElement).value) || 0)}
+              />
+            </>
+          ) : (
+            <>
+              <label>b0</label>
+              <input type="number" value={adrcB0} onInput={(e) => setAdrcB0(Number((e.target as HTMLInputElement).value) || 0)} />
+              <label>w0</label>
+              <input type="number" value={adrcW0} onInput={(e) => setAdrcW0(Number((e.target as HTMLInputElement).value) || 0)} />
+              <label>wc</label>
+              <input type="number" value={adrcWc} onInput={(e) => setAdrcWc(Number((e.target as HTMLInputElement).value) || 0)} />
+            </>
+          )}
           <label>Target</label>
           <select value={pidTarget} onChange={(e) => setPidTarget((e.target as HTMLSelectElement).value as PidTarget)}>
             <option value="BT">BT</option>
@@ -615,7 +642,13 @@ export function RoastApp() {
             <option value="simBT">Sim BT</option>
           </select>
           <label>Control</label>
-          <select value={controlMode} onChange={(e) => setControlMode((e.target as HTMLSelectElement).value as ControlMode)}>
+          <select
+            value={controlMode}
+            onChange={(e) => {
+              controlModeDirty.current = true;
+              setControlMode((e.target as HTMLSelectElement).value as ControlMode);
+            }}
+          >
             <option value="pid">PID</option>
             <option value="adrc">ADRC</option>
           </select>
@@ -632,7 +665,7 @@ export function RoastApp() {
                 pidKi: ki,
                 pidKd: kd,
               });
-              sendCommand({ id: 1, command: "setPidControl", controlMode, pidTarget });
+              sendCommand({ id: 1, command: "setPidControl", controlMode, pidTarget, adrcB0, adrcW0, adrcWc });
               window.dispatchEvent(
                 new CustomEvent("pid-preferences-updated", {
                   detail: { kp, ki, kd, pidTarget },
@@ -640,7 +673,7 @@ export function RoastApp() {
               );
             }}
           >
-            Apply pid
+            Apply controller
           </button>
           <label class="switch-label">
             <input
@@ -651,7 +684,7 @@ export function RoastApp() {
                 sendPidControlConfig(state.currentState.status, e.currentTarget.checked && roastControlActive);
               }}
             />
-            PID Enabled
+            Controller Enabled
           </label>
         </div>
       </div>

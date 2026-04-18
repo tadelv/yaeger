@@ -28,6 +28,8 @@ export function AutotuneApp() {
   const lastCrossing = useRef(-1);
   const autotuneBoundsDirty = useRef(false);
   const delayInputsDirty = useRef(false);
+  const controlModeDirty = useRef(false);
+  const autotuneModeDirty = useRef(false);
 
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
@@ -37,10 +39,18 @@ export function AutotuneApp() {
   useEffect(() => {
     if (!lastMessage) return;
     if (lastMessage.controlMode === "pid" || lastMessage.controlMode === "adrc") {
-      setControlMode(lastMessage.controlMode);
+      if (!controlModeDirty.current) {
+        setControlMode(lastMessage.controlMode);
+      } else if (lastMessage.controlMode === controlMode) {
+        controlModeDirty.current = false;
+      }
     }
     if (lastMessage.autotuneMode === "pid" || lastMessage.autotuneMode === "adrc") {
-      setAutotuneMode(lastMessage.autotuneMode);
+      if (!autotuneModeDirty.current) {
+        setAutotuneMode(lastMessage.autotuneMode);
+      } else if (lastMessage.autotuneMode === autotuneMode) {
+        autotuneModeDirty.current = false;
+      }
     }
 
     if (typeof lastMessage.pidAutotuneCrossings === "number" && lastMessage.pidAutotuneCrossings !== lastCrossing.current) {
@@ -86,7 +96,7 @@ export function AutotuneApp() {
     if (typeof lastMessage.ET === "number" && typeof lastMessage.BT === "number" && typeof lastMessage.simBT === "number") {
       setHistory((prev) => [...prev, { ET: lastMessage.ET, BT: lastMessage.BT, simBT: Number(lastMessage.simBT) }].slice(-300));
     }
-  }, [delayFan, delayHeater, kd, ki, lastMessage, maxHeaterPwm, minHeaterPwm]);
+  }, [autotuneMode, controlMode, delayFan, delayHeater, kd, ki, lastMessage, maxHeaterPwm, minHeaterPwm]);
 
   const delayElapsedSec =
     typeof lastMessage?.pidDelayMeasureElapsedSec === "number" ? lastMessage.pidDelayMeasureElapsedSec.toFixed(1) : "0.0";
@@ -113,11 +123,23 @@ export function AutotuneApp() {
           <option value="pessen-integral">Pessen Integral</option><option value="no-overshoot">No overshoot</option>
         </select>
         <label>Control mode</label>
-        <select value={controlMode} onChange={(e) => setControlMode((e.target as HTMLSelectElement).value as ControlMode)}>
+        <select
+          value={controlMode}
+          onChange={(e) => {
+            controlModeDirty.current = true;
+            setControlMode((e.target as HTMLSelectElement).value as ControlMode);
+          }}
+        >
           <option value="pid">PID</option><option value="adrc">ADRC</option>
         </select>
         <label>Autotune mode</label>
-        <select value={autotuneMode} onChange={(e) => setAutotuneMode((e.target as HTMLSelectElement).value as ControlMode)}>
+        <select
+          value={autotuneMode}
+          onChange={(e) => {
+            autotuneModeDirty.current = true;
+            setAutotuneMode((e.target as HTMLSelectElement).value as ControlMode);
+          }}
+        >
           <option value="pid">PID</option><option value="adrc">ADRC</option>
         </select>
         <label>Setpoint</label>
