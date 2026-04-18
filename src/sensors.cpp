@@ -7,9 +7,7 @@
 #include "logging.h"
 #include "sensors.h"
 #include <Adafruit_MAX31855.h>
-#include <NexgenFilter.h>
 #include <SPI.h>
-#include <MovingAverageFilter.h>
 #include <cstdint>
 
 void getChipTemp() {
@@ -22,12 +20,34 @@ void getChipTemp() {
 Adafruit_MAX31855 tcExhaust(MAX1CLK, MAX1CS, MAX1DO);
 Adafruit_MAX31855 tcBeans(MAX2CLK, MAX2CS, MAX2DO);
 
-const uint8_t kMovingAverageWindowSize = 4;
+constexpr uint8_t kMovingAverageWindowSize = 4;
 const unsigned long kSamplingWindowDurationMs = 400;
 const uint8_t kFaultDebounceThreshold = 3;
 
-MovingAverageFilter exhaustFilter(kMovingAverageWindowSize);
-MovingAverageFilter beansFilter(kMovingAverageWindowSize);
+class MovingAverage {
+public:
+  float process(float value) {
+    if (count < kMovingAverageWindowSize) {
+      samples[count++] = value;
+      sum += value;
+    } else {
+      sum -= samples[index];
+      samples[index] = value;
+      sum += value;
+    }
+    index = (index + 1) % kMovingAverageWindowSize;
+    return sum / count;
+  }
+
+private:
+  float samples[kMovingAverageWindowSize] = {0};
+  float sum = 0;
+  uint8_t count = 0;
+  uint8_t index = 0;
+};
+
+MovingAverage exhaustFilter;
+MovingAverage beansFilter;
 /*SimpleKalmanFilter exhaustFilter(80, 80, 3);*/
 /*SimpleKalmanFilter beansFilter(80, 80, 3);*/
 unsigned long lastReadTime = 0;

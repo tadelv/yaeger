@@ -1,7 +1,3 @@
-import { AxisBottom, AxisLeft } from "@visx/axis";
-import { Group } from "@visx/group";
-import { scaleLinear } from "@visx/scale";
-import { LinePath } from "@visx/shape";
 import { Profile, RoastState } from "./model";
 
 export type RoastGraphMode = "combined" | "separate";
@@ -14,7 +10,7 @@ type GraphSeries = {
   values: Array<number | null>;
 };
 
-type VisxLineGraphProps = {
+type LineGraphProps = {
   title: string;
   samples: number[];
   series: GraphSeries[];
@@ -26,6 +22,44 @@ type VisxLineGraphProps = {
 
 const WIDTH = 900;
 const MARGIN = { top: 20, right: 20, bottom: 34, left: 52 };
+
+function createScale(domainMin: number, domainMax: number, rangeMin: number, rangeMax: number) {
+  const domainSpan = domainMax - domainMin || 1;
+  const rangeSpan = rangeMax - rangeMin;
+  return (value: number) => rangeMin + ((value - domainMin) / domainSpan) * rangeSpan;
+}
+
+function formatTick(value: number) {
+  if (Math.abs(value) >= 100 || Number.isInteger(value)) {
+    return value.toFixed(0);
+  }
+  return value.toFixed(1);
+}
+
+function linePath(
+  samples: number[],
+  values: Array<number | null>,
+  xScale: (value: number) => number,
+  yScale: (value: number) => number,
+) {
+  let path = "";
+  let drawing = false;
+
+  for (let i = 0; i < values.length; i += 1) {
+    const value = values[i];
+    if (value == null || !Number.isFinite(value)) {
+      drawing = false;
+      continue;
+    }
+
+    const x = xScale(samples[i]);
+    const y = yScale(value);
+    path += `${drawing ? "L" : "M"}${x.toFixed(2)} ${y.toFixed(2)} `;
+    drawing = true;
+  }
+
+  return path.trim();
+}
 
 function buildRoR(values: number[], timeSeconds: number[], windowSize = 20): Array<number | null> {
   const rate = values.map((temp, i) => {
@@ -95,31 +129,26 @@ function getProfileSetpointAtElapsed(profile: Profile, elapsedSeconds: number): 
   return profile.steps[profile.steps.length - 1].setpoint;
 }
 
-function VisxLineGraph({ title, samples, series, minY, maxY, height, eventTimes = [] }: VisxLineGraphProps) {
+function LineGraph({ title, samples, series, minY, maxY, height, eventTimes = [] }: LineGraphProps) {
   if (samples.length < 2) {
     return <div class="graph-empty">{title}: waiting for samples…</div>;
   }
 
   const innerWidth = WIDTH - MARGIN.left - MARGIN.right;
   const innerHeight = height - MARGIN.top - MARGIN.bottom;
-
-  const xScale = scaleLinear<number>({
-    domain: [0, Math.max(1, samples[samples.length - 1])],
-    range: [0, innerWidth],
-  });
-
-  const yScale = scaleLinear<number>({
-    domain: [minY, maxY],
-    range: [innerHeight, 0],
-  });
+  const maxSample = Math.max(1, samples[samples.length - 1]);
+  const xScale = createScale(0, maxSample, 0, innerWidth);
+  const yScale = createScale(minY, maxY, innerHeight, 0);
+  const yTicks = gridTicks(minY, maxY, 5);
+  const xTicks = gridTicks(0, maxSample, 5);
 
   return (
     <div class="graph-card">
       <h4>{title}</h4>
       <svg class="line-graph" viewBox={`0 0 ${WIDTH} ${height}`} preserveAspectRatio="none">
         <rect x={0} y={0} width={WIDTH} height={height} fill="#0f172a" rx={8} />
-        <Group top={MARGIN.top} left={MARGIN.left}>
-          {gridTicks(minY, maxY, 5).map((tick) => (
+        <g transform={`translate(${MARGIN.left}, ${MARGIN.top})`}>
+          {yTicks.map((tick) => (
             <line
               key={`${title}-h-${tick}`}
               x1={0}
@@ -131,20 +160,17 @@ function VisxLineGraph({ title, samples, series, minY, maxY, height, eventTimes 
             />
           ))}
 
-          {[0, 0.25, 0.5, 0.75, 1].map((ratio) => {
-            const x = innerWidth * ratio;
-            return (
-              <line
-                key={`${title}-v-${ratio}`}
-                x1={x}
-                y1={0}
-                x2={x}
-                y2={innerHeight}
-                stroke="rgba(148, 163, 184, 0.14)"
-                strokeWidth={1}
-              />
-            );
-          })}
+          {xTicks.map((tick) => (
+            <line
+              key={`${title}-v-${tick}`}
+              x1={xScale(tick)}
+              y1={0}
+              x2={xScale(tick)}
+              y2={innerHeight}
+              stroke="rgba(148, 163, 184, 0.14)"
+              strokeWidth={1}
+            />
+          ))}
 
           {eventTimes.map((event) => {
             const x = xScale(event.sec);
@@ -156,35 +182,41 @@ function VisxLineGraph({ title, samples, series, minY, maxY, height, eventTimes 
             );
           })}
 
-          {series.map((s) => (
-            <LinePath
-              key={`${title}-${s.label}`}
-              data={s.values.map((v, i) => ({ x: samples[i], y: v }))}
-              x={(d) => xScale(d.x)}
-              y={(d) => yScale((d.y ?? minY) as number)}
-              defined={(d) => d.y != null}
-              stroke={s.color}
-              strokeWidth={2}
-              fill="none"
-            />
+          {series.map((s) => {
+            const path = linePath(samples, s.values, xScale, yScale);
+            return path ? (
+              <path
+                key={`${title}-${s.label}`}
+                d={path}
+                stroke={s.color}
+                strokeWidth={2}
+                fill="none"
+                vectorEffect="non-scaling-stroke"
+              />
+            ) : null;
+          })}
+
+          <line x1={0} y1={innerHeight} x2={innerWidth} y2={innerHeight} stroke="#94a3b8" strokeWidth={1} />
+          <line x1={0} y1={0} x2={0} y2={innerHeight} stroke="#cbd5e1" strokeWidth={1} />
+
+          {xTicks.map((tick) => (
+            <g key={`${title}-x-label-${tick}`} transform={`translate(${xScale(tick)}, ${innerHeight})`}>
+              <line y2={5} stroke="#94a3b8" strokeWidth={1} />
+              <text y={17} fill="#94a3b8" fontSize={11} textAnchor="middle">
+                {formatTick(tick)}
+              </text>
+            </g>
           ))}
 
-          <AxisBottom
-            top={innerHeight}
-            scale={xScale}
-            numTicks={6}
-            stroke="#94a3b8"
-            tickStroke="#94a3b8"
-            tickLabelProps={() => ({ fill: "#94a3b8", fontSize: 11, textAnchor: "middle", dy: "0.25em" })}
-          />
-          <AxisLeft
-            scale={yScale}
-            numTicks={6}
-            stroke="#cbd5e1"
-            tickStroke="#cbd5e1"
-            tickLabelProps={() => ({ fill: "#cbd5e1", fontSize: 11, textAnchor: "end", dx: "-0.3em", dy: "0.25em" })}
-          />
-        </Group>
+          {yTicks.map((tick) => (
+            <g key={`${title}-y-label-${tick}`} transform={`translate(0, ${yScale(tick)})`}>
+              <line x2={-5} stroke="#cbd5e1" strokeWidth={1} />
+              <text x={-8} y={4} fill="#cbd5e1" fontSize={11} textAnchor="end">
+                {formatTick(tick)}
+              </text>
+            </g>
+          ))}
+        </g>
       </svg>
       <div class="graph-legend">
         {series.map((s) => (
@@ -226,7 +258,7 @@ export function RoastGraphs({
     const maxY = validValues.length ? Math.ceil(Math.max(...validValues) + 5) : 300;
 
     return (
-      <VisxLineGraph
+      <LineGraph
         title="Profile Preview"
         samples={previewSamples}
         minY={minY}
@@ -260,7 +292,7 @@ export function RoastGraphs({
 
   if (mode === "combined") {
     return (
-      <VisxLineGraph
+      <LineGraph
         title="Combined Roast Telemetry"
         samples={sampleTimes}
         minY={0}
@@ -285,7 +317,7 @@ export function RoastGraphs({
 
   return (
     <div class="graph-stack">
-      <VisxLineGraph
+      <LineGraph
         title="Temperature"
         samples={sampleTimes}
         minY={0}
@@ -301,7 +333,7 @@ export function RoastGraphs({
             : []),
         ]}
       />
-      <VisxLineGraph
+      <LineGraph
         title="Power"
         samples={sampleTimes}
         minY={0}
@@ -312,7 +344,7 @@ export function RoastGraphs({
           { label: "Heater %", color: "#fb923c", values: heater },
         ]}
       />
-      <VisxLineGraph
+      <LineGraph
         title="Rate of Rise"
         samples={sampleTimes}
         minY={-5}
@@ -340,7 +372,7 @@ export function AutotuneGraph({
   const samples = values.map((_, i) => i);
 
   return (
-    <VisxLineGraph
+    <LineGraph
       title="Autotune target trend"
       samples={samples}
       minY={Math.min(...values, setpoint) - 3}

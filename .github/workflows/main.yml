@@ -20,17 +20,19 @@ jobs:
           - esp32-s3-mini
 
     steps:
-      - uses: actions/checkout@v3
+      - uses: actions/checkout@v6
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
             ~/.platformio/.cache
           key: ${{ runner.os }}-pio
-      - uses: actions/setup-node@v4.1.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -51,7 +53,7 @@ jobs:
           name: firmware-${{ matrix.board }}
           path: |
             .pio/build/${{ matrix.board }}/firmware.bin
-            .pio/build/${{ matrix.board }}/spiffs.bin
+            .pio/build/${{ matrix.board }}/littlefs.bin
 
   publish:
     if: ${{ github.event_name == 'push' && github.repository == 'tadelv/yaeger' }}
@@ -60,7 +62,7 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
 

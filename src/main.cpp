@@ -1,5 +1,4 @@
 
-#include <Adafruit_NeoPixel.h>
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA
 #include <LittleFS.h>
@@ -16,8 +15,6 @@
 #include "security.h"
 #include "wifi_setup.h"
 
-#define PIN 48
-Adafruit_NeoPixel pixels(1, PIN);
 // Create AsyncWebServer object on port 80
 /*WebServer server(80);*/
 // Create a WebSocket object
@@ -61,10 +58,6 @@ void setup(void) {
   Serial.begin(115200);
   delay(1000); // Take some time to open up the Serial Monitor
   startSensors();
-  pixels.begin();
-  pixels.clear();
-  pixels.setPixelColor(0, pixels.Color(5, 0, 0));
-  pixels.show();
 
   // Wait for connection
   setupWifi();
@@ -97,9 +90,6 @@ void setup(void) {
 
   server.begin();
   log("HTTP server started");
-  pixels.clear();
-  pixels.setPixelColor(0, pixels.Color(0, 5, 0));
-  pixels.show();
 
   initFan();
   initHeater();

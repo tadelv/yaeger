@@ -169,7 +169,7 @@ export function RoastApp() {
     const startDate = new Date(nowMs - latestMs);
 
     const measurements: Measurement[] = samples
-      .map((entry) => {
+      .map((entry): Measurement | null => {
         const sample = entry as Record<string, unknown>;
         const sampleMs = Number(sample.ms ?? 0);
         if (!Number.isFinite(sampleMs)) return null;
@@ -193,7 +193,7 @@ export function RoastApp() {
               kd,
             },
           },
-        } satisfies Measurement;
+        };
       })
       .filter((m): m is Measurement => m != null);
 

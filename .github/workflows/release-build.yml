@@ -11,7 +11,7 @@ jobs:
     outputs:
       matrix: ${{ steps.collect.outputs.matrix }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - name: Collect PlatformIO environments
         id: collect
@@ -43,18 +43,20 @@ jobs:
       matrix: ${{ fromJson(needs.determine-boards.outputs.matrix) }}
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/cache@v3
+      - uses: actions/cache@v5
         with:
           path: |
             ~/.cache/pip
             ~/.platformio/.cache
           key: ${{ runner.os }}-pio
 
-      - uses: actions/setup-node@v4.1.0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
 
-      - uses: actions/setup-python@v4
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.11"
 
@@ -73,7 +75,7 @@ jobs:
         run: |
           mkdir -p release/${{ matrix.board }}
           cp .pio/build/${{ matrix.board }}/firmware.bin release/${{ matrix.board }}/firmware.bin
-          cp .pio/build/${{ matrix.board }}/spiffs.bin release/${{ matrix.board }}/spiffs.bin
+          cp .pio/build/${{ matrix.board }}/littlefs.bin release/${{ matrix.board }}/littlefs.bin
 
       - name: Upload firmware artifacts
         uses: actions/upload-artifact@v4
