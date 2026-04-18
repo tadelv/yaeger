@@ -75,6 +75,28 @@ if match:
 PY
 }
 
+extract_missing_errno2_path() {
+  local log_file="$1"
+  local py_cmd="${PYTHON_BIN:-python3}"
+
+  "$py_cmd" - "$log_file" <<'PY'
+import re
+import sys
+from pathlib import Path
+
+text = Path(sys.argv[1]).read_text(errors="ignore")
+patterns = [
+    r"FileNotFoundError:\s+\[Errno 2\]\s+No such file or directory:\s+'([^']+)'",
+    r"Error building filesystem image:\s+\[Errno 2\]\s+No such file or directory:\s+'([^']+)'",
+]
+for pattern in patterns:
+    matches = re.findall(pattern, text)
+    if matches:
+        print(matches[-1])
+        break
+PY
+}
+
 ensure_ota_venv() {
   local python_cmd="${PYTHON_BIN:-python3}"
 
@@ -131,6 +153,18 @@ run_pio_with_auto_deps() {
       missing_fs_dir=$(dirname "$missing_fs_output")
       echo "Detected missing filesystem output path '$missing_fs_output'. Creating '$missing_fs_dir' and retrying..."
       mkdir -p "$missing_fs_dir"
+      rm -f "$log_file"
+      attempt=$((attempt + 1))
+      continue
+    fi
+
+    local missing_errno2_path
+    missing_errno2_path=$(extract_missing_errno2_path "$log_file")
+    if [[ -n "$missing_errno2_path" && "$missing_errno2_path" == *"/.pio/build/"* ]]; then
+      local missing_errno2_dir
+      missing_errno2_dir=$(dirname "$missing_errno2_path")
+      echo "Detected missing PlatformIO build path '$missing_errno2_path'. Creating '$missing_errno2_dir' and retrying..."
+      mkdir -p "$missing_errno2_dir"
       rm -f "$log_file"
       attempt=$((attempt + 1))
       continue
