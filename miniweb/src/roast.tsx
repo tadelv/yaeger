@@ -36,6 +36,7 @@ export function RoastApp() {
   const [adrcWc, setAdrcWc] = useState(0.25);
   const [controlFanMin, setControlFanMin] = useState(30);
   const [controlFanMax, setControlFanMax] = useState(80);
+  const [adrcFanControlEnabled, setAdrcFanControlEnabled] = useState(true);
   const [pidEnabled, setPidEnabled] = useState(false);
   const [roastControlActive, setRoastControlActive] = useState(false);
   const [pidTarget, setPidTarget] = useState<PidTarget>("BT");
@@ -47,6 +48,7 @@ export function RoastApp() {
   const [graphHeightScale, setGraphHeightScale] = useState(1.2);
   const controlModeDirty = useRef(false);
   const controlFanBoundsDirty = useRef(false);
+  const adrcFanControlDirty = useRef(false);
   const sendCommand = (data: Record<string, unknown>) => {
     const authToken = getAdminSecret();
     sendWsCommand({ ...data, authToken });
@@ -96,6 +98,7 @@ export function RoastApp() {
       controlMode,
       controlFanMin: fanBounds.min,
       controlFanMax: fanBounds.max,
+      adrcFanControlEnabled,
       adrcB0,
       adrcW0,
       adrcWc,
@@ -254,6 +257,13 @@ export function RoastApp() {
         }
       }
     }
+    if (typeof lastMessage?.adrcFanControlEnabled === "boolean") {
+      if (!adrcFanControlDirty.current) {
+        setAdrcFanControlEnabled(lastMessage.adrcFanControlEnabled);
+      } else if (lastMessage.adrcFanControlEnabled === adrcFanControlEnabled) {
+        adrcFanControlDirty.current = false;
+      }
+    }
     if (lastMessage?.controlMode === "pid" || lastMessage?.controlMode === "adrc") {
       if (!controlModeDirty.current) {
         setControlMode(lastMessage.controlMode);
@@ -261,7 +271,7 @@ export function RoastApp() {
         controlModeDirty.current = false;
       }
     }
-  }, [controlFanMax, controlFanMin, controlMode, isEditingPid, lastMessage]);
+  }, [adrcFanControlEnabled, controlFanMax, controlFanMin, controlMode, isEditingPid, lastMessage]);
 
   useEffect(() => {
     const onPidUpdated = (event: Event) => {
@@ -527,6 +537,7 @@ export function RoastApp() {
             <span>Setpoint {formatMetric(lastMessage?.setpoint ?? setpointTarget, 1)} °C</span>
             <span>Command {formatMetric(controllerCommand, 2)}%</span>
             <span>Fan range {formatMetric(lastMessage?.controlFanMin ?? controlFanMin, 0)}-{formatMetric(lastMessage?.controlFanMax ?? controlFanMax, 0)}%</span>
+            <span>ADRC fan {(lastMessage?.adrcFanControlEnabled ?? adrcFanControlEnabled) ? "On" : "Manual"}</span>
           </div>
           <details class="controller-diagnostics roast-controller-diagnostics">
             <summary>Debug values</summary>
@@ -718,6 +729,15 @@ export function RoastApp() {
               setControlFanMax(Number((e.target as HTMLInputElement).value) || 0);
             }}
           />
+          <label>ADRC controls fan</label>
+          <input
+            type="checkbox"
+            checked={adrcFanControlEnabled}
+            onChange={(e) => {
+              adrcFanControlDirty.current = true;
+              setAdrcFanControlEnabled(e.currentTarget.checked);
+            }}
+          />
         </div>
         <div class="inline-actions">
           <button
@@ -741,6 +761,7 @@ export function RoastApp() {
                 pidTarget,
                 controlFanMin: fanBounds.min,
                 controlFanMax: fanBounds.max,
+                adrcFanControlEnabled,
                 adrcB0,
                 adrcW0,
                 adrcWc,

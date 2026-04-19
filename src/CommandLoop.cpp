@@ -79,7 +79,7 @@ size_t pidAutotuneLowPeakCount = 0;
 double pidAutotuneAvgPeakHigh = NAN;
 double pidAutotuneAvgPeakLow = NAN;
 
-// Shared fan envelope for automatic controllers (PID/ADRC).
+// Fan envelope used when ADRC is allowed to command airflow.
 double controlFanMin = 30.0;
 double controlFanMax = 80.0;
 
@@ -98,6 +98,7 @@ double adrcLastCommand = 0.0;
 double adrcB0 = 0.02;
 double adrcW0 = 1.0;
 double adrcWc = 0.25;
+bool adrcFanControlEnabled = true;
 
 enum class PidDelayMeasureState { IDLE, STABILIZING, HEATING, COMPLETE, FAILED };
 PidDelayMeasureState pidDelayMeasureState = PidDelayMeasureState::IDLE;
@@ -520,6 +521,10 @@ bool validateCommandSchema(AsyncWebSocketClient *client, JsonDocument &doc, cons
       client->text("{\"error\":\"invalid schema: controlFanMax must be numeric\"}");
       return false;
     }
+    if (!doc["adrcFanControlEnabled"].isNull() && !doc["adrcFanControlEnabled"].is<bool>()) {
+      client->text("{\"error\":\"invalid schema: adrcFanControlEnabled must be boolean\"}");
+      return false;
+    }
     if (!doc["adrcAutotune"].isNull() && !doc["adrcAutotune"].is<bool>()) {
       client->text("{\"error\":\"invalid schema: adrcAutotune must be boolean\"}");
       return false;
@@ -620,7 +625,9 @@ void startAdrcAutotune() {
   pidEnabled = false;
   preferences.putBool("pidEnabled", false);
   setHeaterPower(0);
-  setFanSpeed(lround(std::clamp((controlFanMin + controlFanMax) * 0.5, controlFanMin, controlFanMax)));
+  if (adrcFanControlEnabled) {
+    setFanSpeed(lround(std::clamp((controlFanMin + controlFanMax) * 0.5, controlFanMin, controlFanMax)));
+  }
   logf("ADRC autotune started (target=%s, setpoint=%.2f)\n", pidTargetToString(pidTarget), pidSetpoint);
 }
 
@@ -863,6 +870,10 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       }
       preferences.putDouble("controlFanMin", controlFanMin);
       preferences.putDouble("controlFanMax", controlFanMax);
+      if (!doc["adrcFanControlEnabled"].isNull()) {
+        adrcFanControlEnabled = doc["adrcFanControlEnabled"].as<bool>();
+        preferences.putBool("adrcFanCtrl", adrcFanControlEnabled);
+      }
       if (!doc["pidEnabled"].isNull()) {
         bool nextPidEnabled = doc["pidEnabled"].as<bool>();
         if (pidEnabled != nextPidEnabled) {
@@ -1095,6 +1106,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidDelayHeater"] = pidDelayMeasureHeater;
       dataObj["controlFanMin"] = controlFanMin;
       dataObj["controlFanMax"] = controlFanMax;
+      dataObj["adrcFanControlEnabled"] = adrcFanControlEnabled;
       dataObj["adrcB0"] = adrcB0;
       dataObj["adrcW0"] = adrcW0;
       dataObj["adrcWc"] = adrcWc;
@@ -1188,6 +1200,7 @@ void onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client, AwsEventTyp
       dataObj["pidDelayHeater"] = pidDelayMeasureHeater;
       dataObj["controlFanMin"] = controlFanMin;
       dataObj["controlFanMax"] = controlFanMax;
+      dataObj["adrcFanControlEnabled"] = adrcFanControlEnabled;
       dataObj["adrcB0"] = adrcB0;
       dataObj["adrcW0"] = adrcW0;
       dataObj["adrcWc"] = adrcWc;
@@ -1292,6 +1305,7 @@ void setupMainLoop(AsyncWebSocket *ws) {
   adrcB0 = std::max(0.001, preferences.getDouble("adrcB0", 0.02));
   adrcW0 = std::max(0.1, preferences.getDouble("adrcW0", 1.0));
   adrcWc = std::max(0.05, preferences.getDouble("adrcWc", 0.25));
+  adrcFanControlEnabled = preferences.getBool("adrcFanCtrl", true);
   pidAutotuneRelayOutputLow = std::clamp(preferences.getDouble("pidAutoMin", 0.0), 0.0, 100.0);
   pidAutotuneRelayOutputHigh = std::clamp(preferences.getDouble("pidAutoMax", 60.0), 0.0, 100.0);
   pidDelayMeasureFan = std::clamp(preferences.getDouble("pidDelayFan", 50.0), 0.0, 100.0);
@@ -1437,8 +1451,10 @@ void updatePidControl() {
 
   if (adrcAutotuneActive) {
     const unsigned long elapsed = now - adrcAutotuneStartMs;
-    const double fanBaseline = std::clamp((controlFanMin + controlFanMax) * 0.5, controlFanMin, controlFanMax);
-    setFanSpeed(lround(fanBaseline));
+    if (adrcFanControlEnabled) {
+      const double fanBaseline = std::clamp((controlFanMin + controlFanMax) * 0.5, controlFanMin, controlFanMax);
+      setFanSpeed(lround(fanBaseline));
+    }
     if (elapsed < 10000) {
       setHeaterPower(0);
       adrcAutotuneBaselineSum += currentTemp;
@@ -1576,9 +1592,12 @@ void updatePidControl() {
     adrcLastCommand += PID_OUTPUT_SMOOTHING_ALPHA * (heaterCommand - adrcLastCommand);
     adrcLastCommand = std::clamp(adrcLastCommand, 0.0, 100.0);
 
-    const double fanSpan = std::max(0.0, controlFanMax - controlFanMin);
-    const double fanCommand = std::clamp(controlFanMin + ((100.0 - adrcLastCommand) / 100.0) * fanSpan, controlFanMin, controlFanMax);
-    setFanSpeed(lround(fanCommand));
+    if (adrcFanControlEnabled) {
+      const double fanSpan = std::max(0.0, controlFanMax - controlFanMin);
+      const double fanCommand =
+          std::clamp(controlFanMin + ((100.0 - adrcLastCommand) / 100.0) * fanSpan, controlFanMin, controlFanMax);
+      setFanSpeed(lround(fanCommand));
+    }
     setHeaterPower(lround(adrcLastCommand));
     pidPredictedTemp = adrcObserverZ1;
     pidCurrentTemp = currentTemp;

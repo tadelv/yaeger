@@ -56,6 +56,7 @@ export type YaegerMessage = {
   pidKdActive?: number;
   controlFanMin?: number;
   controlFanMax?: number;
+  adrcFanControlEnabled?: boolean;
   adrcB0?: number;
   adrcW0?: number;
   adrcWc?: number;
