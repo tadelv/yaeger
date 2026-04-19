@@ -19,6 +19,7 @@ export function AutotuneApp() {
   const [maxHeaterPwm, setMaxHeaterPwm] = useState(60);
   const [controlFanMin, setControlFanMin] = useState(30);
   const [controlFanMax, setControlFanMax] = useState(80);
+  const [adrcFanControlEnabled, setAdrcFanControlEnabled] = useState(true);
   const [delayFan, setDelayFan] = useState(50);
   const [delayHeater, setDelayHeater] = useState(60);
   const [processDelaySec, setProcessDelaySec] = useState(0);
@@ -37,6 +38,7 @@ export function AutotuneApp() {
   const autotuneStopRequested = useRef(false);
   const autotuneBoundsDirty = useRef(false);
   const controlFanBoundsDirty = useRef(false);
+  const adrcFanControlDirty = useRef(false);
   const delayInputsDirty = useRef(false);
   const adrcValuesDirty = useRef(false);
   const controlModeDirty = useRef(false);
@@ -161,6 +163,13 @@ export function AutotuneApp() {
         }
       }
     }
+    if (typeof lastMessage.adrcFanControlEnabled === "boolean") {
+      if (!adrcFanControlDirty.current) {
+        setAdrcFanControlEnabled(lastMessage.adrcFanControlEnabled);
+      } else if (lastMessage.adrcFanControlEnabled === adrcFanControlEnabled) {
+        adrcFanControlDirty.current = false;
+      }
+    }
     if (typeof lastMessage.pidDelayFan === "number" && typeof lastMessage.pidDelayHeater === "number") {
       if (!delayInputsDirty.current) {
         setDelayFan(lastMessage.pidDelayFan);
@@ -182,6 +191,7 @@ export function AutotuneApp() {
     wasAdrcAutotuneRunning.current = adrcAutotuneRunning;
   }, [
     adrcB0,
+    adrcFanControlEnabled,
     adrcW0,
     adrcWc,
     autotuneMode,
@@ -229,7 +239,7 @@ export function AutotuneApp() {
             Step autotune holds heat off for 10 seconds, applies a 60% heater step for 25 seconds, then estimates b0 from the fastest
             positive temperature slope.
           </p>
-          <p>The fan uses the automatic min/max range during tuning. The result appears in b0, w0, and wc below.</p>
+          <p>The fan can use the automatic min/max range during tuning. The result appears in b0, w0, and wc below.</p>
         </article>
       </div>
       <div class="controller-diagnostics">
@@ -302,6 +312,15 @@ export function AutotuneApp() {
             }}
           />
         </div>
+        <label>ADRC controls fan</label>
+        <input
+          type="checkbox"
+          checked={adrcFanControlEnabled}
+          onChange={(e) => {
+            adrcFanControlDirty.current = true;
+            setAdrcFanControlEnabled(e.currentTarget.checked);
+          }}
+        />
         <label>Min PWM</label>
         <input
           type="number"
@@ -395,6 +414,7 @@ export function AutotuneApp() {
               pidTuneMethod: method,
               controlFanMin: fanBounds.min,
               controlFanMax: fanBounds.max,
+              adrcFanControlEnabled,
               setpoint,
               pidAutotuneMin: minHeaterPwm,
               pidAutotuneMax: maxHeaterPwm,
@@ -440,6 +460,7 @@ export function AutotuneApp() {
               controlMode: "adrc",
               controlFanMin: fanBounds.min,
               controlFanMax: fanBounds.max,
+              adrcFanControlEnabled,
               adrcB0,
               adrcW0,
               adrcWc,
