@@ -1,15 +1,10 @@
 
-#include <Adafruit_NeoPixel.h>
-#include <ArduinoJson.h>
 #include <ESPAsyncWebServer.h>
 #include <ElegantOTA.h> //https://github.com/ayushsharma82/AsyncElegantOTA
 #include <LittleFS.h>
 
 #include "AsyncWebSocket.h"
 #include "CommandLoop.h"
-#include "HardwareSerial.h"
-#include "IPAddress.h"
-#include "WiFiType.h"
 #include "api.h"
 #include "config.h"
 #include "display.h"
@@ -17,20 +12,18 @@
 #include "heater.h"
 #include "logging.h"
 #include "sensors.h"
+#include "security.h"
 #include "wifi_setup.h"
 
-#define PIN 48
-Adafruit_NeoPixel pixels(1, PIN);
-// for ota
-const char *host = "esp32 Roaster";
 // Create AsyncWebServer object on port 80
 /*WebServer server(80);*/
 // Create a WebSocket object
 AsyncWebSocket ws("/ws");
 AsyncWebServer server(80);
-
-void setupSimulation(AsyncWebSocket *ws);
-void updateSimulation();
+constexpr unsigned long FAST_TICK_INTERVAL_MS = 10;
+unsigned long lastFastTickMs = 0;
+constexpr unsigned long DISPLAY_REFRESH_INTERVAL_MS = 1000;
+unsigned long lastDisplayRefreshMs = 0;
 
 unsigned long ota_progress_millis = 0;
 void onOTAStart() {
@@ -65,10 +58,6 @@ void setup(void) {
   Serial.begin(115200);
   delay(1000); // Take some time to open up the Serial Monitor
   startSensors();
-  pixels.begin();
-  pixels.clear();
-  pixels.setPixelColor(0, pixels.Color(5, 0, 0));
-  pixels.show();
 
   // Wait for connection
   setupWifi();
@@ -81,8 +70,10 @@ void setup(void) {
   server.serveStatic("/", LittleFS, "/").setDefaultFile("index.html");
   server.serveStatic("/settings", LittleFS, "/").setDefaultFile("index.html");
   server.serveStatic("/editor", LittleFS, "/").setDefaultFile("index.html");
+  server.serveStatic("/logs", LittleFS, "/").setDefaultFile("index.html");
 
-  ElegantOTA.begin(&server); // Start ElegantOTA
+  String adminSecret = getApiAdminSecret();
+  ElegantOTA.begin(&server, getApiAdminUsername(), adminSecret.c_str()); // Start ElegantOTA
   // ElegantOTA callbacks
   ElegantOTA.onStart(onOTAStart);
   ElegantOTA.onProgress(onOTAProgress);
@@ -99,18 +90,27 @@ void setup(void) {
 
   server.begin();
   log("HTTP server started");
-  pixels.clear();
-  pixels.setPixelColor(0, pixels.Color(0, 5, 0));
-  pixels.show();
 
   initFan();
   initHeater();
 }
 
 void loop(void) {
+  unsigned long now = millis();
   ElegantOTA.loop();
-  ws.cleanupClients();
-  delay(10);
-  takeReadings();
+  maintainWifiConnection();
+  if (now - lastFastTickMs >= FAST_TICK_INTERVAL_MS) {
+    lastFastTickMs = now;
+    ws.cleanupClients();
+    updateConnectionSafety(&ws);
+    takeReadings();
+    updateRoastHistory();
+    updatePidControl();
+  }
+  if (now - lastDisplayRefreshMs >= DISPLAY_REFRESH_INTERVAL_MS) {
+    lastDisplayRefreshMs = now;
+    updateDisplaySensorStatus();
+  }
   updateHeater();
+  yield();
 }

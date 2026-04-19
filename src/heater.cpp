@@ -8,6 +8,7 @@ void initHeater() {
 }
 
 static int heaterPower = 0;
+static bool heaterForcedOff = false;
 // Refresh period in milliseconds
 const unsigned long refreshPeriod = 1000; // 1 second (1000 milliseconds)
 const float powerLimitFactor = 0.9;
@@ -18,6 +19,9 @@ unsigned long onTime = 0;
 bool isSSROn = false;
 
 void setHeaterPower(int power) {
+  if (heaterForcedOff) {
+    power = 0;
+  }
   if (power < 0) {
     power = 0;
   } else if (power > 100) {
@@ -59,3 +63,15 @@ void updateHeater() {
 }
 
 int getHeaterPower() { return heaterPower / powerLimitFactor; }
+
+void setHeaterForcedOff(bool forcedOff) {
+  heaterForcedOff = forcedOff;
+  if (heaterForcedOff) {
+    heaterPower = 0;
+    onTime = 0;
+    isSSROn = false;
+    digitalWrite(HEATER_PIN, LOW);
+  }
+}
+
+bool isHeaterForcedOff() { return heaterForcedOff; }

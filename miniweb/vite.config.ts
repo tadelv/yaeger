@@ -1,6 +1,6 @@
-
-import { defineConfig } from 'vite';
-import { VitePWA } from 'vite-plugin-pwa';
+import preact from "@preact/preset-vite";
+import { defineConfig } from "vite";
+import packageJson from "./package.json";
 // This function gets the IP that the Development server will point to from `local.config.ts`.
 // To change your local IP create a file named `local.config.ts` in the same directory as vite.config.ts
 // And contents:
@@ -9,13 +9,17 @@ import { VitePWA } from 'vite-plugin-pwa';
 // export default localConfig;
 // -------------------------------------------------
 async function getDevelopmentIp() {
-  const defaultTargetIp = 'localhost';
+  const defaultTargetIp = "localhost";
   try {
-    const localConfig = await import('./local.config');
-    console.info(`Development server proxying to ${localConfig.default.targetIp}`);
+    const localConfig = await import("./local.config");
+    console.info(
+      `Development server proxying to ${localConfig.default.targetIp}`,
+    );
     return localConfig.default.targetIp;
   } catch (e) {
-    console.info(`Did not find local_config.ts file. IP will default to ${defaultTargetIp}`);
+    console.info(
+      `Did not find local_config.ts file. IP will default to ${defaultTargetIp}`,
+    );
     return defaultTargetIp;
   }
 }
@@ -24,71 +28,33 @@ async function getDevelopmentIp() {
 export default defineConfig(async () => ({
   server: {
     proxy: {
-      '/api': {
+      "/api": {
         target: `http://${await getDevelopmentIp()}`,
         changeOrigin: true,
         secure: false,
       },
-      '/ws': {
+      "/ws": {
         target: `ws://${await getDevelopmentIp()}`,
         ws: true,
         changeOrigin: true,
         secure: false,
       },
     },
-    host: 'localhost',
+    host: "localhost",
     port: 3000,
   },
+  define: {
+    __APP_VERSION__: JSON.stringify(packageJson.version),
+    __BUILD_TIMESTAMP__: JSON.stringify(new Date().toISOString()),
+  },
   plugins: [
-    // react(),
+    preact(),
     // viteTsconfigPaths(),
     // svgrPlugin(),
     // viteCompression(),
-
-    VitePWA({
-      registerType: 'autoUpdate',
-    //   workbox: {
-    //     clientsClaim: true,
-    //     skipWaiting: true,
-    //   },
-      manifest: {
-        short_name: 'Yaeger',
-        name: 'Yaeger web interface',
-        protocol_handlers: [
-          {
-            protocol: 'web+http',
-            url: '/',
-          },
-        ],
-        icons: [
-          {
-            src: 'favicon.png',
-            sizes: '64x64 32x32 24x24 16x16',
-            type: 'image/png',
-          },
-          {
-            src: 'logo.png',
-            sizes: 'any',
-            type: 'image/png',
-          },
-          {
-            src: 'splash.png',
-            sizes: 'any',
-            type: 'image/png',
-          },
-        ],
-        start_url: '/',
-        display: 'standalone',
-        theme_color: '#000000',
-        background_color: '#ffffff',
-      },
-      manifestFilename: 'manifest.json',
-      injectRegister: null, // Disable SW registration for now
-      // registerType: 'autoUpdate',
-    }),
   ],
   build: {
-    outDir: '../data',
+    outDir: "../data",
     emptyOutDir: true,
   },
 }));

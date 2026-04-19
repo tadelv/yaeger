@@ -58,11 +58,76 @@ You can also control Yaeger from its own web interface without an app. Just poin
 your home wifi, or `192.168.4.1` if Yaeger creates its own access point.
 ![yaeger webui](./assets/yaeger-webui.png)
 
+The web UI now includes a **Version & Network Info** section that shows the Web UI version/build timestamp and device firmware/network details (mode, SSID, IP, hostname) so you can quickly check when the currently loaded build was last updated.
+
+### Frontend status
+
+- `miniweb` (TypeScript + Vite) is the **only supported** web UI in this repository.
+- The old `webserver` Svelte/Rollup frontend and related legacy files have been removed.
+- Project scripts and firmware asset packaging target `miniweb`.
+
 #### Using Yaeger on the go
 
 If Yaeger can't connect to your preferred Wifi, it will create its own access point. Perfect for when out and about :grin:
 
 ## Build guide (WIP)
+
+## What changed in this fork
+
+If you are reviewing this fork before opening a PR against `tadelv/yaeger`, here is the practical summary:
+
+* `miniweb` is now the canonical frontend (TypeScript + Vite). Legacy `webserver` content is gone.
+* OTA uploads are now aligned with ElegantOTA (`/update`) and no longer depend on PlatformIO `espota`.
+* A one-command OTA flow (`ota_update_all.sh`) now updates both LittleFS web assets and firmware in one run.
+* OTA tooling is isolated in a local Python virtual environment (`.ota-venv`) to avoid polluting global Python installs.
+* GitHub Actions build flow now supports PR validation and avoids publish failures on forks/non-upstream repos.
+
+## Installation / update flows
+
+There are now two recommended paths depending on how you connect to your board:
+
+### 1) USB flash (first-time install or recovery)
+
+Use this when the device is connected over USB serial:
+
+```bash
+./build_and_flash.sh s3
+# or
+./build_and_flash.sh s3-mini
+```
+
+What it does:
+1. installs frontend dependencies with `npm ci`,
+2. builds `miniweb`,
+3. optionally erases flash,
+4. uploads LittleFS (`buildfs` + `uploadfs`),
+5. uploads firmware (`upload`).
+
+### 2) OTA update (already deployed device on network)
+
+Use this once the device is reachable over Wi-Fi and ElegantOTA is available:
+
+```bash
+./ota_update_all.sh s3
+# or
+./ota_update_all.sh s3-mini
+```
+
+What it does:
+1. creates/reuses `.ota-venv`,
+2. installs OTA dependencies in that venv (`platformio`, `littlefs-python`, `fatfs-ng`, `pyyaml`),
+3. builds `miniweb`,
+4. uploads LittleFS image over ElegantOTA,
+5. uploads firmware over ElegantOTA.
+
+If your device requires OTA credentials, set:
+
+```bash
+export YAEGER_OTA_USERNAME=admin
+export YAEGER_OTA_PASSWORD='your-password'
+```
+
+(`YAEGER_OTA_USERNAME` defaults to `admin` if omitted.)
 
 ### Schema
 
@@ -76,12 +141,42 @@ Courtesy of [@dlisec](https://github.com/dlisec)
 
 A build script has been provided by [@matthew73210](https://github.com/matthew73210), so to get up and running on the
 ESP, just run `./build_and_flash.sh`. Make sure to read the comments in the script. But also in the platformio.ini and choose the right board
+Yaeger OTA in this project is provided by the web-based ElegantOTA handler (`/update`) and not the PlatformIO `espota`
+upload protocol.
+
+For VS Code + PlatformIO uploads via ElegantOTA, use one of these environments:
+
+* `esp32-s3-elegantota`
+* `esp32-s3-mini-elegantota`
+
+These use a custom PlatformIO upload script that sends the built firmware to `http://yaeger.local/update` through the
+same ElegantOTA mechanism used by the device web UI.
+
+For a **single-command OTA update of the whole project** (frontend files + firmware), run:
+
+```bash
+./ota_update_all.sh s3
+# or
+./ota_update_all.sh s3-mini
+```
+
+This builds `miniweb`, then runs OTA in two explicit steps: (1) upload LittleFS (`buildfs` + `uploadfs`) and (2) upload firmware (`upload`). The script creates and uses a local Python virtual environment (`.ota-venv`), installs required OTA dependencies (`platformio`, `littlefs-python`, `fatfs-ng`, `pyyaml`), and auto-retries if PlatformIO reports missing Python modules.
+
+For local frontend builds, use npm from `miniweb`:
+
+```bash
+cd miniweb
+npm ci
+npm run build
+```
 
 ## Latest features
 
 ### PID
 
 PID temp follower, set the temperature setpoint and the PID controller will try and follow. You'll need to find your own PID values
+
+A controller review with alternatives (including MPC/LQR and fan min/max envelope design) is available at `docs/control_strategy_review_2026-04-14.md` (current recommendation: ADRC as primary advanced controller, with an ADRC autotune workflow proposal).
 
 ### Profile
 
