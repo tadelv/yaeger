@@ -38,7 +38,7 @@
 #define DISPLAY_CL 42
 #endif
 
-#define DEBUG
+#define DEBUG false
 
 
 // DEVICE PARAMETERS

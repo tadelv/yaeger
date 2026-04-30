@@ -20,6 +20,7 @@
 Adafruit_NeoPixel pixels(1, PIN);
 Control *control;
 Preferences preferences;
+WSRequestHandler *wsHandler;
 // for ota
 const char *host = "esp32 Roaster";
 // Create AsyncWebServer object on port 80
@@ -99,7 +100,7 @@ void setup() {
   );
 
   // WebSocket handler
-  new WSRequestHandler(&ws, control, &preferences);
+  wsHandler = new WSRequestHandler(&ws, control, &preferences);
 
   server.addHandler(&ws);
 
@@ -118,6 +119,7 @@ void loop() {
   ws.cleanupClients();
   delay(10);
   control->loop();
+  wsHandler->loop();
   if (control->hasAutotuneResults()) {
     preferences.putFloat(pidPKey, control->getKp());
     preferences.putFloat(pidIKey, control->getKi());

@@ -5,13 +5,17 @@
 #include <cmath>
 #include <cstring>
 #include <Preferences.h>
+
+#include "config.h"
 #include "preferenceKeys.h"
 
 WSRequestHandler::WSRequestHandler(AsyncWebSocket *ws, Control *control, Preferences *preferences) {
   using namespace std::placeholders;
   this->control = control;
   this->preferences = preferences;
-  ws->onEvent(std::bind(&WSRequestHandler::onWsEvent, this, _1, _2, _3, _4, _5, _6));
+  this->_lastUpdate = 0;
+  this->ws = ws;
+  this->ws->onEvent(std::bind(&WSRequestHandler::onWsEvent, this, _1, _2, _3, _4, _5, _6));
 }
 
 void WSRequestHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *client,
@@ -67,20 +71,20 @@ void WSRequestHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 
       if (!doc["BurnerVal"].isNull()) {
         auto val = doc["BurnerVal"].as<float>();
-        logf("BurnerVal: %6.1lf\n", val);
+        if (DEBUG) logf("BurnerVal: %6.1lf\n", val);
         // DimmerVal = doc["BurnerVal"].as<long>();
         control->setHeater(val);
       }
 
       if (!doc["Setpoint"].isNull()) {
         auto setpoint = doc["Setpoint"].as<float>();
-        logf("Setpoint: %6.1lf\n", setpoint);
+        if (DEBUG) logf("Setpoint: %6.1lf\n", setpoint);
         control->setSetpoint(setpoint);
       }
 
       if (!doc["FanVal"].isNull()) {
         auto fanVal = doc["FanVal"].as<float>();
-        logf("FanVal: %6.1lf\n", fanVal);
+        if (DEBUG) logf("FanVal: %6.1lf\n", fanVal);
         control->setFan(fanVal);
       }
 
@@ -95,12 +99,12 @@ void WSRequestHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
       const char *command = doc["command"].as<const char *>();
       if (command != nullptr && strncmp(command, "setBurner", 9) == 0) {
         auto val = doc["value"].as<float>();
-        logf("BurnerVal: %d\n", val);
+        if (DEBUG) logf("BurnerVal: %d\n", val);
         control->setHeater(val);
       }
       if (command != nullptr && strncmp(command, "setFan", 6) == 0) {
         auto val = doc["value"].as<float>();
-        logf("FanVal: %d\n", val);
+        if (DEBUG) logf("FanVal: %d\n", val);
         control->setFan(val);
       }
 
@@ -122,15 +126,15 @@ void WSRequestHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
 
         if (!doc["cooldownFanSpeed"].isNull()) {
           long cooldownFanSpeed = doc["cooldownFanSpeed"].as<long>();
-          logf("cooldownFanSpeed: %d\n", cooldownFanSpeed);
+          if (DEBUG) logf("cooldownFanSpeed: %d\n", cooldownFanSpeed);
           preferences->putLong(coolingFanKey, cooldownFanSpeed);
         }
 
 
         if (!doc["wifiSsid"].isNull() && !doc["wifiPass"].isNull()) {
-          log("Wifi Credentials found, saving...");
+          if (DEBUG) log("Wifi Credentials found, saving...");
           String wifiSSID = doc["wifiSsid"];
-          log(wifiSSID.c_str());
+          if (DEBUG) log(wifiSSID.c_str());
           preferences->putString(wifiSSIDKey, wifiSSID);
           String wifiPass = doc["wifiPass"];
           log(wifiPass.c_str());
@@ -150,37 +154,49 @@ void WSRequestHandler::onWsEvent(AsyncWebSocket *server, AsyncWebSocketClient *c
         resultData["pidKi"] = preferences->getFloat(pidIKey, 0.1);
         resultData["pidKd"] = preferences->getFloat(pidDKey, 0.01);
         resultData["cooldownFanSpeed"] = preferences->getLong(coolingFanKey, 65);
+
+        char buffer[200]; // create temp buffer
+        serializeJson(doc, buffer); // serialize to buffer
+        // DEBUG WEBSOCKET
+        if (DEBUG) log(buffer);
+
+        client->text(buffer);
       }
-
-      if (command != nullptr && strncmp(command, "getData", 7) == 0) {
-        JsonObject root = doc.to<JsonObject>();
-        JsonObject resultData = root["data"].to<JsonObject>();
-        root["id"] = ln_id;
-
-        resultData["type"] = "status";
-        resultData["ET"] = control->getExhaustTemp();
-        resultData["BT"] = control->getBeanTemp();
-        resultData["Amb"] = control->getAmbientTemp();
-        resultData["BurnerVal"] = control->getHeater();
-        resultData["Setpoint"] = control->getSetpoint();
-        resultData["Target"] = control->getTemperatureTarget();
-        resultData["Mode"] = modeToChar(control->getMode());
-        resultData["FanVal"] = control->getFan();
-        resultData["pidKp"] = control->getKp();
-        resultData["pidKi"] = control->getKi();
-        resultData["pidKd"] = control->getKd();
-      }
-
-      char buffer[200]; // create temp buffer
-      serializeJson(doc, buffer); // serialize to buffer
-      // DEBUG WEBSOCKET
-      log(buffer);
-
-      client->text(buffer);
     }
     break;
     default:
       logf("unhandled message type: %d\n", type);
       break;
   }
+}
+
+
+void WSRequestHandler::loop() {
+  if (millis() - _lastUpdate < 100)
+    return; // Max update frequency 100ms
+
+  JsonDocument doc;
+  JsonObject root = doc.to<JsonObject>();
+  JsonObject resultData = root["data"].to<JsonObject>();
+
+  resultData["type"] = "status";
+  resultData["ET"] = control->getExhaustTemp();
+  resultData["BT"] = control->getBeanTemp();
+  resultData["Amb"] = control->getAmbientTemp();
+  resultData["BurnerVal"] = control->getHeater();
+  resultData["Setpoint"] = control->getSetpoint();
+  resultData["Target"] = control->getTemperatureTarget();
+  resultData["Mode"] = modeToChar(control->getMode());
+  resultData["FanVal"] = control->getFan();
+  resultData["pidKp"] = control->getKp();
+  resultData["pidKi"] = control->getKi();
+  resultData["pidKd"] = control->getKd();
+
+  char buffer[300]; // create temp buffer
+  serializeJson(doc, buffer); // serialize to buffer
+  // DEBUG WEBSOCKET
+  if (DEBUG) log(buffer);
+
+  this->ws->textAll(buffer);
+  this->_lastUpdate = millis();
 }
